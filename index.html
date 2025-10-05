@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Scream Collector — Home</title>
+<style>
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#111;color:#eee}
+  header{padding:24px;text-align:center}
+  .actions{margin-top:8px}
+  button,a.btn{background:crimson;color:#fff;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;text-decoration:none}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;padding:16px;max-width:1100px;margin:0 auto}
+  .card{background:#1c1c1c;border-radius:10px;overflow:hidden}
+  .thumb{height:160px;background:#222;display:flex;align-items:center;justify-content:center}
+  .thumb img{max-width:100%;max-height:100%}
+  .meta{padding:10px}
+  .owner{display:flex;align-items:center;gap:8px;opacity:.8;font-size:12px;margin-top:4px}
+  .ava{width:20px;height:20px;border-radius:50%;background:#333;display:inline-block;overflow:hidden}
+  .ava img{width:100%;height:100%;object-fit:cover;display:block}
+  form#userSearch{margin:14px auto 0; max-width:480px; display:flex; gap:8px; justify-content:center}
+  #q{flex:1; padding:10px; border-radius:6px; border:1px solid #333; background:#222; color:#eee}
+  #qbtn{padding:10px 16px; background:#444; color:#fff; border:none; border-radius:6px; cursor:pointer}
+</style>
+</head>
+<body>
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+
+<header>
+  <h1>Scream Collector</h1>
+  <div class="actions">
+    <a class="btn" id="loginBtn" href="login.html">Login / Sign up</a>
+    <a class="btn" id="myPortfolio" href="portfolio.html" style="display:none">My Portfolio</a>
+    <a class="btn" id="createBtn" href="create.html" style="display:none">Add Item</a>
+    <a class="btn" href="settings.html" style="display:none" id="settingsBtn">Settings</a>
+  </div>
+
+  <form id="userSearch">
+    <input id="q" type="text" placeholder="Search users by name…">
+    <button id="qbtn">Search</button>
+  </form>
+</header>
+
+<main class="grid" id="items"></main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+
+document.getElementById('userSearch').addEventListener('submit', e=>{
+  e.preventDefault();
+  const q = document.getElementById('q').value.trim();
+  if (q) location.href = 'users.html?q=' + encodeURIComponent(q);
+});
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  document.getElementById('loginBtn').style.display = session ? 'none':'inline-block';
+  document.getElementById('myPortfolio').style.display = session ? 'inline-block':'none';
+  document.getElementById('createBtn').style.display = session ? 'inline-block':'none';
+  document.getElementById('settingsBtn').style.display = session ? 'inline-block':'none';
+
+  const { data, error } = await sb
+    .from('items')
+    .select('id,title,user_value,image_url,created_at,owner_id,profiles:owner_id(username,avatar_url)')
+    .order('created_at', { ascending:false })
+    .limit(24);
+
+  const list = document.getElementById('items');
+  if (error){ list.innerHTML = '<p style="grid-column:1/-1">Error loading items.</p>'; return; }
+  if (!data || data.length===0){ list.innerHTML = '<p style="grid-column:1/-1">No items yet. Sign in and add one!</p>'; return; }
+
+  list.innerHTML = data.map(it => {
+    const ava = it.profiles?.avatar_url
+      ? `<span class="ava"><img src="${it.profiles.avatar_url}" alt=""></span>`
+      : `<span class="ava"></span>`;
+    return `
+      <a class="card" href="item.html?id=${it.id}" style="color:inherit;text-decoration:none">
+        <div class="thumb">${it.image_url ? `<img src="${it.image_url}" alt="">` : 'No image'}</div>
+        <div class="meta">
+          <div><strong>${it.title}</strong></div>
+          <div class="owner">${ava}<span>@${it.profiles?.username || 'user'}</span></div>
+          <div>$${(it.user_value||0).toLocaleString()}</div>
+        </div>
+      </a>
+    `;
+  }).join('');
+})();
+</script>
+</body>
+</html>

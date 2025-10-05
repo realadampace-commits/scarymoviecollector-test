@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>User — Scream Collector</title>
+<style>
+  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px}
+  a{color:#9ecbff;text-decoration:none}
+  .muted{opacity:.75}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:16px}
+  .card{background:#1c1c1c;border-radius:10px;overflow:hidden}
+  .thumb{height:160px;background:#222;display:flex;align-items:center;justify-content:center}
+  .thumb img{max-width:100%;max-height:100%}
+  .meta{padding:10px}
+  .userHead{display:flex;align-items:center;gap:12px}
+  .ava{width:56px;height:56px;border-radius:50%;background:#333;overflow:hidden;flex:0 0 auto}
+  .ava img{width:100%;height:100%;object-fit:cover;display:block}
+  .roleTag{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:12px;vertical-align:middle}
+  .role-free{background:#333;color:#ddd}
+  .role-subscriber{background:#2a6;color:#fff}
+  .role-moderator{background:#c33;color:#fff}
+  .sectionHead{display:flex;align-items:center;justify-content:space-between;margin-top:20px}
+  .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;text-decoration:none}
+</style>
+</head>
+<body>
+<!-- Shared menu component -->
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+
+<div class="wrap">
+  <a href="users.html">← Back to Search</a>
+
+  <div class="userHead" style="margin-top:10px">
+    <span class="ava" id="uAva"></span>
+    <div>
+      <h2 id="title" style="margin:0">Loading…</h2>
+      <div id="roleTagWrap" style="margin:4px 0 0"></div>
+      <p id="bio" class="muted" style="margin:4px 0 0"></p>
+    </div>
+  </div>
+
+  <!-- Moderator panel (only if viewer is moderator and viewing someone else) -->
+  <div id="modPanel" class="card" style="display:none; margin-top:16px; padding:12px; background:#261e1e; border:1px solid #532;">
+    <h3 style="margin:0 0 10px">Moderator Controls</h3>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <label>Role:
+        <select id="roleSelect">
+          <option value="free">free</option>
+          <option value="subscriber">subscriber</option>
+          <option value="moderator">moderator</option>
+        </select>
+      </label>
+      <button id="saveRole" class="btn" style="background:#c33">Save Role</button>
+      <span id="roleMsg" class="muted"></span>
+    </div>
+  </div>
+
+  <!-- Showcase -->
+  <div id="showcase"></div>
+
+  <!-- Portfolio preview / full list -->
+  <div class="sectionHead">
+    <h3 style="margin:0" id="portfolioHeading">Recent Uploads</h3>
+    <a id="portfolioToggle" class="btn" href="#">View full portfolio</a>
+  </div>
+  <div id="items" class="grid"></div>
+  <div id="empty" class="muted" style="margin-top:12px; display:none">No items yet.</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+
+const qs = new URLSearchParams(location.search);
+const uname = qs.get('u');
+const showAll = qs.get('all') === '1';
+
+const itemsEl = document.getElementById('items');
+const emptyEl = document.getElementById('empty');
+const showcaseEl = document.getElementById('showcase');
+const titleEl = document.getElementById('title');
+const bioEl = document.getElementById('bio');
+const roleTagWrap = document.getElementById('roleTagWrap');
+const uAva = document.getElementById('uAva');
+const portfolioToggle = document.getElementById('portfolioToggle');
+const portfolioHeading = document.getElementById('portfolioHeading');
+
+(async function loadProfile(){
+  if (!uname){ titleEl.textContent = 'User not found'; return; }
+
+  // Load the profile by username
+  const { data: profile, error: pErr } = await sb
+    .from('profiles')
+    .select('id, username, avatar_url, bio, showcase_ids, role')
+    .eq('username', uname)
+    .maybeSingle();
+
+  if (pErr || !profile){ titleEl.textContent = 'User not found'; return; }
+
+  titleEl.textContent = '@' + profile.username;
+  bioEl.textContent = profile.bio || '';
+
+  if (profile.avatar_url) uAva.innerHTML = `<img src="${profile.avatar_url}" alt="">`;
+
+  // Role badge
+  const role = profile.role || 'free';
+  const roleClass = role === 'moderator' ? 'role-moderator' : role === 'subscriber' ? 'role-subscriber' : 'role-free';
+  roleTagWrap.innerHTML = `<span class="roleTag ${roleClass}">${role}</span>`;
+
+  // Portfolio toggle link (same page, toggles ?all=1)
+  portfolioHeading.textContent = showAll ? 'All Items' : 'Recent Uploads';
+  portfolioToggle.textContent = showAll ? 'Show last 5' : 'View full portfolio';
+  const newQs = new URLSearchParams(qs);
+  if (showAll) { newQs.delete('all'); } else { newQs.set('all','1'); }
+  portfolioToggle.href = 'user.html?' + newQs.toString();
+
+  // Moderator panel visibility
+  const { data: sess } = await sb.auth.getSession();
+  const viewer = sess?.session?.user || null;
+  let viewerRole = null;
+  if (viewer) {
+    const { data: vp } = await sb.from('profiles').select('role').eq('id', viewer.id).maybeSingle();
+    viewerRole = vp?.role || 'free';
+  }
+  if (viewerRole === 'moderator' && viewer?.id !== profile.id) {
+    showModPanel(profile);
+  }
+
+  // Showcase: if there are showcase_ids, fetch those items
+  if (profile.showcase_ids && profile.showcase_ids.length) {
+    const { data: showcaseItems, error: sErr } = await sb
+      .from('items')
+      .select('id,title,image_url,user_value')
+      .in('id', profile.showcase_ids)
+      .limit(5);
+    if (!sErr && showcaseItems?.length) {
+      showcaseEl.innerHTML = `
+        <h3 style="margin-top:20px;margin-bottom:0">Showcase</h3>
+        <div class="grid" style="margin-top:12px">
+          ${showcaseItems.map(it=>`
+            <a class="card" href="item.html?id=${it.id}" style="color:inherit;text-decoration:none">
+              <div class="thumb">${it.image_url ? `<img src="${it.image_url}" alt="">` : 'No image'}</div>
+              <div class="meta"><strong>${it.title}</strong><br>$${(it.user_value||0).toLocaleString()}</div>
+            </a>
+          `).join('')}
+        </div>`;
+    }
+  }
+
+  // Portfolio preview (last 5) or full list
+  await loadPortfolioItems(profile.id, showAll);
+})();
+
+async function loadPortfolioItems(ownerId, all) {
+  const q = sb.from('items')
+    .select('id,title,user_value,image_url,created_at')
+    .eq('owner_id', ownerId)
+    .order('created_at', { ascending:false });
+
+  if (!all) q.limit(5);
+
+  const { data: items, error } = await q;
+  if (error) {
+    console.error('Items load error:', error);
+    itemsEl.innerHTML = '<div class="muted">Error loading items.</div>';
+    return;
+  }
+
+  if (!items || items.length === 0) {
+    emptyEl.style.display = 'block';
+    itemsEl.innerHTML = '';
+    return;
+  }
+
+  emptyEl.style.display = 'none';
+  itemsEl.innerHTML = items.map(it => `
+    <a class="card" href="item.html?id=${it.id}" style="color:inherit;text-decoration:none">
+      <div class="thumb">${it.image_url ? `<img src="${it.image_url}" alt="">` : 'No image'}</div>
+      <div class="meta">
+        <strong>${it.title}</strong><br>$${(it.user_value||0).toLocaleString()}
+      </div>
+    </a>
+  `).join('');
+}
+
+function showModPanel(profile) {
+  const modPanel = document.getElementById('modPanel');
+  const roleSelect = document.getElementById('roleSelect');
+  const roleMsg = document.getElementById('roleMsg');
+
+  modPanel.style.display = 'block';
+  roleSelect.value = profile.role || 'free';
+
+  document.getElementById('saveRole').onclick = async () => {
+    const newRole = roleSelect.value;
+    const { error } = await sb.from('profiles').update({ role: newRole }).eq('id', profile.id);
+    roleMsg.textContent = error ? ('Error: ' + error.message) : 'Saved!';
+    if (!error) setTimeout(()=>location.reload(), 500);
+  };
+}
+</script>
+</body>
+</html>

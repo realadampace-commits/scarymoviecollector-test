@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Item — Scream Collector</title>
+<style>
+  :root{--bg:#111;--ink:#eee;--panel:#1c1c1c;--muted:#a9adb4;--accent:#dc143c}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink)}
+  a{color:#9ecbff;text-decoration:none}
+  .wrap{max-width:980px;margin:0 auto;padding:24px}
+  .head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;text-decoration:none}
+  .grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
+  .card{background:var(--panel);border-radius:12px;padding:16px}
+  .imgbox{background:#222;border-radius:10px;min-height:320px;display:flex;align-items:center;justify-content:center}
+  .imgbox img{max-width:100%;max-height:520px;display:block}
+  .value{font-size:28px;font-weight:800;margin:6px 0 10px}
+  .muted{color:var(--muted);font-size:14px}
+  .ownerRow{display:flex;align-items:center;gap:10px;opacity:.9}
+  .ava{width:28px;height:28px;border-radius:50%;background:#333;overflow:hidden}
+  .ava img{width:100%;height:100%;object-fit:cover;display:block}
+  .ownerControls{margin-top:12px;display:flex;gap:10px}
+  @media (max-width:900px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<!-- Shared menu -->
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+
+<div class="wrap">
+  <div class="head">
+    <a href="index.html">← Home</a>
+    <div style="display:flex;gap:8px">
+      <a class="btn" href="users.html" style="background:#444">Find Users</a>
+      <a class="btn" href="portfolio.html" id="myLink" style="display:none">My Portfolio</a>
+    </div>
+  </div>
+
+  <h1 id="title">Loading…</h1>
+  <div id="owner" class="ownerRow"><span class="ava"></span><span class="muted">—</span></div>
+
+  <div class="grid" style="margin-top:12px">
+    <div class="card imgbox">
+      <img id="img" alt="Item image" style="display:none"/>
+      <div id="imgFallback">No image</div>
+    </div>
+    <div class="card">
+      <div class="muted">Current Value</div>
+      <div class="value">$<span id="value">0</span></div>
+
+      <div class="muted" style="margin-top:8px">Description</div>
+      <p id="desc" style="margin-top:6px;line-height:1.5"></p>
+
+      <div class="muted" style="margin-top:12px" id="created">—</div>
+
+      <div class="ownerControls" id="ownerControls" style="display:none">
+        <button class="btn" id="editBtn" style="background:#444">Edit</button>
+        <button class="btn" id="deleteBtn" style="background:#c33">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notfound" class="card" style="display:none;margin-top:16px">
+    Item not found. It may have been deleted or the link is incorrect.
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+
+const qs = new URLSearchParams(location.search);
+const itemId = qs.get('id');
+
+const titleEl = document.getElementById('title');
+const ownerEl = document.getElementById('owner');
+const imgEl   = document.getElementById('img');
+const imgFallback = document.getElementById('imgFallback');
+const valueEl = document.getElementById('value');
+const descEl  = document.getElementById('desc');
+const createdEl = document.getElementById('created');
+const myLink = document.getElementById('myLink');
+const notfound = document.getElementById('notfound');
+const ownerControls = document.getElementById('ownerControls');
+
+let currentUserId = null;
+let itemOwnerId = null;
+
+(async function load(){
+  const { data:{ session } } = await sb.auth.getSession();
+  currentUserId = session?.user?.id || null;
+  if (session) myLink.style.display = 'inline-block';
+
+  if (!itemId){
+    titleEl.textContent = 'Item not found';
+    notfound.style.display = 'block';
+    return;
+  }
+
+  // Load item + owner profile (avatar, username)
+  const { data: item, error } = await sb
+    .from('items')
+    .select('id,title,description,user_value,image_url,created_at,owner_id,profiles:owner_id(username,avatar_url)')
+    .eq('id', itemId)
+    .maybeSingle();
+
+  if (error || !item){
+    console.error('Item load error:', error);
+    titleEl.textContent = 'Item not found';
+    notfound.style.display = 'block';
+    return;
+  }
+
+  // Render content
+  titleEl.textContent = item.title || 'Untitled Item';
+  const avaHtml = item.profiles?.avatar_url
+    ? `<span class="ava"><img src="${item.profiles.avatar_url}" alt=""></span>`
+    : `<span class="ava"></span>`;
+  const uname = item.profiles?.username || 'user';
+  ownerEl.innerHTML = `${avaHtml}<span>Owned by <a href="user.html?u=${encodeURIComponent(uname)}">@${uname}</a></span>`;
+
+  valueEl.textContent = (item.user_value || 0).toLocaleString();
+  descEl.textContent = item.description || 'No description.';
+  createdEl.textContent = 'Created: ' + new Date(item.created_at).toLocaleString();
+
+  if (item.image_url){
+    imgEl.src = item.image_url;
+    imgEl.style.display = 'block';
+    imgFallback.style.display = 'none';
+  }
+
+  itemOwnerId = item.owner_id;
+
+  // Owner or Moderator can manage
+  let isMod = false;
+  if (currentUserId) {
+    const { data: myProfile } = await sb.from('profiles').select('role').eq('id', currentUserId).maybeSingle();
+    isMod = myProfile?.role === 'moderator';
+  }
+  if (currentUserId && (itemOwnerId === currentUserId || isMod)) {
+    ownerControls.style.display = 'flex';
+  }
+})();
+
+// Actions
+document.getElementById('editBtn')?.addEventListener('click', ()=>{
+  location.href = 'edit.html?id=' + itemId;
+});
+
+document.getElementById('deleteBtn')?.addEventListener('click', async ()=>{
+  if (!confirm('Are you sure you want to delete this item?')) return;
+  const { error } = await sb.from('items').delete().eq('id', itemId);
+  if (error){ alert('Delete failed: ' + error.message); return; }
+  alert('Item deleted.');
+  location.href = 'portfolio.html';
+});
+</script>
+</body>
+</html>

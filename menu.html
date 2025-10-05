@@ -1,0 +1,18 @@
+<!-- /menu.html -->
+<nav class="menu">
+  <button class="hamburger" aria-expanded="false" aria-controls="drawer" aria-label="Open menu">☰</button>
+
+  <aside id="drawer" class="drawer" hidden>
+    <ul>
+      <!-- Always visible -->
+      <li class="only-guest"><a href="login.html"><span class="ico">🔑</span> Log in / Sign up</a></li>
+
+      <!-- Only when logged in -->
+      <li class="only-auth"><a href="users.html"><span class="ico">👤</span> Users</a></li>
+      <li class="only-auth"><a href="portfolio.html"><span class="ico">👜</span> My Portfolio</a></li>
+      <li class="only-auth"><a href="create.html"><span class="ico">➕</span> Add Item</a></li>
+      <li class="only-auth"><a href="settings.html"><span class="ico">⚙️</span> Settings</a></li>
+      <li class="only-auth"><a href="#" id="logoutLink"><span class="ico">🚪</span> Logout</a></li>
+    </ul>
+  </aside>
+</nav>

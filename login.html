@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Login — Scream Collector</title>
+<style>
+  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif;display:grid;place-items:center;height:100vh}
+  .box{background:#1c1c1c;border-radius:10px;padding:24px;width:340px}
+  input,button{width:100%;padding:10px;margin-top:8px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
+  button{border:none;background:crimson;cursor:pointer}
+  .alt{background:#444}
+  .msg{margin-top:8px;font-size:14px;white-space:pre-wrap}
+  a{color:#9ecbff;text-decoration:none}
+  .small{opacity:.75;font-size:12px;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="box">
+  <h2>Sign in / Sign up</h2>
+
+  <input id="email" type="email" placeholder="Email"/>
+  <input id="password" type="password" placeholder="Password (min 6)"/>
+  <button id="signup">Sign up with Email</button>
+  <button id="signin" class="alt">Sign in with Email</button>
+
+  <div id="msg" class="msg"></div>
+  <div class="small">After signing in you’ll be redirected to your <a href="portfolio.html">portfolio</a>.</div>
+  <div id="diag" class="small"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+
+const emailEl = document.getElementById('email');
+const passEl  = document.getElementById('password');
+const msgEl   = document.getElementById('msg');
+
+const btnSignup = document.getElementById('signup');  // ✅ matches your HTML
+const btnLogin  = document.getElementById('signin');   // ✅ matches your HTML
+
+const setMsg = (t, cls='') => { msgEl.className = 'msg ' + cls; msgEl.textContent = t; };
+const disableAll = (on) => {
+  [btnSignup, btnLogin, emailEl, passEl].forEach(el => el && (el.disabled = on));
+};
+
+// optional: support ?next=/somepage.html (default to portfolio)
+const qs = new URLSearchParams(location.search);
+const nextUrl = qs.get('next') || 'portfolio.html';
+
+function isAlreadyRegistered(err) {
+  if (!err) return false;
+  const m = (err.message || '').toLowerCase();
+  return err.status === 422 || m.includes('already registered') || m.includes('user already registered');
+}
+
+// If already signed in, bounce to nextUrl
+(async () => {
+  try {
+    const { data:{ session } } = await sb.auth.getSession();
+    if (session) {
+      setMsg('You are signed in. Redirecting…', 'ok');
+      setTimeout(()=> location.href = nextUrl, 400);
+    }
+  } catch(e){ console.warn('getSession error:', e); }
+})();
+
+// SIGN UP
+btnSignup.addEventListener('click', async () => {
+  const email = emailEl.value.trim();
+  const password = passEl.value;
+  if (!email || !password) return setMsg('Email & password required', 'err');
+
+  // simple cooldown (avoid double-click spam)
+  const last = Number(localStorage.getItem('last_signup_ts') || '0');
+  if (Date.now() - last < 3000) return setMsg('Please wait a couple seconds and try again.', 'err');
+
+  disableAll(true);
+  setMsg('Creating account…');
+
+  try {
+    const { error } = await sb.auth.signUp({ email, password });
+    if (error) {
+      return setMsg(isAlreadyRegistered(error)
+        ? 'That email is already registered. Try signing in.'
+        : 'Sign up error: ' + error.message, 'err');
+    }
+    setMsg('Check your email to confirm your account.', 'ok');
+  } catch (e) {
+    setMsg('Sign up error: ' + (e?.message || e), 'err');
+  } finally {
+    localStorage.setItem('last_signup_ts', String(Date.now()));
+    disableAll(false);
+  }
+});
+
+// SIGN IN
+btnLogin.addEventListener('click', async () => {
+  const email = emailEl.value.trim();
+  const password = passEl.value;
+  if (!email || !password) return setMsg('Email & password required', 'err');
+
+  disableAll(true);
+  setMsg('Signing in…');
+
+  try {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) return setMsg('Login error: ' + error.message, 'err');
+
+    setMsg('Signed in. Redirecting…', 'ok');
+    setTimeout(()=> location.href = nextUrl, 300);
+  } catch (e) {
+    setMsg('Login error: ' + (e?.message || e), 'err');
+  } finally {
+    disableAll(false);
+  }
+});
+</script>
+
+
+</body>
+</html>

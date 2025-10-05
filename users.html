@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Search Users</title>
+<style>
+  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:24px}
+  a{color:#9ecbff;text-decoration:none}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#1c1c1c;border-radius:10px;padding:12px 14px;margin:8px 0}
+  .muted{opacity:.75}
+  input{width:100%;padding:10px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
+  button{padding:10px 14px;background:#444;border:none;border-radius:6px;color:#fff;cursor:pointer}
+</style>
+</head>
+<body>
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+<div class="wrap">
+  <a href="index.html">← Home</a>
+  <h2>Search Users</h2>
+
+  <form id="searchForm" style="display:flex; gap:8px; margin:8px 0 16px">
+    <input id="q" placeholder="Type a username (e.g., nate008)" />
+    <button>Search</button>
+  </form>
+
+  <div id="results" class="muted">Type a name and press Search.</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+
+const results = document.getElementById('results');
+const qInput  = document.getElementById('q');
+
+// read ?q= from URL
+const qs = new URLSearchParams(location.search);
+const initialQ = qs.get('q') || '';
+qInput.value = initialQ;
+
+async function runSearch(query){
+  if (!query){ results.textContent = 'Type a name and press Search.'; return; }
+  results.textContent = 'Searching…';
+
+  // Case-insensitive search on username
+  const { data, error } = await sb
+    .from('profiles')
+    .select('id, username')
+    .ilike('username', '%' + query + '%')   // ilike = case-insensitive LIKE
+    .order('username', { ascending: true })
+    .limit(50);
+
+  if (error){ results.textContent = 'Error: ' + error.message; return; }
+  if (!data || data.length === 0){ results.textContent = 'No users found.'; return; }
+
+  results.innerHTML = data.map(u => `
+    <div class="row">
+      <div>
+        <div><strong>@${u.username}</strong></div>
+        <div class="muted">${u.id}</div>
+      </div>
+      <div>
+        <a href="user.html?u=${encodeURIComponent(u.username)}" style="background:#444;padding:8px 12px;border-radius:6px;color:#fff;text-decoration:none">View</a>
+      </div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('searchForm').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const q = qInput.value.trim();
+  if (q) {
+    history.replaceState({}, '', 'users.html?q=' + encodeURIComponent(q));
+    runSearch(q);
+  }
+});
+
+// Auto-run if ?q= is present
+if (initialQ) runSearch(initialQ);
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Edit Item</title>
+<style>
+  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
+  .wrap{max-width:720px;margin:0 auto;padding:24px}
+  input,textarea,button{width:100%;padding:10px;margin-top:10px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
+  button{border:none;background:crimson;cursor:pointer}
+  a{color:#9ecbff;text-decoration:none}
+  .ok{color:#9f9}.err{color:#f88}
+</style>
+</head>
+<body>
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+<div class="wrap">
+  <a href="index.html">← Home</a>
+  <h2>Edit Item</h2>
+  <input id="title" placeholder="Title" />
+  <textarea id="desc" placeholder="Description"></textarea>
+  <input id="value" type="number" min="0" placeholder="Value (USD)" />
+  <input id="file" type="file" accept="image/*" />
+  <button id="save">Save Changes</button>
+  <div id="msg" style="margin-top:10px;opacity:.95;white-space:pre-wrap"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const PROJECT_URL = 'https://wktxpukjmvmhzpctttjx.supabase.co';
+const ANON_KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY';
+
+const sb = supabase.createClient(PROJECT_URL, ANON_KEY);
+const BUCKET = 'item-images';
+
+const qs = new URLSearchParams(location.search);
+const itemId = qs.get('id');
+
+const msg = (t,cls='')=>{ const m=document.getElementById('msg'); m.className=cls; m.textContent=t; }
+
+let currentUserId=null, itemOwnerId=null;
+
+(async function load(){
+  const { data:{ session } } = await sb.auth.getSession();
+  currentUserId = session?.user?.id;
+  if (!session){ msg('Please login first.','err'); return; }
+
+  if (!itemId){ msg('No item id given.','err'); return; }
+
+  const { data:item, error } = await sb
+    .from('items')
+    .select('*')
+    .eq('id', itemId)
+    .maybeSingle();
+
+  if (error || !item){ msg('Item not found.','err'); return; }
+
+  itemOwnerId = item.owner_id;
+  if (itemOwnerId !== currentUserId){
+    msg('You do not own this item.','err'); return;
+  }
+
+  // Pre-fill form
+  document.getElementById('title').value = item.title || '';
+  document.getElementById('desc').value = item.description || '';
+  document.getElementById('value').value = item.user_value || '';
+})();
+
+document.getElementById('save').onclick = async ()=>{
+  const title = document.getElementById('title').value.trim();
+  const description = document.getElementById('desc').value.trim();
+  const user_value = Number(document.getElementById('value').value) || 0;
+  const file = document.getElementById('file').files[0];
+
+  if (!title){ msg('Please enter a title.','err'); return; }
+
+  // Update item row
+  const { error:updateErr } = await sb.from('items')
+    .update({ title, description, user_value })
+    .eq('id', itemId);
+  if (updateErr){ msg('Update failed: ' + updateErr.message,'err'); return; }
+
+  // If new image uploaded
+  if (file){
+    const safeName = file.name.replace(/[^\w.\-]+/g,'_');
+    const path = `items/${currentUserId}/${itemId}/main-${Date.now()}-${safeName}`;
+    const up = await sb.storage.from(BUCKET).upload(path, file, { upsert:true, contentType:file.type });
+    if (up.error){ msg('Image upload failed: ' + up.error.message,'err'); return; }
+    const publicUrl = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    const { error:imgErr } = await sb.from('items').update({ image_url: publicUrl }).eq('id', itemId);
+    if (imgErr){ msg('Failed saving new image URL: ' + imgErr.message,'err'); return; }
+  }
+
+  msg('Item updated successfully! Redirecting…','ok');
+  setTimeout(()=>{ location.href = 'item.html?id='+itemId; },1000);
+};
+</script>
+</body>
+</html>

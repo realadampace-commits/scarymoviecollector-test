@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Account Settings</title>
+<style>
+  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
+  .wrap{max-width:780px;margin:0 auto;padding:24px}
+  a{color:#9ecbff;text-decoration:none}
+  .card{background:#1c1c1c;border-radius:12px;padding:16px;margin-top:16px}
+  .row{display:grid;grid-template-columns:160px 1fr;gap:16px;align-items:center}
+  input,button,textarea{padding:10px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
+  button{border:none;background:crimson;cursor:pointer}
+  .muted{opacity:.8}
+  .ok{color:#9f9}.err{color:#f88}
+  .avatar{width:120px;height:120px;border-radius:999px;background:#222;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .avatar img{max-width:100%;max-height:100%}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<!-- shared menu -->
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+
+<div class="wrap">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <a href="index.html">← Home</a>
+    <a href="portfolio.html" style="background:#444;padding:8px 12px;border-radius:6px;color:#fff;text-decoration:none">My Portfolio</a>
+  </div>
+  <h2>Account Settings</h2>
+
+  <div id="roleBanner" class="muted" style="margin-top:6px"></div>
+
+  <!-- Avatar -->
+  <div class="card">
+    <h3>Profile Picture</h3>
+    <div class="row">
+      <div class="avatar" id="avatarBox"><span class="muted">No image</span></div>
+      <div class="actions">
+        <input type="file" id="avatarFile" accept="image/*" />
+        <button id="uploadAvatar">Upload</button>
+        <div id="avatarMsg" class="muted"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Username -->
+  <div class="card">
+    <h3>Change Username</h3>
+    <div class="row">
+      <label for="username" class="muted">New username</label>
+      <div class="actions" style="display:flex;gap:8px">
+        <input id="username" placeholder="e.g., nate008"/>
+        <button id="saveUsername">Save</button>
+      </div>
+    </div>
+    <div id="userMsg" class="muted" style="margin-top:8px"></div>
+  </div>
+
+  <!-- Bio -->
+  <div class="card">
+    <h3>Bio</h3>
+    <textarea id="bioInput" placeholder="Tell people about yourself…" style="width:100%;height:80px;"></textarea>
+    <button id="saveBio" style="margin-top:8px">Save Bio</button>
+    <div id="bioMsg" class="muted"></div>
+  </div>
+
+  <!-- Showcase -->
+  <div class="card">
+    <h3>Showcase Favorites</h3>
+    <p class="muted" style="margin-top:6px">Paste up to 5 item IDs (from item URLs) separated by commas.</p>
+    <input id="showcaseInput" placeholder="e.g. 65a7f..., b91c4..., ..." />
+    <button id="saveShowcase" style="margin-top:8px">Save Showcase</button>
+    <div id="showcaseMsg" class="muted"></div>
+  </div>
+
+  <!-- Password -->
+  <div class="card">
+    <h3>Change Password (Email Confirmation)</h3>
+    <p class="muted" style="margin-top:6px">We’ll send a secure reset link to your email.</p>
+    <div class="actions" style="margin-top:8px">
+      <button id="sendReset">Send Password Reset Email</button>
+      <div id="pwdMsg" class="muted"></div>
+    </div>
+  </div>
+
+  <!-- Logout -->
+  <div class="card">
+    <h3>Sign out</h3>
+    <p class="muted" style="margin-top:6px">Sign out of this browser, or all devices.</p>
+    <div class="actions" style="margin-top:8px">
+      <button id="logoutLocal"  style="background:#666">Sign out (this device)</button>
+      <button id="logoutGlobal" style="background:#c33">Sign out (all devices)</button>
+      <div id="logoutMsg" class="muted"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+const AVATAR_BUCKET = 'avatars';
+
+const avatarBox = document.getElementById('avatarBox');
+const avatarFile = document.getElementById('avatarFile');
+const uploadAvatarBtn = document.getElementById('uploadAvatar');
+const avatarMsg = document.getElementById('avatarMsg');
+const usernameInput = document.getElementById('username');
+const saveUsernameBtn = document.getElementById('saveUsername');
+const userMsg = document.getElementById('userMsg');
+const sendResetBtn = document.getElementById('sendReset');
+const pwdMsg = document.getElementById('pwdMsg');
+
+const bioInput = document.getElementById('bioInput');
+const saveBioBtn = document.getElementById('saveBio');
+const bioMsg = document.getElementById('bioMsg');
+
+const showcaseInput = document.getElementById('showcaseInput');
+const saveShowcaseBtn = document.getElementById('saveShowcase');
+const showcaseMsg = document.getElementById('showcaseMsg');
+
+const logoutMsg = document.getElementById('logoutMsg');
+const logoutLocalBtn = document.getElementById('logoutLocal');
+const logoutGlobalBtn = document.getElementById('logoutGlobal');
+const roleBanner = document.getElementById('roleBanner');
+
+let user = null;
+
+const setMsg = (el, text, cls='muted') => { el.className = cls; el.textContent = text; };
+const sanitizeUsername = (u) => u.toLowerCase().replace(/[^a-z0-9_.-]/g,'').slice(0,30);
+
+// init
+(async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session){ alert('Please log in first.'); location.href = 'login.html'; return; }
+  user = session.user;
+
+  const { data: profile, error } = await sb.from('profiles')
+    .select('username, avatar_url, bio, showcase_ids, role')
+    .eq('id', user.id).maybeSingle();
+
+  if (error) console.error(error);
+
+  if (profile?.avatar_url) avatarBox.innerHTML = `<img src="${profile.avatar_url}" alt="avatar">`;
+  if (profile?.username)   usernameInput.value = profile.username;
+  if (profile?.bio)        bioInput.value = profile.bio;
+  if (profile?.showcase_ids?.length) showcaseInput.value = profile.showcase_ids.join(', ');
+  roleBanner.textContent = `Your role: ${profile?.role || 'free'}`;
+})();
+
+// avatar upload
+uploadAvatarBtn.addEventListener('click', async () => {
+  if (!avatarFile.files[0]) return setMsg(avatarMsg, 'Choose an image first.', 'err');
+  const file = avatarFile.files[0];
+  const safe = file.name.replace(/[^\w.\-]+/g,'_');
+  const path = `${user.id}/avatar-${Date.now()}-${safe}`;
+
+  setMsg(avatarMsg, 'Uploading...');
+  const up = await sb.storage.from(AVATAR_BUCKET).upload(path, file, { upsert: true, contentType: file.type });
+  if (up.error) return setMsg(avatarMsg, 'Upload error: ' + up.error.message, 'err');
+
+  const { data: publicData } = sb.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+  const publicUrl = publicData.publicUrl;
+
+  const upd = await sb.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
+  if (upd.error) return setMsg(avatarMsg, 'Failed saving avatar URL: ' + upd.error.message, 'err');
+
+  avatarBox.innerHTML = `<img src="${publicUrl}" alt="avatar">`;
+  setMsg(avatarMsg, 'Avatar updated!', 'ok');
+});
+
+// save username
+saveUsernameBtn.addEventListener('click', async () => {
+  let uname = sanitizeUsername(usernameInput.value.trim());
+  if (!uname) return setMsg(userMsg, 'Username cannot be empty.', 'err');
+
+  const { data: existing } = await sb.from('profiles')
+    .select('id').ilike('username', uname).neq('id', user.id).limit(1);
+  if (existing && existing.length>0) return setMsg(userMsg, 'Username already taken.', 'err');
+
+  const upd = await sb.from('profiles').update({ username: uname }).eq('id', user.id);
+  if (upd.error) return setMsg(userMsg, 'Failed updating username: ' + upd.error.message, 'err');
+
+  setMsg(userMsg, 'Username updated!', 'ok');
+});
+
+// bio
+saveBioBtn.addEventListener('click', async () => {
+  const bio = bioInput.value.trim();
+  const { error } = await sb.from('profiles').update({ bio }).eq('id', user.id);
+  if (error) return setMsg(bioMsg, 'Error: ' + error.message, 'err');
+  setMsg(bioMsg, 'Bio updated!', 'ok');
+});
+
+// showcase
+saveShowcaseBtn.addEventListener('click', async () => {
+  const arr = showcaseInput.value.split(',').map(x=>x.trim()).filter(Boolean).slice(0,5);
+  const { error } = await sb.from('profiles').update({ showcase_ids: arr }).eq('id', user.id);
+  if (error) return setMsg(showcaseMsg, 'Error: ' + error.message, 'err');
+  setMsg(showcaseMsg, 'Showcase updated!', 'ok');
+});
+
+// password reset
+sendResetBtn.addEventListener('click', async () => {
+  setMsg(pwdMsg, 'Sending reset email...');
+  const redirectTo = window.location.origin + '/reset.html';
+  const { error } = await sb.auth.resetPasswordForEmail(user.email, { redirectTo });
+  if (error) return setMsg(pwdMsg, 'Error: ' + error.message, 'err');
+  setMsg(pwdMsg, 'Check your email for the reset link.', 'ok');
+});
+
+// robust sign out (handles "Auth session missing!")
+async function safeSignOut(scope) {
+  try {
+    const { error } = await sb.auth.signOut(scope ? { scope } : undefined);
+    if (error && error.message !== 'Auth session missing!') { setMsg(logoutMsg, 'Error: ' + error.message, 'err'); return false; }
+    return true;
+  } catch(e) {
+    setMsg(logoutMsg, 'Error: ' + (e?.message || e), 'err'); return false;
+  }
+}
+logoutLocalBtn.addEventListener('click', async ()=>{ setMsg(logoutMsg, 'Signing out…'); if (await safeSignOut(null)) location.href='index.html'; });
+logoutGlobalBtn.addEventListener('click', async ()=>{ setMsg(logoutMsg, 'Signing out everywhere…'); if (await safeSignOut('global')) location.href='index.html'; });
+</script>
+</body>
+</html>
