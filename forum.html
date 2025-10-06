@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Forum — Scream Collector</title>
+<style>
+  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#dc143c}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  a{color:#9ecbff;text-decoration:none}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px}
+  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
+  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
+  .tree{list-style:none;margin:0;padding:0}
+  .node{padding:10px;border-radius:8px;border:1px solid #2a2a2a;margin-bottom:8px;background:#161616}
+  .nodeHead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;text-decoration:none}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  input{padding:8px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
+  .childs{margin-top:10px;margin-left:16px}
+</style>
+</head>
+<body>
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+
+<div class="wrap">
+  <a href="index.html">← Home</a>
+  <h2>Forum</h2>
+
+  <!-- Moderator: create a top-level category -->
+  <div id="modTop" class="card" style="display:none">
+    <h3 style="margin-top:0">Moderator: New Category</h3>
+    <div class="row">
+      <input id="catTitle" placeholder="Category title (e.g., Horror Movies)"/>
+      <button id="addCat" class="btn" style="background:#2a6">Create</button>
+      <span id="modMsg" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <ul id="tree" class="tree"></ul>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+ 'https://wktxpukjmvmhzpctttjx.supabase.co',
+ 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+
+const treeEl = document.getElementById('tree');
+const modTop = document.getElementById('modTop');
+const catTitle = document.getElementById('catTitle');
+const addCat = document.getElementById('addCat');
+const modMsg = document.getElementById('modMsg');
+
+let me=null, myRole='free';
+
+(async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  me = session?.user || null;
+  if (me) {
+    const { data: p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
+    myRole = p?.role || 'free';
+  }
+  if (myRole==='moderator') modTop.style.display='block';
+  await loadTree();
+})();
+
+async function loadTree(){
+  // Pull all categories; assemble tree client-side
+  const { data: cats, error } = await sb
+    .from('forum_categories')
+    .select('id,title,parent_id,created_at')
+    .order('title',{ascending:true});
+  if (error){ treeEl.innerHTML='<li class="muted err">Error loading categories</li>'; return; }
+
+  const byParent = {};
+  cats.forEach(c=>{ (byParent[c.parent_id||'root'] ||= []).push(c); });
+
+  treeEl.innerHTML = renderNodes(byParent, 'root');
+}
+
+function renderNodes(byParent, key){
+  const list = byParent[key] || [];
+  return list.map(node=>{
+    const hasChildren = !!(byParent[node.id]?.length);
+    const childHtml = hasChildren ? `<div class="childs">${renderNodes(byParent,node.id)}</div>` : '';
+    const actions = myRole==='moderator'
+      ? `<div class="row">
+           <a class="btn" href="forum_category.html?id=${node.id}">Open</a>
+           <button class="btn" onclick="addSub('${node.id}')">Add Sub</button>
+           <button class="btn" style="background:#933" onclick="delCat('${node.id}')">Delete</button>
+         </div>`
+      : `<a class="btn" href="forum_category.html?id=${node.id}">Open</a>`;
+    return `
+      <li class="node">
+        <div class="nodeHead">
+          <strong>${node.title}</strong>
+          ${actions}
+        </div>
+        ${childHtml}
+      </li>
+    `;
+  }).join('');
+}
+
+// mod actions
+window.addSub = async (parentId)=>{
+  const t = prompt('Subcategory title?'); if(!t) return;
+  const { error } = await sb.from('forum_categories').insert({ title: t.trim(), parent_id: parentId });
+  if (error) { modMsg.textContent='Error: '+error.message; modMsg.className='err'; return; }
+  modMsg.textContent='Created.'; modMsg.className='ok'; await loadTree();
+};
+addCat.onclick = async ()=>{
+  const t = catTitle.value.trim(); if(!t) return;
+  const { error } = await sb.from('forum_categories').insert({ title: t, parent_id: null });
+  if (error) { modMsg.textContent='Error: '+error.message; modMsg.className='err'; return; }
+  catTitle.value=''; modMsg.textContent='Created.'; modMsg.className='ok'; await loadTree();
+};
+window.delCat = async (id)=>{
+  if(!confirm('Delete this category and all its subcategories/posts/replies?')) return;
+  const { error } = await sb.from('forum_categories').delete().eq('id', id);
+  if (error) { modMsg.textContent='Error: '+error.message; modMsg.className='err'; return; }
+  modMsg.textContent='Deleted.'; modMsg.className='ok'; await loadTree();
+};
+</script>
+</body>
+</html>
