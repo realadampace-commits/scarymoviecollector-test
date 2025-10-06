@@ -14,10 +14,10 @@
   .thumb img{max-width:100%;max-height:100%}
   .meta{padding:10px}
   .userHead{display:flex;align-items:center;gap:14px}
-  /* Avatar + frame overlay */
+  /* avatar + frame */
   .ava{position:relative;width:80px;height:80px;border-radius:50%;background:#333;overflow:hidden;flex:0 0 auto}
   .ava img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%}
-  .ava .frame {position: absolute;top: -6%;left: -10%;width: 120%;height: 120%;background-size: cover;background-position: center;background-repeat: no-repeat;pointer-events: none;}
+  .ava .frame{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;transform-origin:center;transform:scale(var(--frameScale,1));}
   .roleTag{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:12px;vertical-align:middle}
   .role-free{background:#333;color:#ddd}
   .role-subscriber{background:#2a6;color:#fff}
@@ -27,7 +27,6 @@
 </style>
 </head>
 <body>
-<!-- Shared menu component -->
 <app-menu></app-menu>
 <script type="module" src="/menu.js"></script>
 
@@ -35,8 +34,7 @@
   <a href="users.html">← Back to Search</a>
 
   <div class="userHead" style="margin-top:10px">
-    <!-- Avatar with frame overlay -->
-    <span class="ava" id="uAva">
+    <span class="ava">
       <img id="uAvaImg" alt="avatar">
       <span id="uFrame" class="frame"></span>
     </span>
@@ -47,7 +45,7 @@
     </div>
   </div>
 
-  <!-- Moderator panel (only if viewer is moderator and viewing someone else) -->
+  <!-- Moderator panel -->
   <div id="modPanel" class="card" style="display:none; margin-top:16px; padding:12px; background:#261e1e; border:1px solid #532;">
     <h3 style="margin:0 0 10px">Moderator Controls</h3>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -66,7 +64,7 @@
   <!-- Showcase -->
   <div id="showcase"></div>
 
-  <!-- Portfolio preview / full list -->
+  <!-- Portfolio -->
   <div class="sectionHead">
     <h3 style="margin:0" id="portfolioHeading">Recent Uploads</h3>
     <a id="portfolioToggle" class="btn" href="#">View full portfolio</a>
@@ -82,77 +80,66 @@ const sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
 
-const qs = new URLSearchParams(location.search);
-const uname = qs.get('u');
-const showAll = qs.get('all') === '1';
+const qs=new URLSearchParams(location.search);
+const uname=qs.get('u');
+const showAll=qs.get('all')==='1';
 
-const itemsEl = document.getElementById('items');
-const emptyEl = document.getElementById('empty');
-const showcaseEl = document.getElementById('showcase');
-const titleEl = document.getElementById('title');
-const bioEl = document.getElementById('bio');
-const roleTagWrap = document.getElementById('roleTagWrap');
-const uAvaImg = document.getElementById('uAvaImg');
-const uFrameEl = document.getElementById('uFrame');
-const portfolioToggle = document.getElementById('portfolioToggle');
-const portfolioHeading = document.getElementById('portfolioHeading');
+const itemsEl=document.getElementById('items');
+const emptyEl=document.getElementById('empty');
+const showcaseEl=document.getElementById('showcase');
+const titleEl=document.getElementById('title');
+const bioEl=document.getElementById('bio');
+const roleTagWrap=document.getElementById('roleTagWrap');
+const uAvaImg=document.getElementById('uAvaImg');
+const uFrameEl=document.getElementById('uFrame');
+const portfolioToggle=document.getElementById('portfolioToggle');
+const portfolioHeading=document.getElementById('portfolioHeading');
 
 (async function loadProfile(){
-  if (!uname){ titleEl.textContent = 'User not found'; return; }
+  if(!uname){ titleEl.textContent='User not found'; return; }
 
-  // Load the profile by username (now also fetching frame_url)
-  const { data: profile, error: pErr } = await sb
-    .from('profiles')
-    .select('id, username, avatar_url, frame_url, bio, showcase_ids, role')
-    .eq('username', uname)
-    .maybeSingle();
+  const { data: profile } = await sb.from('profiles')
+    .select('id, username, avatar_url, frame_url, frame_scale, bio, showcase_ids, role')
+    .eq('username', uname).maybeSingle();
 
-  if (pErr || !profile){ titleEl.textContent = 'User not found'; return; }
+  if(!profile){ titleEl.textContent='User not found'; return; }
 
-  titleEl.textContent = '@' + profile.username;
-  bioEl.textContent = profile.bio || '';
-
-  if (profile.avatar_url) uAvaImg.src = profile.avatar_url;
-  if (profile.frame_url)  uFrameEl.style.backgroundImage = `url('${profile.frame_url}')`;
-
-  // Role badge
-  const role = profile.role || 'free';
-  const roleClass = role === 'moderator' ? 'role-moderator' : role === 'subscriber' ? 'role-subscriber' : 'role-free';
-  roleTagWrap.innerHTML = `<span class="roleTag ${roleClass}">${role}</span>`;
-
-  // Portfolio toggle link (same page, toggles ?all=1)
-  portfolioHeading.textContent = showAll ? 'All Items' : 'Recent Uploads';
-  portfolioToggle.textContent = showAll ? 'Show last 5' : 'View full portfolio';
-  const newQs = new URLSearchParams(qs);
-  if (showAll) { newQs.delete('all'); } else { newQs.set('all','1'); }
-  portfolioToggle.href = 'user.html?' + newQs.toString();
-
-  // Moderator panel visibility
-  const { data: sess } = await sb.auth.getSession();
-  const viewer = sess?.session?.user || null;
-  let viewerRole = null;
-  if (viewer) {
-    const { data: vp } = await sb.from('profiles').select('role').eq('id', viewer.id).maybeSingle();
-    viewerRole = vp?.role || 'free';
-  }
-  if (viewerRole === 'moderator' && viewer?.id !== profile.id) {
-    showModPanel(profile);
+  titleEl.textContent='@'+profile.username;
+  bioEl.textContent=profile.bio||'';
+  if(profile.avatar_url) uAvaImg.src=profile.avatar_url;
+  if(profile.frame_url){
+    uFrameEl.style.backgroundImage=`url('${profile.frame_url}')`;
+    uFrameEl.style.setProperty('--frameScale', profile.frame_scale ?? 1);
   }
 
-  // Showcase: if there are showcase_ids, fetch those items
-  if (profile.showcase_ids && profile.showcase_ids.length) {
-    const { data: showcaseItems, error: sErr } = await sb
-      .from('items')
-      .select('id,title,image_url,user_value')
-      .in('id', profile.showcase_ids)
-      .limit(5);
-    if (!sErr && showcaseItems?.length) {
-      showcaseEl.innerHTML = `
+  const role=profile.role||'free';
+  const roleClass=role==='moderator'?'role-moderator':role==='subscriber'?'role-subscriber':'role-free';
+  roleTagWrap.innerHTML=`<span class="roleTag ${roleClass}">${role}</span>`;
+
+  portfolioHeading.textContent=showAll?'All Items':'Recent Uploads';
+  portfolioToggle.textContent=showAll?'Show last 5':'View full portfolio';
+  const newQs=new URLSearchParams(qs); if(showAll){newQs.delete('all');}else{newQs.set('all','1');}
+  portfolioToggle.href='user.html?'+newQs.toString();
+
+  // moderator panel visibility
+  const { data:sess } = await sb.auth.getSession();
+  const viewer=sess?.session?.user||null;
+  if(viewer && viewer.id!==profile.id){
+    const { data: vp }=await sb.from('profiles').select('role').eq('id',viewer.id).maybeSingle();
+    if(vp?.role==='moderator') showModPanel(profile);
+  }
+
+  // showcase
+  if(profile.showcase_ids?.length){
+    const { data: showcaseItems } = await sb.from('items')
+      .select('id,title,image_url,user_value').in('id',profile.showcase_ids).limit(5);
+    if(showcaseItems?.length){
+      showcaseEl.innerHTML=`
         <h3 style="margin-top:20px;margin-bottom:0">Showcase</h3>
         <div class="grid" style="margin-top:12px">
           ${showcaseItems.map(it=>`
             <a class="card" href="item.html?id=${it.id}" style="color:inherit;text-decoration:none">
-              <div class="thumb">${it.image_url ? `<img src="${it.image_url}" alt="">` : 'No image'}</div>
+              <div class="thumb">${it.image_url?`<img src="${it.image_url}" alt="">`:'No image'}</div>
               <div class="meta"><strong>${it.title}</strong><br>$${(it.user_value||0).toLocaleString()}</div>
             </a>
           `).join('')}
@@ -160,55 +147,35 @@ const portfolioHeading = document.getElementById('portfolioHeading');
     }
   }
 
-  // Portfolio preview (last 5) or full list
   await loadPortfolioItems(profile.id, showAll);
 })();
 
-async function loadPortfolioItems(ownerId, all) {
-  const q = sb.from('items')
-    .select('id,title,user_value,image_url,created_at')
-    .eq('owner_id', ownerId)
-    .order('created_at', { ascending:false });
-
-  if (!all) q.limit(5);
-
-  const { data: items, error } = await q;
-  if (error) {
-    console.error('Items load error:', error);
-    itemsEl.innerHTML = '<div class="muted">Error loading items.</div>';
-    return;
-  }
-
-  if (!items || items.length === 0) {
-    emptyEl.style.display = 'block';
-    itemsEl.innerHTML = '';
-    return;
-  }
-
-  emptyEl.style.display = 'none';
-  itemsEl.innerHTML = items.map(it => `
+async function loadPortfolioItems(ownerId, all){
+  const q=sb.from('items').select('id,title,user_value,image_url,created_at')
+    .eq('owner_id',ownerId).order('created_at',{ascending:false});
+  if(!all) q.limit(5);
+  const { data: items, error }=await q;
+  if(error){ itemsEl.innerHTML='<div class="muted">Error loading items.</div>'; return; }
+  if(!items?.length){ emptyEl.style.display='block'; itemsEl.innerHTML=''; return; }
+  emptyEl.style.display='none';
+  itemsEl.innerHTML=items.map(it=>`
     <a class="card" href="item.html?id=${it.id}" style="color:inherit;text-decoration:none">
-      <div class="thumb">${it.image_url ? `<img src="${it.image_url}" alt="">` : 'No image'}</div>
-      <div class="meta">
-        <strong>${it.title}</strong><br>$${(it.user_value||0).toLocaleString()}
-      </div>
-    </a>
-  `).join('');
+      <div class="thumb">${it.image_url?`<img src="${it.image_url}" alt="">`:'No image'}</div>
+      <div class="meta"><strong>${it.title}</strong><br>$${(it.user_value||0).toLocaleString()}</div>
+    </a>`).join('');
 }
 
-function showModPanel(profile) {
-  const modPanel = document.getElementById('modPanel');
-  const roleSelect = document.getElementById('roleSelect');
-  const roleMsg = document.getElementById('roleMsg');
-
-  modPanel.style.display = 'block';
-  roleSelect.value = profile.role || 'free';
-
-  document.getElementById('saveRole').onclick = async () => {
-    const newRole = roleSelect.value;
-    const { error } = await sb.from('profiles').update({ role: newRole }).eq('id', profile.id);
-    roleMsg.textContent = error ? ('Error: ' + error.message) : 'Saved!';
-    if (!error) setTimeout(()=>location.reload(), 500);
+function showModPanel(profile){
+  const panel=document.getElementById('modPanel');
+  const roleSelect=document.getElementById('roleSelect');
+  const roleMsg=document.getElementById('roleMsg');
+  panel.style.display='block';
+  roleSelect.value=profile.role||'free';
+  document.getElementById('saveRole').onclick=async()=>{
+    const newRole=roleSelect.value;
+    const { error }=await sb.from('profiles').update({role:newRole}).eq('id',profile.id);
+    roleMsg.textContent=error?('Error: '+error.message):'Saved!';
+    if(!error) setTimeout(()=>location.reload(),500);
   };
 }
 </script>
