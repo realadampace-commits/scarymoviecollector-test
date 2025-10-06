@@ -4,23 +4,32 @@
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Item — Scream Collector</title>
 <style>
-  :root{
-    --bg:#111; --panel:#1b1b1b; --ink:#eee; --muted:#a9adb4; --accent:#dc143c; --ok:#2a6;
-  }
+  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#dc143c;--ok:#2a6}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
   a{color:#9ecbff;text-decoration:none}
   .wrap{max-width:1100px;margin:0 auto;padding:24px}
   .grid{display:grid;grid-template-columns:1fr 360px;gap:20px}
   .card{background:var(--panel);border-radius:12px;padding:16px}
-  .muted{color:var(--muted)}
-  .ok{color:#9f9}.err{color:#f88}
+  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
   .title{display:flex;align-items:center;justify-content:space-between;gap:12px}
   .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;text-decoration:none}
   .btn.main{background:var(--accent)}
   .btn.ok{background:var(--ok)}
-  .thumb{background:#191919;border-radius:12px;display:flex;align-items:center;justify-content:center;min-height:280px;overflow:hidden}
-  .thumb img{max-width:100%;max-height:460px;display:block}
-  /* Vote ui */
+  .stack{display:grid;gap:12px}
+  .mainImg{background:#171717;border-radius:12px;display:flex;align-items:center;justify-content:center;min-height:320px;overflow:hidden;cursor:pointer}
+  .mainImg img{max-width:100%;max-height:520px;display:block}
+  .thumbs{display:flex;gap:10px;flex-wrap:wrap}
+  .thumbs img{width:90px;height:90px;object-fit:cover;border-radius:8px;border:2px solid transparent;cursor:pointer}
+  .thumbs img.sel{border-color:#4ade80}
+  /* lightbox */
+  .overlay{position:fixed;inset:0;display:none;background:rgba(0,0,0,.85);z-index:999}
+  .lightbox{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .lightbox img{max-width:92vw;max-height:92vh;border-radius:8px}
+  .navBtn{position:absolute;top:50%;transform:translateY(-50%);font-size:28px;background:#222;border:1px solid #333;border-radius:999px;padding:8px 12px;cursor:pointer;color:#eee;opacity:.9}
+  .navBtn:hover{opacity:1}
+  .navPrev{left:24px} .navNext{right:24px}
+  .navClose{position:absolute;top:18px;right:18px;padding:8px 10px}
+  /* vote UI */
   .voteBox{background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:14px}
   .voteRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .voteBtn{background:#333;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer}
@@ -30,14 +39,10 @@
   .voteStats{margin-top:10px;color:var(--muted)}
   .bar{height:10px;background:#222;border-radius:999px;overflow:hidden}
   .bar > span{display:block;height:100%;background:#2a6;width:0%}
-  .stack{display:grid;gap:10px}
-  /* Owner tools (optional) */
   .ownerTools{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 </head>
 <body>
-
-<!-- Shared menu -->
 <app-menu></app-menu>
 <script type="module" src="/menu.js"></script>
 
@@ -47,16 +52,19 @@
   <div class="title" style="margin-top:8px">
     <h1 id="itemTitle" style="margin:0">Loading…</h1>
     <div class="ownerTools" id="ownerTools" style="display:none">
-      <a class="btn" href="#" id="editBtn">Edit</a>
+      <a class="btn" id="editBtn">Edit</a>
       <button class="btn" id="deleteBtn">Delete</button>
     </div>
   </div>
   <div class="muted" id="metaLine" style="margin-top:6px"></div>
 
   <div class="grid" style="margin-top:12px">
-    <!-- Left: image + description -->
+    <!-- Left: gallery + description -->
     <div class="stack">
-      <div class="card thumb" id="imgBox">No image</div>
+      <div class="card">
+        <div class="mainImg" id="mainImg">No image</div>
+        <div id="thumbs" class="thumbs" style="margin-top:10px"></div>
+      </div>
       <div class="card">
         <h3 style="margin:0 0 8px">Description</h3>
         <div id="desc" class="muted">—</div>
@@ -73,30 +81,24 @@
 
       <div class="card">
         <h3 style="margin:0 0 8px">Community Vote</h3>
-
-        <!-- Summary -->
         <div class="voteStats" id="aggText">Agree: 0 • Disagree: 0</div>
         <div class="bar" style="margin-top:8px"><span id="agreeFill" style="width:0%"></span></div>
         <div class="voteStats" id="avgLine" style="margin-top:6px">Average suggested: —</div>
 
-        <!-- Voting UI (hidden for guests) -->
         <div class="voteBox" id="voteBox" style="display:none;margin-top:12px">
           <div class="voteRow">
             <button id="agreeBtn" class="voteBtn">Agree</button>
             <button id="disagreeBtn" class="voteBtn">Disagree</button>
             <span id="bandHint" class="voteStats"></span>
           </div>
-
           <div id="disagreeBlock" class="voteInput" style="margin-top:8px">
             <label for="suggestPrice">Suggest price:</label>
             <input id="suggestPrice" type="number" step="1" min="0"/>
             <button id="saveSuggestion" class="voteBtn ok">Save</button>
           </div>
-
           <div class="voteStats" id="voteMsg"></div>
         </div>
 
-        <!-- Guest nudge -->
         <div class="voteStats" id="guestMsg" style="display:none;margin-top:10px">
           <a href="login.html?next=item.html%3Fid%3D" id="loginLink">Log in</a> to vote.
         </div>
@@ -105,7 +107,16 @@
   </div>
 </div>
 
-<!-- Supabase -->
+<!-- Lightbox overlay -->
+<div class="overlay" id="overlay">
+  <div class="lightbox">
+    <button class="navBtn navPrev" id="prevBtn" aria-label="Previous">&lt;</button>
+    <img id="overlayImg" alt="">
+    <button class="navBtn navNext" id="nextBtn" aria-label="Next">&gt;</button>
+    <button class="navBtn navClose" id="closeBtn" aria-label="Close">✕</button>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const sb = supabase.createClient(
@@ -113,10 +124,9 @@ const sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
 
-// ---- DOM refs
+// DOM
 const itemTitle = document.getElementById('itemTitle');
 const metaLine  = document.getElementById('metaLine');
-const imgBox    = document.getElementById('imgBox');
 const descEl    = document.getElementById('desc');
 const priceEl   = document.getElementById('price');
 const createdAt = document.getElementById('createdAt');
@@ -124,7 +134,15 @@ const ownerTools= document.getElementById('ownerTools');
 const editBtn   = document.getElementById('editBtn');
 const deleteBtn = document.getElementById('deleteBtn');
 
-// Voting
+const mainImg   = document.getElementById('mainImg');
+const thumbsEl  = document.getElementById('thumbs');
+const overlay   = document.getElementById('overlay');
+const overlayImg= document.getElementById('overlayImg');
+const prevBtn   = document.getElementById('prevBtn');
+const nextBtn   = document.getElementById('nextBtn');
+const closeBtn  = document.getElementById('closeBtn');
+
+// voting
 const voteBox = document.getElementById('voteBox');
 const agreeBtn = document.getElementById('agreeBtn');
 const disagreeBtn = document.getElementById('disagreeBtn');
@@ -139,14 +157,12 @@ const bandHint = document.getElementById('bandHint');
 const guestMsg = document.getElementById('guestMsg');
 const loginLink = document.getElementById('loginLink');
 
-// ---- State
 const qs = new URLSearchParams(location.search);
 const itemId = qs.get('id');
 
-let me = null;
-let item = null;
-let basePrice = 0;
-let minBand = 0, maxBand = 0;
+let me=null, item=null;
+let basePrice=0, minBand=0, maxBand=0;
+let images=[], idx=0;
 
 function money(n){ return '$' + Number(n||0).toLocaleString(); }
 function setActive(which){
@@ -159,150 +175,152 @@ function setVoteMsg(t, ok=false){ voteMsg.textContent=t; voteMsg.style.color = o
 (async function init(){
   if(!itemId){ itemTitle.textContent='Item not found'; return; }
 
-  // session (to decide voting visibility & owner tools)
   const { data:{ session } } = await sb.auth.getSession();
   me = session?.user || null;
-  // login link should come back to this item
   loginLink.href = 'login.html?next=' + encodeURIComponent('item.html?id='+itemId);
 
-  // fetch item with owner profile
-  const { data: it } = await sb
-    .from('items')
-    .select('id,title,description,image_url,user_value,created_at,owner_id,profiles:owner_id(username)')
+  const q = await sb.from('items')
+    .select('id,title,description,user_value,created_at,owner_id,profiles:owner_id(username)')
     .eq('id', itemId).maybeSingle();
+  if (!q.data){ itemTitle.textContent='Item not found'; return; }
+  item = q.data;
 
-  if(!it){ itemTitle.textContent='Item not found'; return; }
-  item = it;
-  basePrice = Number(item.user_value||0);
-  minBand = Math.round(basePrice*0.70);
-  maxBand = Math.round(basePrice*1.30);
+  const im = await sb.from('items_images')
+    .select('id,image_url,position,created_at')
+    .eq('item_id', itemId)
+    .order('position', {ascending:true})
+    .order('created_at', {ascending:true});
+  images = im.data || [];
 
-  // render
+  // render basics
   itemTitle.textContent = item.title || 'Untitled';
   metaLine.innerHTML = `Owner: ${item.profiles?.username
     ? `<a href="user.html?u=${encodeURIComponent(item.profiles.username)}">@${item.profiles.username}</a>`
     : 'unknown'
   }`;
-  if(item.image_url){
-    imgBox.innerHTML = `<img src="${item.image_url}" alt="">`;
-  }else{
-    imgBox.textContent = 'No image';
-  }
   descEl.textContent = item.description || '—';
+  basePrice = Number(item.user_value||0);
   priceEl.textContent = money(basePrice);
   createdAt.textContent = 'Added ' + new Date(item.created_at).toLocaleString();
 
-  // owner tools
-  if (me && me.id === item.owner_id) {
-    ownerTools.style.display = 'flex';
-    editBtn.href = 'edit.html?id=' + item.id;
-    deleteBtn.onclick = async ()=>{
-      if(!confirm('Delete this item?')) return;
-      const { error } = await sb.from('items').delete().eq('id', item.id);
-      if(error) return alert('Delete error: ' + error.message);
-      location.href = 'portfolio.html';
-    };
+  // gallery render
+  renderGallery();
+
+  // owner/mod tools
+  if (me) {
+    const my = await sb.from('profiles').select('role').eq('id', me.id).maybeSingle();
+    const role = my.data?.role || 'free';
+    if (me.id === item.owner_id || role === 'moderator') {
+      ownerTools.style.display = 'flex';
+      editBtn.href = 'edit.html?id=' + item.id;
+      deleteBtn.onclick = async ()=>{
+        if(!confirm('Delete this item?')) return;
+        const { error } = await sb.from('items').delete().eq('id', item.id);
+        if (error) return alert('Delete error: ' + error.message);
+        location.href='portfolio.html';
+      };
+    }
   }
 
-  // show vote box if logged in; otherwise nudge
+  // voting
   if (me) {
     voteBox.style.display = 'block';
+    minBand = Math.round(basePrice*0.70);
+    maxBand = Math.round(basePrice*1.30);
     bandHint.textContent = `If you disagree, suggest between ${money(minBand)} and ${money(maxBand)}.`;
     await refreshMyVote();
   } else {
     guestMsg.style.display = 'block';
   }
-
   await refreshAggregates();
 })();
 
-// ---- My vote
-async function refreshMyVote(){
-  const { data: row } = await sb
-    .from('item_votes')
-    .select('agree, suggested_price')
-    .eq('item_id', itemId)
-    .eq('voter_id', me.id)
-    .maybeSingle();
-
-  if(!row){
-    setActive(null);
-    suggestPriceEl.value = '';
-    setVoteMsg('You have not voted yet.');
+function renderGallery(){
+  if (!images.length) {
+    mainImg.textContent = 'No image';
+    thumbsEl.innerHTML = '';
     return;
   }
-
-  if(row.agree){
-    setActive('agree');
-    setVoteMsg('You agree with the price.', true);
-  }else{
-    setActive('disagree');
-    suggestPriceEl.value = row.suggested_price ?? '';
-    setVoteMsg('You disagree. Adjust your suggestion and save.', true);
-  }
+  idx = 0;
+  mainImg.innerHTML = `<img src="${images[0].image_url}" alt="">`;
+  mainImg.onclick = openOverlay;
+  thumbsEl.innerHTML = images.map((im, i)=>`<img data-i="${i}" src="${im.image_url}" class="${i===0?'sel':''}" alt="">`).join('');
+  thumbsEl.querySelectorAll('img').forEach(t=>{
+    t.addEventListener('click', ()=>{
+      const i = Number(t.dataset.i);
+      idx = i;
+      mainImg.innerHTML = `<img src="${images[i].image_url}" alt="">`;
+      thumbsEl.querySelectorAll('img').forEach(x=>x.classList.remove('sel'));
+      t.classList.add('sel');
+    });
+  });
 }
 
-// ---- Aggregates
+// Lightbox
+function openOverlay(){
+  if (!images.length) return;
+  overlay.style.display='block';
+  overlayImg.src = images[idx].image_url;
+}
+function closeOverlay(){
+  overlay.style.display='none';
+}
+function prev(){ if (!images.length) return; idx=(idx-1+images.length)%images.length; overlayImg.src=images[idx].image_url; }
+function next(){ if (!images.length) return; idx=(idx+1)%images.length; overlayImg.src=images[idx].image_url; }
+overlay.addEventListener('click', (e)=>{ if(e.target===overlay) closeOverlay(); });
+closeBtn.addEventListener('click', closeOverlay);
+prevBtn.addEventListener('click', (e)=>{ e.stopPropagation(); prev(); });
+nextBtn.addEventListener('click', (e)=>{ e.stopPropagation(); next(); });
+document.addEventListener('keydown', (e)=>{
+  if (overlay.style.display==='block') {
+    if (e.key==='Escape') closeOverlay();
+    if (e.key==='ArrowLeft') prev();
+    if (e.key==='ArrowRight') next();
+  }
+});
+
+// My vote
+async function refreshMyVote(){
+  const { data: row } = await sb.from('item_votes')
+    .select('agree, suggested_price').eq('item_id', itemId).eq('voter_id', me.id).maybeSingle();
+  if(!row){ setActive(null); suggestPriceEl.value=''; setVoteMsg('You have not voted yet.'); return; }
+  if(row.agree){ setActive('agree'); setVoteMsg('You agree with the price.', true); }
+  else{ setActive('disagree'); suggestPriceEl.value=row.suggested_price??''; setVoteMsg('You disagree. Adjust your suggestion and save.', true); }
+}
 async function refreshAggregates(){
-  const { data: rows, error } = await sb
-    .from('item_votes')
-    .select('agree, suggested_price')
-    .eq('item_id', itemId);
-
-  if(error){ aggText.textContent = 'Error loading votes.'; return; }
-
+  const { data: rows } = await sb.from('item_votes').select('agree, suggested_price').eq('item_id', itemId);
   let agrees=0, disagrees=0, sum=0, n=0;
-  for(const r of rows){
-    if(r.agree) agrees++;
-    else{
-      disagrees++;
-      if(typeof r.suggested_price === 'number') { sum += r.suggested_price; n++; }
-    }
-  }
-
-  const total = agrees + disagrees;
-  const agreePct = total ? Math.round(agrees*100/total) : 0;
-  agreeFill.style.width = agreePct + '%';
-  aggText.textContent = `Agree: ${agrees} • Disagree: ${disagrees} • ${agreePct}% agree`;
-  avgLine.textContent = n ? `Average suggested: ${money(Math.round(sum/n))}` : 'Average suggested: —';
+  for(const r of rows||[]){ if(r.agree) agrees++; else {disagrees++; if(typeof r.suggested_price==='number'){sum+=r.suggested_price;n++;}}}
+  const total=agrees+disagrees, pct= total? Math.round(agrees*100/total):0;
+  agreeFill.style.width=pct+'%';
+  aggText.textContent=`Agree: ${agrees} • Disagree: ${disagrees} • ${pct}% agree`;
+  avgLine.textContent= n? `Average suggested: ${money(Math.round(sum/n))}` : 'Average suggested: —';
 }
-
-// ---- Interactions
 agreeBtn.addEventListener('click', async ()=>{
   if(!me) return;
-  setActive('agree');
-  setVoteMsg('Saving…');
+  setActive('agree'); setVoteMsg('Saving…');
   const { error } = await sb.from('item_votes').upsert(
-    { item_id:itemId, voter_id:me.id, agree:true, suggested_price:null },
-    { onConflict:'item_id,voter_id' }
+    { item_id:itemId, voter_id:me.id, agree:true, suggested_price:null }, { onConflict:'item_id,voter_id' }
   );
-  if(error){ setVoteMsg('Error: ' + error.message); return; }
-  setVoteMsg('You agree with the price.', true);
-  await refreshAggregates();
+  if(error) return setVoteMsg('Error: '+error.message);
+  setVoteMsg('You agree with the price.', true); await refreshAggregates();
 });
-
 disagreeBtn.addEventListener('click', ()=>{
   if(!me) return;
-  setActive('disagree');
-  setVoteMsg(`Enter a suggestion within ${money(minBand)}–${money(maxBand)}.`);
+  setActive('disagree'); setVoteMsg(`Enter a suggestion within ${money(minBand)}–${money(maxBand)}.`);
   if(!suggestPriceEl.value) suggestPriceEl.value = Math.round(basePrice);
 });
-
 saveSuggestionBtn.addEventListener('click', async ()=>{
   if(!me) return;
   const val = Math.round(Number(suggestPriceEl.value||0));
   if(!val) return setVoteMsg('Enter a number.');
-  if(val < minBand || val > maxBand){
-    return setVoteMsg(`Must be between ${money(minBand)} and ${money(maxBand)}.`);
-  }
+  if(val<Math.round(basePrice*0.70)||val>Math.round(basePrice*1.30)) return setVoteMsg(`Must be between ${money(Math.round(basePrice*0.70))} and ${money(Math.round(basePrice*1.30))}.`);
   setVoteMsg('Saving…');
   const { error } = await sb.from('item_votes').upsert(
-    { item_id:itemId, voter_id:me.id, agree:false, suggested_price:val },
-    { onConflict:'item_id,voter_id' }
+    { item_id:itemId, voter_id:me.id, agree:false, suggested_price:val }, { onConflict:'item_id,voter_id' }
   );
-  if(error){ setVoteMsg('Error: ' + error.message); return; }
-  setVoteMsg('Saved your suggestion.', true);
-  await refreshAggregates();
+  if(error) return setVoteMsg('Error: '+error.message);
+  setVoteMsg('Saved your suggestion.', true); await refreshAggregates();
 });
 </script>
 </body>
