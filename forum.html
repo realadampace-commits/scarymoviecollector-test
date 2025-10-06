@@ -17,6 +17,7 @@
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   input{padding:8px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
   .childs{margin-top:10px;margin-left:16px}
+  .topbar{display:flex;align-items:center;justify-content:space-between}
 </style>
 </head>
 <body>
@@ -24,8 +25,11 @@
 <script type="module" src="/menu.js"></script>
 
 <div class="wrap">
-  <a href="index.html">← Home</a>
-  <h2>Forum</h2>
+  <div class="topbar">
+    <a href="index.html">← Home</a>
+    <a href="forum.html" style="color:#9ecbff">Forum</a>
+  </div>
+  <h2 style="margin-top:8px">Forum</h2>
 
   <!-- Moderator: create a top-level category -->
   <div id="modTop" class="card" style="display:none">
@@ -38,92 +42,155 @@
   </div>
 
   <div class="card">
-    <ul id="tree" class="tree"></ul>
+    <div id="status" class="muted">Loading categories…</div>
+    <ul id="tree" class="tree" style="margin-top:8px"></ul>
   </div>
 </div>
 
-<!-- only the <script> part changed to include created_by on inserts -->
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const sb = supabase.createClient(
- 'https://wktxpukjmvmhzpctttjx.supabase.co',
- 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
-);
+(function(){
+  const sb = supabase.createClient(
+    'https://wktxpukjmvmhzpctttjx.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+  );
 
-const treeEl = document.getElementById('tree');
-const modTop = document.getElementById('modTop');
-const catTitle = document.getElementById('catTitle');
-const addCat = document.getElementById('addCat');
-const modMsg = document.getElementById('modMsg');
+  const treeEl   = document.getElementById('tree');
+  const statusEl = document.getElementById('status');
+  const modTop   = document.getElementById('modTop');
+  const catTitle = document.getElementById('catTitle');
+  const addCat   = document.getElementById('addCat');
+  const modMsg   = document.getElementById('modMsg');
 
-let me=null, myRole='free';
+  let myRole = 'free';
+  let me = null;
 
-(async function init(){
-  const { data:{ session } } = await sb.auth.getSession();
-  me = session?.user || null;
-  if (me) {
-    const { data: p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
-    myRole = p?.role || 'free';
+  // Utility render helpers
+  const setStatus = (t, cls='muted') => { statusEl.className = cls; statusEl.textContent = t; };
+  const setModMsg = (t, cls='muted') => { modMsg.className = cls; modMsg.textContent = t; };
+
+  // Build tree HTML safely
+  function renderNodes(byParent, parentKey){
+    const list = byParent[parentKey] || [];
+    return list.map(node=>{
+      const hasChildren = !!(byParent[node.id] && byParent[node.id].length);
+      const childHtml = hasChildren ? `<div class="childs">${renderNodes(byParent, node.id)}</div>` : '';
+      const actions = (myRole === 'moderator')
+        ? `<div class="row">
+            <a class="btn" href="forum_category.html?id=${node.id}">Open</a>
+            <button class="btn" data-act="addSub" data-id="${node.id}">Add Sub</button>
+            <button class="btn" style="background:#933" data-act="delCat" data-id="${node.id}">Delete</button>
+           </div>`
+        : `<a class="btn" href="forum_category.html?id=${node.id}">Open</a>`;
+      return `
+        <li class="node">
+          <div class="nodeHead">
+            <strong>${escapeHtml(node.title)}</strong>
+            ${actions}
+          </div>
+          ${childHtml}
+        </li>
+      `;
+    }).join('');
   }
-  if (myRole==='moderator') modTop.style.display='block';
-  await loadTree();
+
+  function escapeHtml(s){
+    return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  }
+
+  async function loadTree(){
+    try{
+      setStatus('Loading categories…','muted');
+      const { data: cats, error } = await sb
+        .from('forum_categories')
+        .select('id,title,parent_id,created_at')
+        .order('title',{ascending:true});
+      if (error) {
+        console.error(error);
+        setStatus('Error loading categories: ' + error.message, 'err');
+        treeEl.innerHTML = '';
+        return;
+      }
+      const byParent = {};
+      (cats||[]).forEach(c=>{
+        const key = c.parent_id || 'root';
+        (byParent[key] ||= []).push(c);
+      });
+      const html = renderNodes(byParent, 'root');
+      treeEl.innerHTML = html || '<li class="muted">No categories yet.</li>';
+      setStatus(html ? '' : 'Create the first category (moderators only).');
+    }catch(e){
+      console.error(e);
+      setStatus('Unexpected error loading categories.', 'err');
+    }
+  }
+
+  // Event delegation for moderator buttons inside the tree
+  treeEl.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const act = btn.getAttribute('data-act');
+    const id  = btn.getAttribute('data-id');
+    if (act === 'addSub') {
+      const t = prompt('Subcategory title?');
+      if (!t) return;
+      try{
+        const { data:{ session } } = await sb.auth.getSession();
+        const uid = session?.user?.id || null;
+        const { error } = await sb.from('forum_categories')
+          .insert({ title: t.trim(), parent_id: id, created_by: uid });
+        if (error) return setModMsg('Error: ' + error.message, 'err');
+        setModMsg('Created.', 'ok');
+        await loadTree();
+      }catch(err){ console.error(err); setModMsg('Unexpected error.', 'err'); }
+    } else if (act === 'delCat') {
+      if (!confirm('Delete this category and all its subcategories/posts/replies?')) return;
+      try{
+        const { error } = await sb.from('forum_categories').delete().eq('id', id);
+        if (error) return setModMsg('Error: ' + error.message, 'err');
+        setModMsg('Deleted.', 'ok');
+        await loadTree();
+      }catch(err){ console.error(err); setModMsg('Unexpected error.', 'err'); }
+    }
+  });
+
+  // Init
+  (async function init(){
+    try{
+      const { data:{ session } } = await sb.auth.getSession();
+      me = session?.user || null;
+      if (me){
+        const { data:p, error:pe } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
+        if (pe) console.warn('profiles role error:', pe);
+        myRole = p?.role || 'free';
+      }
+      if (myRole === 'moderator') modTop.style.display = 'block';
+      await loadTree();
+    }catch(e){
+      console.error(e);
+      setStatus('Failed to initialize forum.', 'err');
+    }
+  })();
+
+  // Top-level add category
+  addCat.addEventListener('click', async ()=>{
+    const t = (catTitle.value||'').trim();
+    if (!t) { setModMsg('Enter a title.', 'err'); return; }
+    try{
+      const { data:{ session } } = await sb.auth.getSession();
+      const uid = session?.user?.id || null;
+      const { error } = await sb.from('forum_categories').insert({ title: t, parent_id: null, created_by: uid });
+      if (error) return setModMsg('Error: ' + error.message, 'err');
+      catTitle.value = '';
+      setModMsg('Created.', 'ok');
+      await loadTree();
+    }catch(e){
+      console.error(e);
+      setModMsg('Unexpected error.', 'err');
+    }
+  });
 })();
-
-async function loadTree(){
-  const { data: cats } = await sb
-    .from('forum_categories')
-    .select('id,title,parent_id,created_at')
-    .order('title',{ascending:true});
-  const byParent = {};
-  (cats||[]).forEach(c=>{ (byParent[c.parent_id||'root'] ||= []).push(c); });
-  treeEl.innerHTML = renderNodes(byParent, 'root');
-}
-
-function renderNodes(byParent, key){
-  const list = byParent[key] || [];
-  return list.map(node=>{
-    const hasChildren = !!(byParent[node.id]?.length);
-    const childHtml = hasChildren ? `<div class="childs">${renderNodes(byParent,node.id)}</div>` : '';
-    const actions = myRole==='moderator'
-      ? `<div class="row">
-           <a class="btn" href="forum_category.html?id=${node.id}">Open</a>
-           <button class="btn" onclick="addSub('${node.id}')">Add Sub</button>
-           <button class="btn" style="background:#933" onclick="delCat('${node.id}')">Delete</button>
-         </div>`
-      : `<a class="btn" href="forum_category.html?id=${node.id}">Open</a>`;
-    return `
-      <li class="node">
-        <div class="nodeHead">
-          <strong>${node.title}</strong>
-          ${actions}
-        </div>
-        ${childHtml}
-      </li>
-    `;
-  }).join('');
-}
-
-window.addSub = async (parentId)=>{
-  const t = prompt('Subcategory title?'); if(!t) return;
-  const { data:{ session } } = await sb.auth.getSession();
-  const uid = session?.user?.id;
-  const { error } = await sb.from('forum_categories').insert({ title: t.trim(), parent_id: parentId, created_by: uid });
-  if (error) { modMsg.textContent='Error: '+error.message; modMsg.className='err'; return; }
-  modMsg.textContent='Created.'; modMsg.className='ok'; await loadTree();
-};
-addCat.onclick = async ()=>{
-  const t = catTitle.value.trim(); if(!t) return;
-  const { data:{ session } } = await sb.auth.getSession();
-  const uid = session?.user?.id;
-  const { error } = await sb.from('forum_categories').insert({ title: t, parent_id: null, created_by: uid });
-  if (error) { modMsg.textContent='Error: '+error.message; modMsg.className='err'; return; }
-  catTitle.value=''; modMsg.textContent='Created.'; modMsg.className='ok'; await loadTree();
-};
-window.delCat = async (id)=>{
-  if(!confirm('Delete this category and all its subcategories/posts/replies?')) return;
-  const { error } = await sb.from('forum_categories').delete().eq('id', id);
-  if (error) { modMsg.textContent='Error: '+error.message; modMsg.className='err'; return; }
-  modMsg.textContent='Deleted.'; modMsg.className='ok'; await loadTree();
-};
 </script>
 </body>
 </html>
