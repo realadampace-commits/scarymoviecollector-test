@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Thread — Scream Collector</title>
+<style>
+  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#dc143c}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  a{color:#9ecbff;text-decoration:none}
+  .wrap{max-width:900px;margin:0 auto;padding:24px}
+  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
+  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
+  .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;text-decoration:none}
+  .postHead{display:flex;align-items:flex-start;gap:12px}
+  .ava{position:relative;width:54px;height:54px;border-radius:50%;overflow:hidden;background:#333;flex:0 0 auto}
+  .ava img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+  .frame{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;transform:scale(var(--frameScale,1))}
+  .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .reply{display:grid;grid-template-columns:64px 1fr;gap:12px;border-top:1px solid #2a2a2a;padding-top:12px;margin-top:12px}
+  textarea,input{padding:10px;border-radius:8px;border:1px solid #333;background:#222;color:#eee}
+  textarea{width:100%}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+
+<div class="wrap">
+  <a id="back" href="forum.html">← Forum</a>
+
+  <!-- Main post -->
+  <div class="card" id="postCard">
+    <div class="postHead">
+      <div class="ava">
+        <img id="postAva" alt="">
+        <span id="postFrame" class="frame"></span>
+      </div>
+      <div>
+        <h2 id="postTitle" style="margin:0">Loading…</h2>
+        <div class="meta">
+          <span id="postAuthor">@user</span>
+          <span class="muted">•</span>
+          <span id="postTime" class="muted"></span>
+          <span class="muted">•</span>
+          <span id="postCount" class="muted"></span>
+        </div>
+      </div>
+      <div style="margin-left:auto" id="postActions"></div>
+    </div>
+    <div id="postBody" style="margin-top:12px;white-space:pre-wrap"></div>
+  </div>
+
+  <!-- Replies -->
+  <div class="card" id="repliesCard">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="margin:0">Replies</h3>
+      <span id="repliesCount" class="muted"></span>
+    </div>
+    <div id="replies"></div>
+  </div>
+
+  <!-- Reply box (all authenticated users inc. free) -->
+  <div class="card" id="replyBox" style="display:none">
+    <h3 style="margin-top:0">Add a reply</h3>
+    <textarea id="replyBody" rows="4" placeholder="Write your reply…"></textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="sendReply" class="btn" style="background:#2a6">Reply</button>
+      <span id="replyMsg" class="muted"></span>
+    </div>
+  </div>
+
+  <div id="guestMsg" class="muted" style="display:none">
+    <a id="loginLink" href="login.html">Log in</a> to reply.
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+ 'https://wktxpukjmvmhzpctttjx.supabase.co',
+ 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+const qs=new URLSearchParams(location.search);
+const postId=qs.get('id');
+const back=document.getElementById('back');
+
+const postAva=document.getElementById('postAva');
+const postFrame=document.getElementById('postFrame');
+const postTitle=document.getElementById('postTitle');
+const postAuthor=document.getElementById('postAuthor');
+const postTime=document.getElementById('postTime');
+const postBody=document.getElementById('postBody');
+const postActions=document.getElementById('postActions');
+const postCount=document.getElementById('postCount');
+
+const repliesEl=document.getElementById('replies');
+const repliesCount=document.getElementById('repliesCount');
+const replyBox=document.getElementById('replyBox');
+const replyBody=document.getElementById('replyBody');
+const sendReply=document.getElementById('sendReply');
+const replyMsg=document.getElementById('replyMsg');
+const guestMsg=document.getElementById('guestMsg');
+const loginLink=document.getElementById('loginLink');
+
+let me=null, myRole='free', post=null, authorProfile=null;
+
+function countPostsLabel(pcount, rcount){
+  const total = Number(pcount||0) + Number(rcount||0);
+  return `Posts: ${total}`;
+}
+
+(async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  me = session?.user || null;
+  if (me){
+    const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
+    myRole = p?.role || 'free';
+  } else {
+    guestMsg.style.display='block';
+    loginLink.href = 'login.html?next=' + encodeURIComponent(location.pathname+location.search);
+  }
+
+  const q = await sb.from('forum_posts')
+    .select('id,title,body,created_at,author_id,category_id, author:author_id(username,avatar_url,frame_url,frame_scale,post_count,reply_count)')
+    .eq('id',postId).maybeSingle();
+  if(!q.data){ postTitle.textContent='Post not found'; return; }
+  post = q.data;
+  authorProfile = post.author;
+
+  back.href = 'forum_category.html?id=' + post.category_id;
+
+  // render post
+  postTitle.textContent = post.title;
+  postAuthor.innerHTML = authorProfile?.username ? `<a href="user.html?u=${encodeURIComponent(authorProfile.username)}">@${authorProfile.username}</a>` : 'unknown';
+  postTime.textContent = new Date(post.created_at).toLocaleString();
+  postBody.textContent = post.body || '';
+  if (authorProfile?.avatar_url) postAva.src = authorProfile.avatar_url;
+  if (authorProfile?.frame_url) {
+    postFrame.style.backgroundImage = `url('${authorProfile.frame_url}')`;
+    postFrame.style.setProperty('--frameScale', authorProfile.frame_scale ?? 1);
+  }
+  postCount.textContent = countPostsLabel(authorProfile?.post_count, authorProfile?.reply_count);
+
+  // post actions (author or mod)
+  if (me && (me.id === post.author_id || myRole==='moderator')){
+    const del = document.createElement('button');
+    del.className='btn'; del.style.background='#933'; del.textContent='Delete Post';
+    del.onclick = async ()=>{
+      if(!confirm('Delete this post and all replies?')) return;
+      const { error } = await sb.from('forum_posts').delete().eq('id', post.id);
+      if (error) return alert('Delete error: '+error.message);
+      location.href = back.href;
+    };
+    postActions.appendChild(del);
+  }
+
+  // replies
+  await loadReplies();
+
+  // reply box visibility (all authenticated)
+  if (me) replyBox.style.display='block';
+})();
+
+async function loadReplies(){
+  const { data: reps } = await sb
+    .from('forum_replies')
+    .select('id,body,created_at,author:author_id(username,avatar_url,frame_url,frame_scale,post_count,reply_count),author_id')
+    .eq('post_id', postId)
+    .order('created_at',{ascending:true});
+
+  repliesEl.innerHTML = (reps||[]).map(r=>`
+    <div class="reply" data-id="${r.id}">
+      <div class="ava">
+        ${r.author?.avatar_url ? `<img src="${r.author.avatar_url}" alt="">` : '<img alt="">'}
+        ${r.author?.frame_url ? `<span class="frame" style="--frameScale:${r.author.frame_scale ?? 1};background-image:url('${r.author.frame_url}')"></span>` : ''}
+      </div>
+      <div>
+        <div class="row" style="justify-content:space-between">
+          <div class="row">
+            <strong>${r.author?.username ? `<a href="user.html?u=${encodeURIComponent(r.author.username)}">@${r.author.username}</a>` : 'unknown'}</strong>
+            <span class="muted">• ${new Date(r.created_at).toLocaleString()}</span>
+            <span class="muted">• ${countPostsLabel(r.author?.post_count, r.author?.reply_count)}</span>
+          </div>
+          <div>
+            ${(me && (me.id===r.author_id || myRole==='moderator')) ? `<button class="btn" style="background:#933" onclick="delReply('${r.id}')">Delete</button>` : ''}
+          </div>
+        </div>
+        <div style="margin-top:6px;white-space:pre-wrap">${(r.body||'')}</div>
+      </div>
+    </div>
+  `).join('');
+
+  repliesCount.textContent = `${(reps||[]).length} repl${(reps||[]).length===1?'y':'ies'}`;
+}
+
+window.delReply = async (id)=>{
+  if(!confirm('Delete this reply?')) return;
+  const { error } = await sb.from('forum_replies').delete().eq('id', id);
+  if (error) return alert('Delete error: '+error.message);
+  await loadReplies();
+};
+
+sendReply.addEventListener('click', async ()=>{
+  const body = replyBody.value.trim();
+  if (!body) { replyMsg.textContent='Write something.'; replyMsg.className='err'; return; }
+  replyMsg.textContent='Posting…'; replyMsg.className='muted';
+  const { error } = await sb.from('forum_replies').insert({ post_id: postId, body });
+  if (error) { replyMsg.textContent='Error: '+error.message; replyMsg.className='err'; return; }
+  replyBody.value=''; replyMsg.textContent='Posted.'; replyMsg.className='ok';
+  await loadReplies();
+});
+</script>
+</body>
+</html>
