@@ -5,11 +5,11 @@
 <title>Thread — Scream Collector</title>
 <style>
   :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#dc143c}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
   a{color:#9ecbff;text-decoration:none}
   .wrap{max-width:900px;margin:0 auto;padding:24px}
-  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
-  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
+  .card{background:#1b1b1b;border-radius:12px;padding:16px;margin-top:16px}
+  .muted{color:#a9adb4}.ok{color:#9f9}.err{color:#f88}
   .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;text-decoration:none}
   .postHead{display:flex;align-items:flex-start;gap:12px}
   .ava{position:relative;width:54px;height:54px;border-radius:50%;overflow:hidden;background:#333;flex:0 0 auto}
@@ -17,8 +17,7 @@
   .frame{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;transform:scale(var(--frameScale,1))}
   .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .reply{display:grid;grid-template-columns:64px 1fr;gap:12px;border-top:1px solid #2a2a2a;padding-top:12px;margin-top:12px}
-  textarea,input{padding:10px;border-radius:8px;border:1px solid #333;background:#222;color:#eee}
-  textarea{width:100%}
+  textarea{padding:10px;border-radius:8px;border:1px solid #333;background:#222;color:#eee;width:100%}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 </style>
 </head>
@@ -29,7 +28,6 @@
 <div class="wrap">
   <a id="back" href="forum.html">← Forum</a>
 
-  <!-- Main post -->
   <div class="card" id="postCard">
     <div class="postHead">
       <div class="ava">
@@ -51,7 +49,6 @@
     <div id="postBody" style="margin-top:12px;white-space:pre-wrap"></div>
   </div>
 
-  <!-- Replies -->
   <div class="card" id="repliesCard">
     <div style="display:flex;align-items:center;justify-content:space-between">
       <h3 style="margin:0">Replies</h3>
@@ -60,7 +57,6 @@
     <div id="replies"></div>
   </div>
 
-  <!-- Reply box (all authenticated users inc. free) -->
   <div class="card" id="replyBox" style="display:none">
     <h3 style="margin-top:0">Add a reply</h3>
     <textarea id="replyBody" rows="4" placeholder="Write your reply…"></textarea>
@@ -83,8 +79,8 @@ const sb = supabase.createClient(
 );
 const qs=new URLSearchParams(location.search);
 const postId=qs.get('id');
-const back=document.getElementById('back');
 
+const back=document.getElementById('back');
 const postAva=document.getElementById('postAva');
 const postFrame=document.getElementById('postFrame');
 const postTitle=document.getElementById('postTitle');
@@ -130,7 +126,6 @@ function countPostsLabel(pcount, rcount){
 
   back.href = 'forum_category.html?id=' + post.category_id;
 
-  // render post
   postTitle.textContent = post.title;
   postAuthor.innerHTML = authorProfile?.username ? `<a href="user.html?u=${encodeURIComponent(authorProfile.username)}">@${authorProfile.username}</a>` : 'unknown';
   postTime.textContent = new Date(post.created_at).toLocaleString();
@@ -142,7 +137,6 @@ function countPostsLabel(pcount, rcount){
   }
   postCount.textContent = countPostsLabel(authorProfile?.post_count, authorProfile?.reply_count);
 
-  // post actions (author or mod)
   if (me && (me.id === post.author_id || myRole==='moderator')){
     const del = document.createElement('button');
     del.className='btn'; del.style.background='#933'; del.textContent='Delete Post';
@@ -155,10 +149,7 @@ function countPostsLabel(pcount, rcount){
     postActions.appendChild(del);
   }
 
-  // replies
   await loadReplies();
-
-  // reply box visibility (all authenticated)
   if (me) replyBox.style.display='block';
 })();
 
@@ -189,7 +180,7 @@ async function loadReplies(){
         <div style="margin-top:6px;white-space:pre-wrap">${(r.body||'')}</div>
       </div>
     </div>
-  `).join('');
+  ).join('');
 
   repliesCount.textContent = `${(reps||[]).length} repl${(reps||[]).length===1?'y':'ies'}`;
 }
@@ -202,10 +193,13 @@ window.delReply = async (id)=>{
 };
 
 sendReply.addEventListener('click', async ()=>{
+  if (!me) return;
   const body = replyBody.value.trim();
   if (!body) { replyMsg.textContent='Write something.'; replyMsg.className='err'; return; }
   replyMsg.textContent='Posting…'; replyMsg.className='muted';
-  const { error } = await sb.from('forum_replies').insert({ post_id: postId, body });
+  const { error } = await sb.from('forum_replies').insert({
+    post_id: postId, body, author_id: me.id    // <-- include author_id
+  });
   if (error) { replyMsg.textContent='Error: '+error.message; replyMsg.className='err'; return; }
   replyBody.value=''; replyMsg.textContent='Posted.'; replyMsg.className='ok';
   await loadReplies();
