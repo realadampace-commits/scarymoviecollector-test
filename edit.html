@@ -6,13 +6,15 @@
 <style>
   :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#dc143c;--ok:#2a6}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
-  .wrap{max-width:960px;margin:0 auto;padding:24px}
   a{color:#9ecbff;text-decoration:none}
+  .wrap{max-width:960px;margin:0 auto;padding:24px}
   .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
+  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
   input,textarea,button{padding:10px;border-radius:8px;border:1px solid #333;background:#222;color:#eee}
   input,textarea{width:100%}
   button{border:none;background:var(--accent);cursor:pointer}
-  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
+  .row{display:grid;grid-template-columns:180px 1fr;gap:14px;align-items:center}
+  .small{font-size:12px;opacity:.8}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
   .tile{position:relative;background:#161616;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden}
   .tile img{width:100%;height:140px;object-fit:cover;display:block}
@@ -22,6 +24,7 @@
   .btn{padding:8px 12px;border:none;border-radius:8px;cursor:pointer}
   .btn.del{background:#933}
   .btn.add{background:var(--ok)}
+  .actions{display:flex;gap:10px;align-items:center}
 </style>
 </head>
 <body>
@@ -32,6 +35,20 @@
   <a href="#" id="backLink">← Back to item</a>
   <h2>Edit Item</h2>
 
+  <!-- Details -->
+  <div class="card">
+    <div class="row"><label for="title">Title</label><input id="title" placeholder="Item title"></div>
+    <div class="row"><label for="price">Your value ($)</label><input id="price" type="number" min="0" step="1" placeholder="e.g. 150"></div>
+    <div class="row" style="align-items:start"><label for="desc" style="padding-top:10px">Description</label><textarea id="desc" rows="5" placeholder="Describe the item…"></textarea></div>
+
+    <div class="actions" style="margin-top:12px">
+      <button id="saveDetails">Save changes</button>
+      <span id="detailsMsg" class="muted"></span>
+    </div>
+    <div class="small" style="margin-top:6px">Owners and moderators can edit these fields.</div>
+  </div>
+
+  <!-- Photos -->
   <div class="card">
     <div class="tools">
       <strong>Photos</strong>
@@ -46,6 +63,7 @@
       <button id="delBtn" class="btn del">Delete Selected</button>
       <span id="msg" class="muted"></span>
     </div>
+    <div class="small" style="margin-top:6px">Up to 5 images total. First image is treated as the main image.</div>
   </div>
 </div>
 
@@ -56,10 +74,18 @@ const sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
 const BUCKET='item-images';
+
 const qs=new URLSearchParams(location.search);
 const itemId=qs.get('id');
+
 const backLink=document.getElementById('backLink');
 backLink.href='item.html?id='+itemId;
+
+const titleEl=document.getElementById('title');
+const priceEl=document.getElementById('price');
+const descEl=document.getElementById('desc');
+const saveDetails=document.getElementById('saveDetails');
+const detailsMsg=document.getElementById('detailsMsg');
 
 const grid=document.getElementById('grid');
 const newFiles=document.getElementById('newFiles');
@@ -72,17 +98,25 @@ let me=null, ownerId=null, myRole='free';
 let images=[];
 
 function msg(t, cls='muted'){ msgEl.className=cls; msgEl.textContent=t; }
+function dmsg(t, cls='muted'){ detailsMsg.className=cls; detailsMsg.textContent=t; }
 
 (async function init(){
   if(!itemId){ alert('Missing item id'); location.href='index.html'; return; }
+
+  // auth
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ alert('Please sign in.'); location.href='login.html?next='+encodeURIComponent('edit.html?id='+itemId); return; }
   me = session.user;
+
+  // role
   const vp = await sb.from('profiles').select('role').eq('id', me.id).maybeSingle();
   myRole = vp.data?.role || 'free';
 
-  // fetch item to validate owner or moderator
-  const it = await sb.from('items').select('id,owner_id').eq('id', itemId).maybeSingle();
+  // fetch item to validate permission and load fields
+  const it = await sb.from('items')
+    .select('id,owner_id,title,description,user_value')
+    .eq('id', itemId).maybeSingle();
+
   ownerId = it.data?.owner_id || null;
   if (!(ownerId && (ownerId===me.id || myRole==='moderator'))) {
     alert('You do not have permission to edit this item.');
@@ -90,9 +124,32 @@ function msg(t, cls='muted'){ msgEl.className=cls; msgEl.textContent=t; }
     return;
   }
 
+  // Fill fields
+  titleEl.value = it.data?.title || '';
+  descEl.value  = it.data?.description || '';
+  priceEl.value = it.data?.user_value ?? '';
+
   await refreshImages();
 })();
 
+saveDetails.addEventListener('click', async ()=>{
+  const title = titleEl.value.trim();
+  const description = descEl.value.trim();
+  const user_value = Number(priceEl.value || 0);
+
+  if (!title) return dmsg('Title is required.', 'err');
+  if (!(user_value >= 0)) return dmsg('Enter a valid price (0 or higher).', 'err');
+
+  dmsg('Saving…');
+  const { error } = await sb.from('items')
+    .update({ title, description, user_value })
+    .eq('id', itemId);
+  if (error) return dmsg('Save error: ' + error.message, 'err');
+
+  dmsg('Saved!', 'ok');
+});
+
+// --------- Photos ----------
 async function refreshImages(){
   const { data } = await sb.from('items_images')
     .select('id,image_url,position,created_at')
@@ -111,7 +168,7 @@ function renderGrid(){
       <img src="${img.image_url}" alt="">
       <div class="bar">
         <span class="muted">pos ${img.position+1}</span>
-        <input type="checkbox" class="chk">
+        <input type="checkbox" class="chk" title="Select to delete">
       </div>
     </div>
   `).join('');
@@ -140,11 +197,11 @@ addBtn.addEventListener('click', async ()=>{
 });
 
 delBtn.addEventListener('click', async ()=>{
-  const checks = Array.from(grid.querySelectorAll('.tile')).filter(t => t.querySelector('.chk').checked);
-  if (!checks.length) return msg('Select photos to delete.', 'err');
+  const picks = Array.from(grid.querySelectorAll('.tile')).filter(t => t.querySelector('.chk').checked);
+  if (!picks.length) return msg('Select photos to delete.', 'err');
   if (!confirm('Delete selected photos?')) return;
 
-  for (const tile of checks) {
+  for (const tile of picks) {
     const id = tile.dataset.id;
     const del = await sb.from('items_images').delete().eq('id', id);
     if (del.error) return msg('Delete error: ' + del.error.message, 'err');
