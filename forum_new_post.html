@@ -5,11 +5,11 @@
 <title>New Post — Scream Collector</title>
 <style>
   :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#2a6}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
   a{color:#9ecbff;text-decoration:none}
   .wrap{max-width:800px;margin:0 auto;padding:24px}
-  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
-  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
+  .card{background:#1b1b1b;border-radius:12px;padding:16px;margin-top:16px}
+  .muted{color:#a9adb4}.ok{color:#9f9}.err{color:#f88}
   input,textarea,button{padding:10px;border-radius:8px;border:1px solid #333;background:#222;color:#eee}
   input,textarea{width:100%}
   button{border:none;background:var(--accent);cursor:pointer}
@@ -46,9 +46,9 @@ const catId = qs.get('cat');
 document.getElementById('back').href = 'forum_category.html?id=' + catId;
 
 const titleEl = document.getElementById('title');
-const bodyEl = document.getElementById('body');
+const bodyEl  = document.getElementById('body');
 const saveBtn = document.getElementById('save');
-const msgEl = document.getElementById('msg');
+const msgEl   = document.getElementById('msg');
 const msg=(t,cls='muted')=>{msgEl.className=cls; msgEl.textContent=t;};
 
 let me=null, myRole='free';
@@ -69,7 +69,7 @@ saveBtn.addEventListener('click', async ()=>{
 
   msg('Creating…');
   const { data: ins, error } = await sb.from('forum_posts').insert({
-    title, body, category_id: catId
+    title, body, category_id: catId, author_id: me.id   // <-- include author_id
   }).select('id').single();
 
   if (error) return msg('Error: '+error.message,'err');
