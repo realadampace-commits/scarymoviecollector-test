@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>New Post — Scream Collector</title>
+<style>
+  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#2a6}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  a{color:#9ecbff;text-decoration:none}
+  .wrap{max-width:800px;margin:0 auto;padding:24px}
+  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
+  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
+  input,textarea,button{padding:10px;border-radius:8px;border:1px solid #333;background:#222;color:#eee}
+  input,textarea{width:100%}
+  button{border:none;background:var(--accent);cursor:pointer}
+</style>
+</head>
+<body>
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+
+<div class="wrap">
+  <a id="back" href="forum.html">← Forum</a>
+  <h2>New Post</h2>
+
+  <div class="card">
+    <label>Title</label>
+    <input id="title" placeholder="Thread title"/>
+    <label style="margin-top:10px">Body</label>
+    <textarea id="body" rows="8" placeholder="Write your post…"></textarea>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+      <button id="save">Create</button>
+      <span id="msg" class="muted"></span>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+ 'https://wktxpukjmvmhzpctttjx.supabase.co',
+ 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+const qs = new URLSearchParams(location.search);
+const catId = qs.get('cat');
+document.getElementById('back').href = 'forum_category.html?id=' + catId;
+
+const titleEl = document.getElementById('title');
+const bodyEl = document.getElementById('body');
+const saveBtn = document.getElementById('save');
+const msgEl = document.getElementById('msg');
+const msg=(t,cls='muted')=>{msgEl.className=cls; msgEl.textContent=t;};
+
+let me=null, myRole='free';
+
+(async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ alert('Please sign in.'); location.href='login.html?next='+encodeURIComponent(location.pathname+location.search); return; }
+  me = session.user;
+  const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
+  myRole = p?.role || 'free';
+  if (myRole==='free'){ alert('Free members cannot create posts.'); location.href='forum_category.html?id='+catId; return; }
+})();
+
+saveBtn.addEventListener('click', async ()=>{
+  const title = titleEl.value.trim();
+  const body  = bodyEl.value.trim();
+  if(!title || !body) return msg('Title and body required.','err');
+
+  msg('Creating…');
+  const { data: ins, error } = await sb.from('forum_posts').insert({
+    title, body, category_id: catId
+  }).select('id').single();
+
+  if (error) return msg('Error: '+error.message,'err');
+  location.href = 'forum_post.html?id=' + ins.id;
+});
+</script>
+</body>
+</html>
