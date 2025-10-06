@@ -2,14 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Add Item</title>
+<title>Create Item — Scream Collector</title>
 <style>
-  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
-  .wrap{max-width:720px;margin:0 auto;padding:24px}
-  input,textarea,button{width:100%;padding:10px;margin-top:10px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
-  button{border:none;background:crimson;cursor:pointer}
+  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#dc143c}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  .wrap{max-width:860px;margin:0 auto;padding:24px}
   a{color:#9ecbff;text-decoration:none}
+  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
+  input,textarea,button{padding:10px;border-radius:8px;border:1px solid #333;background:#222;color:#eee}
+  input,textarea{width:100%}
+  button{border:none;background:var(--accent);cursor:pointer}
+  .row{display:grid;grid-template-columns:180px 1fr;gap:14px;align-items:center}
+  .muted{color:var(--muted)}
   .ok{color:#9f9}.err{color:#f88}
+  .thumbs{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .upbox{background:#161616;border:1px dashed #333;border-radius:10px;padding:12px}
 </style>
 </head>
 <body>
@@ -18,78 +25,99 @@
 
 <div class="wrap">
   <a href="index.html">← Home</a>
-  <h2>Add Item</h2>
-  <input id="title" placeholder="Title" />
-  <textarea id="desc" placeholder="Description"></textarea>
-  <input id="value" type="number" min="0" placeholder="Value (USD)" />
-  <input id="file" type="file" accept="image/*" />
-  <button id="create">Create</button>
-  <div id="msg" style="margin-top:10px;opacity:.95;white-space:pre-wrap"></div>
+  <h2>Create a new Item</h2>
+
+  <div class="card">
+    <div class="row"><label>Title</label><input id="title" placeholder="Item title"/></div>
+    <div class="row"><label>Description</label><textarea id="desc" rows="4" placeholder="Describe the item…"></textarea></div>
+    <div class="row"><label>Your value ($)</label><input id="price" type="number" step="1" min="0" placeholder="e.g. 150"/></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 6px">Images (up to 5)</h3>
+    <div class="upbox">
+      <input id="imgFiles" type="file" accept="image/*" multiple />
+      <div class="muted" style="margin-top:6px">Tip: select up to 5 images. First image becomes the main display.</div>
+      <div id="previews" class="thumbs"></div>
+    </div>
+  </div>
+
+  <div class="card" style="display:flex;gap:10px;align-items:center">
+    <button id="saveBtn">Create Item</button>
+    <span id="msg" class="muted"></span>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const sb = supabase.createClient('https://wktxpukjmvmhzpctttjx.supabase.co',
-'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY');
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
 const BUCKET = 'item-images';
 
-function show(t, cls=''){ const m=document.getElementById('msg'); m.className=cls; m.textContent=t; }
-function append(t){ const m=document.getElementById('msg'); m.textContent=(m.textContent?m.textContent+'\n':'')+t; }
+const titleEl = document.getElementById('title');
+const descEl  = document.getElementById('desc');
+const priceEl = document.getElementById('price');
+const imgFiles= document.getElementById('imgFiles');
+const previews= document.getElementById('previews');
+const saveBtn = document.getElementById('saveBtn');
+const msgEl   = document.getElementById('msg');
 
-document.getElementById('create').onclick = async ()=>{
-  try{
-    show('Checking session...');
-    const { data:{ session } } = await sb.auth.getSession();
-    if (!session){ alert('Please login first'); location.href='login.html'; return; }
-
-    // Free-tier / subscriber check
-    const { data: me } = await sb.from('profiles').select('role').eq('id', session.user.id).maybeSingle();
-    if (me?.role === 'free') {
-      const { count } = await sb.from('items').select('id', { count: 'exact', head: true }).eq('owner_id', session.user.id);
-      if ((count ?? 0) >= 5) {
-        show('Free tier limit reached (5 items). Upgrade to subscriber to add more.', 'err');
-        return;
-      }
-    }
-
-    // Ensure profile
-    append('Ensuring profile...');
-    const { data: prof } = await sb.from('profiles').select('id').eq('id', session.user.id).maybeSingle();
-    if (!prof){ await sb.from('profiles').insert({ id: session.user.id, username: session.user.email.split('@')[0] }); }
-
-    const title = document.getElementById('title').value.trim();
-    const description = document.getElementById('desc').value.trim();
-    const user_value = Number(document.getElementById('value').value) || 0;
-    const file = document.getElementById('file').files[0];
-    if (!title){ show('Please enter a title.', 'err'); return; }
-
-    append('Creating item row...');
-    const ins = await sb.from('items').insert({ owner_id: session.user.id, title, description, user_value }).select().single();
-    if (ins.error){ show('DB insert error: ' + ins.error.message, 'err'); return; }
-    const itemId = ins.data.id;
-
-    let publicUrl = null;
-    if (file){
-      append('Uploading image...');
-      const safeName = file.name.replace(/[^\w.\-]+/g,'_');
-      const path = `items/${session.user.id}/${itemId}/main-${Date.now()}-${safeName}`;
-      const up = await sb.storage.from(BUCKET).upload(path, file, { upsert:true, contentType:file.type });
-      if (up.error){ show('Upload error: ' + up.error.message, 'err'); return; }
-
-      publicUrl = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
-      append('Image URL: ' + publicUrl);
-      const upd = await sb.from('items').update({ image_url: publicUrl }).eq('id', itemId);
-      if (upd.error){ show('DB update error (image_url): ' + upd.error.message, 'err'); return; }
-    }
-
-    show('Item created successfully. Redirecting...', 'ok');
-    location.href = 'item.html?id=' + itemId;
-
-  }catch(e){
-    show('Unexpected error: ' + (e?.message || e), 'err');
-    console.error(e);
+imgFiles.addEventListener('change', ()=>{
+  previews.innerHTML = '';
+  const files = Array.from(imgFiles.files).slice(0,5);
+  files.forEach(f=>{
+    const url = URL.createObjectURL(f);
+    const el = document.createElement('img');
+    el.src = url; el.style.width='120px'; el.style.height='120px'; el.style.objectFit='cover'; el.style.borderRadius='8px';
+    previews.appendChild(el);
+  });
+  if (imgFiles.files.length > 5) {
+    msg('Only the first 5 images will be used.', 'err');
   }
-};
+});
+
+function msg(t, cls='muted'){ msgEl.className=cls; msgEl.textContent=t; }
+
+saveBtn.addEventListener('click', async ()=>{
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) { alert('Please sign in.'); location.href='login.html?next=create.html'; return; }
+
+  const title = titleEl.value.trim();
+  const description = descEl.value.trim();
+  const user_value = Number(priceEl.value||0);
+  if (!title || !user_value) return msg('Title and price are required.', 'err');
+
+  msg('Creating…');
+
+  // 1) create item row
+  const { data: ins, error: e1 } = await sb
+    .from('items')
+    .insert({ title, description, user_value })
+    .select('id')
+    .single();
+  if (e1) return msg('Create error: ' + e1.message, 'err');
+
+  const itemId = ins.id;
+
+  // 2) upload up to 5 images and create rows in items_images
+  const files = Array.from(imgFiles.files).slice(0,5);
+  let position = 0;
+  for (const f of files) {
+    const safe = f.name.replace(/[^\w.\-]+/g,'_');
+    const path = `${itemId}/${Date.now()}-${position}-${safe}`;
+    const up = await sb.storage.from(BUCKET).upload(path, f, { upsert:true, contentType:f.type });
+    if (up.error) { msg('Upload error: ' + up.error.message, 'err'); return; }
+    const pub = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    const insImg = await sb.from('items_images').insert({ item_id:itemId, image_url:pub, position });
+    if (insImg.error) { msg('Image save error: ' + insImg.error.message, 'err'); return; }
+    position++;
+  }
+
+  msg('Created!', 'ok');
+  location.href = 'item.html?id=' + itemId;
+});
 </script>
 </body>
 </html>
