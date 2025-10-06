@@ -2,99 +2,156 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Edit Item</title>
+<title>Edit Item — Scream Collector</title>
 <style>
-  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
-  .wrap{max-width:720px;margin:0 auto;padding:24px}
-  input,textarea,button{width:100%;padding:10px;margin-top:10px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
-  button{border:none;background:crimson;cursor:pointer}
+  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#dc143c;--ok:#2a6}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:24px}
   a{color:#9ecbff;text-decoration:none}
-  .ok{color:#9f9}.err{color:#f88}
+  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
+  input,textarea,button{padding:10px;border-radius:8px;border:1px solid #333;background:#222;color:#eee}
+  input,textarea{width:100%}
+  button{border:none;background:var(--accent);cursor:pointer}
+  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+  .tile{position:relative;background:#161616;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden}
+  .tile img{width:100%;height:140px;object-fit:cover;display:block}
+  .tile .bar{display:flex;align-items:center;justify-content:space-between;padding:8px}
+  .tile input[type=checkbox]{transform:scale(1.2)}
+  .tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .btn{padding:8px 12px;border:none;border-radius:8px;cursor:pointer}
+  .btn.del{background:#933}
+  .btn.add{background:var(--ok)}
 </style>
 </head>
 <body>
 <app-menu></app-menu>
 <script type="module" src="/menu.js"></script>
+
 <div class="wrap">
-  <a href="index.html">← Home</a>
+  <a href="#" id="backLink">← Back to item</a>
   <h2>Edit Item</h2>
-  <input id="title" placeholder="Title" />
-  <textarea id="desc" placeholder="Description"></textarea>
-  <input id="value" type="number" min="0" placeholder="Value (USD)" />
-  <input id="file" type="file" accept="image/*" />
-  <button id="save">Save Changes</button>
-  <div id="msg" style="margin-top:10px;opacity:.95;white-space:pre-wrap"></div>
+
+  <div class="card">
+    <div class="tools">
+      <strong>Photos</strong>
+      <span id="capMsg" class="muted"></span>
+    </div>
+
+    <div id="grid" class="grid" style="margin-top:10px"></div>
+
+    <div class="tools" style="margin-top:12px">
+      <input id="newFiles" type="file" accept="image/*" multiple />
+      <button id="addBtn" class="btn add">Upload</button>
+      <button id="delBtn" class="btn del">Delete Selected</button>
+      <span id="msg" class="muted"></span>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const PROJECT_URL = 'https://wktxpukjmvmhzpctttjx.supabase.co';
-const ANON_KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY';
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+const BUCKET='item-images';
+const qs=new URLSearchParams(location.search);
+const itemId=qs.get('id');
+const backLink=document.getElementById('backLink');
+backLink.href='item.html?id='+itemId;
 
-const sb = supabase.createClient(PROJECT_URL, ANON_KEY);
-const BUCKET = 'item-images';
+const grid=document.getElementById('grid');
+const newFiles=document.getElementById('newFiles');
+const addBtn=document.getElementById('addBtn');
+const delBtn=document.getElementById('delBtn');
+const msgEl=document.getElementById('msg');
+const capMsg=document.getElementById('capMsg');
 
-const qs = new URLSearchParams(location.search);
-const itemId = qs.get('id');
+let me=null, ownerId=null, myRole='free';
+let images=[];
 
-const msg = (t,cls='')=>{ const m=document.getElementById('msg'); m.className=cls; m.textContent=t; }
+function msg(t, cls='muted'){ msgEl.className=cls; msgEl.textContent=t; }
 
-let currentUserId=null, itemOwnerId=null;
-
-(async function load(){
+(async function init(){
+  if(!itemId){ alert('Missing item id'); location.href='index.html'; return; }
   const { data:{ session } } = await sb.auth.getSession();
-  currentUserId = session?.user?.id;
-  if (!session){ msg('Please login first.','err'); return; }
+  if(!session){ alert('Please sign in.'); location.href='login.html?next='+encodeURIComponent('edit.html?id='+itemId); return; }
+  me = session.user;
+  const vp = await sb.from('profiles').select('role').eq('id', me.id).maybeSingle();
+  myRole = vp.data?.role || 'free';
 
-  if (!itemId){ msg('No item id given.','err'); return; }
-
-  const { data:item, error } = await sb
-    .from('items')
-    .select('*')
-    .eq('id', itemId)
-    .maybeSingle();
-
-  if (error || !item){ msg('Item not found.','err'); return; }
-
-  itemOwnerId = item.owner_id;
-  if (itemOwnerId !== currentUserId){
-    msg('You do not own this item.','err'); return;
+  // fetch item to validate owner or moderator
+  const it = await sb.from('items').select('id,owner_id').eq('id', itemId).maybeSingle();
+  ownerId = it.data?.owner_id || null;
+  if (!(ownerId && (ownerId===me.id || myRole==='moderator'))) {
+    alert('You do not have permission to edit this item.');
+    location.href='item.html?id='+itemId;
+    return;
   }
 
-  // Pre-fill form
-  document.getElementById('title').value = item.title || '';
-  document.getElementById('desc').value = item.description || '';
-  document.getElementById('value').value = item.user_value || '';
+  await refreshImages();
 })();
 
-document.getElementById('save').onclick = async ()=>{
-  const title = document.getElementById('title').value.trim();
-  const description = document.getElementById('desc').value.trim();
-  const user_value = Number(document.getElementById('value').value) || 0;
-  const file = document.getElementById('file').files[0];
+async function refreshImages(){
+  const { data } = await sb.from('items_images')
+    .select('id,image_url,position,created_at')
+    .eq('item_id', itemId)
+    .order('position', {ascending:true})
+    .order('created_at', {ascending:true});
+  images = data || [];
+  capMsg.textContent = `(${images.length}/5 used)`;
+  renderGrid();
+}
 
-  if (!title){ msg('Please enter a title.','err'); return; }
+function renderGrid(){
+  if (!images.length){ grid.innerHTML = '<div class="muted">No photos yet.</div>'; return; }
+  grid.innerHTML = images.map(img => `
+    <div class="tile" data-id="${img.id}">
+      <img src="${img.image_url}" alt="">
+      <div class="bar">
+        <span class="muted">pos ${img.position+1}</span>
+        <input type="checkbox" class="chk">
+      </div>
+    </div>
+  `).join('');
+}
 
-  // Update item row
-  const { error:updateErr } = await sb.from('items')
-    .update({ title, description, user_value })
-    .eq('id', itemId);
-  if (updateErr){ msg('Update failed: ' + updateErr.message,'err'); return; }
+addBtn.addEventListener('click', async ()=>{
+  if (!newFiles.files.length) return msg('Choose images first.', 'err');
+  const remaining = 5 - images.length;
+  const files = Array.from(newFiles.files).slice(0, remaining);
+  if (files.length < newFiles.files.length) msg('Only the first '+remaining+' will be uploaded.', 'err');
 
-  // If new image uploaded
-  if (file){
-    const safeName = file.name.replace(/[^\w.\-]+/g,'_');
-    const path = `items/${currentUserId}/${itemId}/main-${Date.now()}-${safeName}`;
-    const up = await sb.storage.from(BUCKET).upload(path, file, { upsert:true, contentType:file.type });
-    if (up.error){ msg('Image upload failed: ' + up.error.message,'err'); return; }
-    const publicUrl = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
-    const { error:imgErr } = await sb.from('items').update({ image_url: publicUrl }).eq('id', itemId);
-    if (imgErr){ msg('Failed saving new image URL: ' + imgErr.message,'err'); return; }
+  let pos = images.length;
+  for (const f of files) {
+    const safe = f.name.replace(/[^\w.\-]+/g,'_');
+    const path = `${itemId}/${Date.now()}-${pos}-${safe}`;
+    const up = await sb.storage.from(BUCKET).upload(path, f, { upsert:true, contentType:f.type });
+    if (up.error) { return msg('Upload error: ' + up.error.message, 'err'); }
+    const pub = sb.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
+    const ins = await sb.from('items_images').insert({ item_id:itemId, image_url:pub, position:pos });
+    if (ins.error) { return msg('Save error: ' + ins.error.message, 'err'); }
+    pos++;
   }
+  newFiles.value = '';
+  msg('Uploaded!', 'ok');
+  await refreshImages();
+});
 
-  msg('Item updated successfully! Redirecting…','ok');
-  setTimeout(()=>{ location.href = 'item.html?id='+itemId; },1000);
-};
+delBtn.addEventListener('click', async ()=>{
+  const checks = Array.from(grid.querySelectorAll('.tile')).filter(t => t.querySelector('.chk').checked);
+  if (!checks.length) return msg('Select photos to delete.', 'err');
+  if (!confirm('Delete selected photos?')) return;
+
+  for (const tile of checks) {
+    const id = tile.dataset.id;
+    const del = await sb.from('items_images').delete().eq('id', id);
+    if (del.error) return msg('Delete error: ' + del.error.message, 'err');
+  }
+  msg('Deleted.', 'ok');
+  await refreshImages();
+});
 </script>
 </body>
 </html>
