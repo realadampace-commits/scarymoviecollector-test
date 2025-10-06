@@ -5,17 +5,29 @@
 <title>Account Settings</title>
 <style>
   body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
-  .wrap{max-width:780px;margin:0 auto;padding:24px}
+  .wrap{max-width:820px;margin:0 auto;padding:24px}
   a{color:#9ecbff;text-decoration:none}
-  .card{background:#1c1c1c;border-radius:12px;padding:16px;margin-top:16px}
+  .card{background:#1c1c1c;border-radius:12px;padding:16px;margin-top:16px;position:relative}
   .row{display:grid;grid-template-columns:160px 1fr;gap:16px;align-items:center}
   input,button,textarea{padding:10px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
   button{border:none;background:crimson;cursor:pointer}
   .muted{opacity:.8}
   .ok{color:#9f9}.err{color:#f88}
+  .avatarWrap{position:relative;width:120px;height:120px}
   .avatar{width:120px;height:120px;border-radius:999px;background:#222;display:flex;align-items:center;justify-content:center;overflow:hidden}
   .avatar img{max-width:100%;max-height:100%}
-  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  /* Frame overlay on avatar preview */
+  .frameOverlay{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none}
+
+  /* Cosmetics gallery */
+  .hscroll{display:flex;gap:12px;overflow:auto;padding-bottom:6px}
+  .frameCard{min-width:140px;background:#181818;border-radius:10px;border:1px solid #2a2a2a;padding:8px;text-align:center;cursor:pointer}
+  .frameThumb{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:#0f0f0f;border-radius:8px;position:relative;overflow:hidden}
+  .frameThumb img{max-width:100%;max-height:100%}
+  .sel{outline:2px solid #4ade80} /* selected */
+  .dim{opacity:.35;filter:grayscale(0.9)}
+  .lockOverlay{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;border-radius:12px;font-weight:600}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 </style>
 </head>
 <body>
@@ -36,8 +48,11 @@
   <div class="card">
     <h3>Profile Picture</h3>
     <div class="row">
-      <div class="avatar" id="avatarBox"><span class="muted">No image</span></div>
-      <div class="actions">
+      <div class="avatarWrap">
+        <div class="avatar" id="avatarBox"><span class="muted">No image</span></div>
+        <div id="frameOverlay" class="frameOverlay"></div>
+      </div>
+      <div class="tools">
         <input type="file" id="avatarFile" accept="image/*" />
         <button id="uploadAvatar">Upload</button>
         <div id="avatarMsg" class="muted"></div>
@@ -50,7 +65,7 @@
     <h3>Change Username</h3>
     <div class="row">
       <label for="username" class="muted">New username</label>
-      <div class="actions" style="display:flex;gap:8px">
+      <div class="tools">
         <input id="username" placeholder="e.g., nate008"/>
         <button id="saveUsername">Save</button>
       </div>
@@ -75,11 +90,37 @@
     <div id="showcaseMsg" class="muted"></div>
   </div>
 
+  <!-- Cosmetics: Frames -->
+  <div class="card" id="cosmeticsCard">
+    <h3 style="margin-bottom:10px">Cosmetics → Profile Picture Frames</h3>
+    <div id="lock" class="lockOverlay" style="display:none">Subscribe to unlock</div>
+
+    <div id="framesRow" class="hscroll"></div>
+
+    <div class="tools" id="subsTools" style="display:none">
+      <button id="saveFrame" style="background:#2a6">Use Selected Frame</button>
+      <button id="clearFrame" style="background:#555">Remove Frame</button>
+      <div id="frameMsg" class="muted"></div>
+    </div>
+
+    <!-- Moderator upload tools -->
+    <div id="modTools" style="display:none;margin-top:14px;border-top:1px dashed #333;padding-top:12px">
+      <h4 style="margin:0 0 6px">Moderator: Upload new frame</h4>
+      <div class="tools">
+        <input id="frameTitle" placeholder="Frame title (optional)" />
+        <input id="frameFile" type="file" accept="image/*" />
+        <button id="uploadFrame">Upload Frame</button>
+        <div id="uploadMsg" class="muted"></div>
+      </div>
+      <div class="muted" style="font-size:12px">Recommended: 1024×1024 PNG with transparency.</div>
+    </div>
+  </div>
+
   <!-- Password -->
   <div class="card">
     <h3>Change Password (Email Confirmation)</h3>
     <p class="muted" style="margin-top:6px">We’ll send a secure reset link to your email.</p>
-    <div class="actions" style="margin-top:8px">
+    <div class="tools">
       <button id="sendReset">Send Password Reset Email</button>
       <div id="pwdMsg" class="muted"></div>
     </div>
@@ -88,8 +129,7 @@
   <!-- Logout -->
   <div class="card">
     <h3>Sign out</h3>
-    <p class="muted" style="margin-top:6px">Sign out of this browser, or all devices.</p>
-    <div class="actions" style="margin-top:8px">
+    <div class="tools">
       <button id="logoutLocal"  style="background:#666">Sign out (this device)</button>
       <button id="logoutGlobal" style="background:#c33">Sign out (all devices)</button>
       <div id="logoutMsg" class="muted"></div>
@@ -104,16 +144,18 @@ const sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
 const AVATAR_BUCKET = 'avatars';
+const FRAMES_BUCKET = 'frames';
 
+const roleBanner = document.getElementById('roleBanner');
 const avatarBox = document.getElementById('avatarBox');
 const avatarFile = document.getElementById('avatarFile');
 const uploadAvatarBtn = document.getElementById('uploadAvatar');
 const avatarMsg = document.getElementById('avatarMsg');
+const frameOverlay = document.getElementById('frameOverlay');
+
 const usernameInput = document.getElementById('username');
 const saveUsernameBtn = document.getElementById('saveUsername');
 const userMsg = document.getElementById('userMsg');
-const sendResetBtn = document.getElementById('sendReset');
-const pwdMsg = document.getElementById('pwdMsg');
 
 const bioInput = document.getElementById('bioInput');
 const saveBioBtn = document.getElementById('saveBio');
@@ -123,12 +165,30 @@ const showcaseInput = document.getElementById('showcaseInput');
 const saveShowcaseBtn = document.getElementById('saveShowcase');
 const showcaseMsg = document.getElementById('showcaseMsg');
 
+const pwdMsg = document.getElementById('pwdMsg');
+const sendResetBtn = document.getElementById('sendReset');
+
 const logoutMsg = document.getElementById('logoutMsg');
 const logoutLocalBtn = document.getElementById('logoutLocal');
 const logoutGlobalBtn = document.getElementById('logoutGlobal');
-const roleBanner = document.getElementById('roleBanner');
+
+const framesRow = document.getElementById('framesRow');
+const subsTools = document.getElementById('subsTools');
+const modTools = document.getElementById('modTools');
+const saveFrameBtn = document.getElementById('saveFrame');
+const clearFrameBtn = document.getElementById('clearFrame');
+const frameMsg = document.getElementById('frameMsg');
+const lockOverlay = document.getElementById('lock');
+
+const frameTitle = document.getElementById('frameTitle');
+const frameFile = document.getElementById('frameFile');
+const uploadFrameBtn = document.getElementById('uploadFrame');
+const uploadMsg = document.getElementById('uploadMsg');
 
 let user = null;
+let role = 'free';
+let selectedFrameUrl = null; // from gallery
+let currentFrameUrl = null;  // saved on profile
 
 const setMsg = (el, text, cls='muted') => { el.className = cls; el.textContent = text; };
 const sanitizeUsername = (u) => u.toLowerCase().replace(/[^a-z0-9_.-]/g,'').slice(0,30);
@@ -139,20 +199,60 @@ const sanitizeUsername = (u) => u.toLowerCase().replace(/[^a-z0-9_.-]/g,'').slic
   if (!session){ alert('Please log in first.'); location.href = 'login.html'; return; }
   user = session.user;
 
-  const { data: profile, error } = await sb.from('profiles')
-    .select('username, avatar_url, bio, showcase_ids, role')
+  const { data: profile } = await sb.from('profiles')
+    .select('username, avatar_url, bio, showcase_ids, role, frame_url')
     .eq('id', user.id).maybeSingle();
 
-  if (error) console.error(error);
+  role = profile?.role || 'free';
+  currentFrameUrl = profile?.frame_url || null;
 
   if (profile?.avatar_url) avatarBox.innerHTML = `<img src="${profile.avatar_url}" alt="avatar">`;
+  if (currentFrameUrl) frameOverlay.style.backgroundImage = `url('${currentFrameUrl}')`;
   if (profile?.username)   usernameInput.value = profile.username;
   if (profile?.bio)        bioInput.value = profile.bio;
   if (profile?.showcase_ids?.length) showcaseInput.value = profile.showcase_ids.join(', ');
-  roleBanner.textContent = `Your role: ${profile?.role || 'free'}`;
+  roleBanner.textContent = `Your role: ${role}`;
+
+  // Cosmetics section behavior
+  if (role === 'free') {
+    lockOverlay.style.display = 'flex';
+    framesRow.classList.add('dim');
+  } else {
+    subsTools.style.display = 'flex';
+    await loadFrames(); // subscribers & moderators can browse
+  }
+  if (role === 'moderator') {
+    modTools.style.display = 'block';
+  }
 })();
 
-// avatar upload
+async function loadFrames(){
+  framesRow.innerHTML = '<div class="muted">Loading frames…</div>';
+  const { data: frames, error } = await sb.from('frames').select('id,title,image_url,created_by').order('created_at', {ascending:false});
+  if (error){ framesRow.innerHTML = '<div class="muted err">Failed to load frames.</div>'; return; }
+  if (!frames?.length){ framesRow.innerHTML = '<div class="muted">No frames uploaded yet.</div>'; return; }
+
+  framesRow.innerHTML = frames.map(fr => `
+    <div class="frameCard ${fr.image_url === currentFrameUrl ? 'sel' : ''}" data-url="${fr.image_url}">
+      <div class="frameThumb">
+        <img src="${fr.image_url}" alt="">
+      </div>
+      <div style="margin-top:6px;font-size:13px" class="muted">${fr.title || 'Frame'}</div>
+    </div>
+  `).join('');
+
+  framesRow.querySelectorAll('.frameCard').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      framesRow.querySelectorAll('.frameCard').forEach(c=>c.classList.remove('sel'));
+      card.classList.add('sel');
+      selectedFrameUrl = card.dataset.url;
+      // live preview on avatar
+      frameOverlay.style.backgroundImage = `url('${selectedFrameUrl}')`;
+    });
+  });
+}
+
+// Avatar upload
 uploadAvatarBtn.addEventListener('click', async () => {
   if (!avatarFile.files[0]) return setMsg(avatarMsg, 'Choose an image first.', 'err');
   const file = avatarFile.files[0];
@@ -173,22 +273,18 @@ uploadAvatarBtn.addEventListener('click', async () => {
   setMsg(avatarMsg, 'Avatar updated!', 'ok');
 });
 
-// save username
+// Username
 saveUsernameBtn.addEventListener('click', async () => {
   let uname = sanitizeUsername(usernameInput.value.trim());
   if (!uname) return setMsg(userMsg, 'Username cannot be empty.', 'err');
-
-  const { data: existing } = await sb.from('profiles')
-    .select('id').ilike('username', uname).neq('id', user.id).limit(1);
+  const { data: existing } = await sb.from('profiles').select('id').ilike('username', uname).neq('id', user.id).limit(1);
   if (existing && existing.length>0) return setMsg(userMsg, 'Username already taken.', 'err');
-
   const upd = await sb.from('profiles').update({ username: uname }).eq('id', user.id);
   if (upd.error) return setMsg(userMsg, 'Failed updating username: ' + upd.error.message, 'err');
-
   setMsg(userMsg, 'Username updated!', 'ok');
 });
 
-// bio
+// Bio
 saveBioBtn.addEventListener('click', async () => {
   const bio = bioInput.value.trim();
   const { error } = await sb.from('profiles').update({ bio }).eq('id', user.id);
@@ -196,7 +292,7 @@ saveBioBtn.addEventListener('click', async () => {
   setMsg(bioMsg, 'Bio updated!', 'ok');
 });
 
-// showcase
+// Showcase
 saveShowcaseBtn.addEventListener('click', async () => {
   const arr = showcaseInput.value.split(',').map(x=>x.trim()).filter(Boolean).slice(0,5);
   const { error } = await sb.from('profiles').update({ showcase_ids: arr }).eq('id', user.id);
@@ -204,7 +300,7 @@ saveShowcaseBtn.addEventListener('click', async () => {
   setMsg(showcaseMsg, 'Showcase updated!', 'ok');
 });
 
-// password reset
+// Password reset
 sendResetBtn.addEventListener('click', async () => {
   setMsg(pwdMsg, 'Sending reset email...');
   const redirectTo = window.location.origin + '/reset.html';
@@ -213,15 +309,56 @@ sendResetBtn.addEventListener('click', async () => {
   setMsg(pwdMsg, 'Check your email for the reset link.', 'ok');
 });
 
+// Save/clear selected frame (subs + mods)
+saveFrameBtn.addEventListener('click', async ()=>{
+  if (!selectedFrameUrl) return setMsg(frameMsg, 'Pick a frame first.', 'err');
+  const { error } = await sb.from('profiles').update({ frame_url: selectedFrameUrl }).eq('id', user.id);
+  if (error) return setMsg(frameMsg, 'Error: ' + error.message, 'err');
+  setMsg(frameMsg, 'Frame applied!', 'ok');
+  currentFrameUrl = selectedFrameUrl;
+});
+
+clearFrameBtn.addEventListener('click', async ()=>{
+  const { error } = await sb.from('profiles').update({ frame_url: null }).eq('id', user.id);
+  if (error) return setMsg(frameMsg, 'Error: ' + error.message, 'err');
+  setMsg(frameMsg, 'Frame removed.', 'ok');
+  selectedFrameUrl = null;
+  currentFrameUrl = null;
+  frameOverlay.style.backgroundImage = 'none';
+  framesRow.querySelectorAll('.frameCard').forEach(c=>c.classList.remove('sel'));
+});
+
+// Moderator: upload new frame
+uploadFrameBtn.addEventListener('click', async ()=>{
+  if (role !== 'moderator') return;
+  const f = frameFile.files[0];
+  if (!f) return setMsg(uploadMsg, 'Choose a PNG with transparency.', 'err');
+
+  setMsg(uploadMsg, 'Uploading…');
+  const safe = f.name.replace(/[^\w.\-]+/g,'_');
+  const path = `${user.id}/frame-${Date.now()}-${safe}`;
+
+  const up = await sb.storage.from(FRAMES_BUCKET).upload(path, f, { upsert:true, contentType: f.type });
+  if (up.error) return setMsg(uploadMsg, 'Upload error: ' + up.error.message, 'err');
+
+  const { data: pub } = sb.storage.from(FRAMES_BUCKET).getPublicUrl(path);
+  const url = pub.publicUrl;
+
+  const ins = await sb.from('frames').insert({ title: frameTitle.value.trim() || null, image_url: url, created_by: user.id });
+  if (ins.error) return setMsg(uploadMsg, 'Save error: ' + ins.error.message, 'err');
+
+  setMsg(uploadMsg, 'Frame uploaded!', 'ok');
+  frameTitle.value=''; frameFile.value='';
+  await loadFrames();
+});
+
 // robust sign out (handles "Auth session missing!")
 async function safeSignOut(scope) {
   try {
     const { error } = await sb.auth.signOut(scope ? { scope } : undefined);
     if (error && error.message !== 'Auth session missing!') { setMsg(logoutMsg, 'Error: ' + error.message, 'err'); return false; }
     return true;
-  } catch(e) {
-    setMsg(logoutMsg, 'Error: ' + (e?.message || e), 'err'); return false;
-  }
+  } catch(e) { setMsg(logoutMsg, 'Error: ' + (e?.message || e), 'err'); return false; }
 }
 logoutLocalBtn.addEventListener('click', async ()=>{ setMsg(logoutMsg, 'Signing out…'); if (await safeSignOut(null)) location.href='index.html'; });
 logoutGlobalBtn.addEventListener('click', async ()=>{ setMsg(logoutMsg, 'Signing out everywhere…'); if (await safeSignOut('global')) location.href='index.html'; });
