@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Forum Category — Scream Collector</title>
+<style>
+  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#dc143c}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  a{color:#9ecbff;text-decoration:none}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px}
+  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
+  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .list{display:grid;gap:10px;margin-top:8px}
+  .item{background:#171717;border:1px solid #2a2a2a;border-radius:10px;padding:10px;display:flex;align-items:center;justify-content:space-between}
+  .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;text-decoration:none}
+</style>
+</head>
+<body>
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+
+<div class="wrap">
+  <a href="forum.html">← Forum</a>
+  <h2 id="catTitle">Loading…</h2>
+
+  <div id="subsCard" class="card" style="display:none">
+    <h3 style="margin-top:0">Subcategories</h3>
+    <div id="subs" class="list"></div>
+  </div>
+
+  <div id="postsCard" class="card" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="margin:0">Threads</h3>
+      <a id="newPostBtn" class="btn" style="display:none;background:#2a6">New Post</a>
+    </div>
+    <div id="posts" class="list"></div>
+  </div>
+
+  <div id="msg" class="muted"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+ 'https://wktxpukjmvmhzpctttjx.supabase.co',
+ 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+const qs=new URLSearchParams(location.search);
+const catId=qs.get('id');
+
+const catTitle=document.getElementById('catTitle');
+const subsCard=document.getElementById('subsCard');
+const subsEl=document.getElementById('subs');
+const postsCard=document.getElementById('postsCard');
+const postsEl=document.getElementById('posts');
+const newPostBtn=document.getElementById('newPostBtn');
+const msg=document.getElementById('msg');
+
+let me=null, myRole='free';
+
+(async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  me = session?.user || null;
+  if (me) {
+    const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
+    myRole = p?.role || 'free';
+  }
+
+  const { data: cat } = await sb.from('forum_categories').select('id,title').eq('id',catId).maybeSingle();
+  if(!cat){ catTitle.textContent='Category not found'; return; }
+  catTitle.textContent = cat.title;
+
+  // fetch children
+  const kids = await sb.from('forum_categories').select('id,title').eq('parent_id',catId).order('title',{ascending:true});
+  const subcats = kids.data || [];
+  if (subcats.length){
+    subsCard.style.display='block';
+    subsEl.innerHTML = subcats.map(c=>`
+      <div class="item">
+        <div><strong>${c.title}</strong></div>
+        <div class="row">
+          <a class="btn" href="forum_category.html?id=${c.id}">Open</a>
+        </div>
+      </div>
+    `).join('');
+  } else {
+    // leaf → show threads list
+    postsCard.style.display='block';
+
+    // free cannot create
+    if (myRole==='subscriber' || myRole==='moderator') {
+      newPostBtn.style.display='inline-block';
+      newPostBtn.href = 'forum_new_post.html?cat=' + catId;
+    }
+
+    await loadThreads();
+  }
+})();
+
+async function loadThreads(){
+  // show author + reply count
+  const { data: threads, error } = await sb
+    .from('forum_posts')
+    .select('id,title,created_at,author:author_id(username),forum_replies(count)')
+    .eq('category_id',catId)
+    .order('created_at',{ascending:false});
+  if (error){ postsEl.innerHTML='<div class="muted err">Error loading threads</div>'; return; }
+  if (!threads?.length){ postsEl.innerHTML='<div class="muted">No posts yet.</div>'; return; }
+
+  postsEl.innerHTML = threads.map(t=>{
+    const rc = (t.forum_replies && t.forum_replies.length) ? t.forum_replies[0].count : 0;
+    return `
+      <div class="item">
+        <div>
+          <a href="forum_post.html?id=${t.id}"><strong>${t.title}</strong></a>
+          <div class="muted">by ${t.author?.username ? '@'+t.author.username : 'unknown'} • ${new Date(t.created_at).toLocaleString()}</div>
+        </div>
+        <div class="muted">Replies: ${rc}</div>
+      </div>
+    `;
+  }).join('');
+}
+</script>
+</body>
+</html>
