@@ -11,6 +11,11 @@
   .muted{opacity:.75}
   input{width:100%;padding:10px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
   button{padding:10px 14px;background:#444;border:none;border-radius:6px;color:#fff;cursor:pointer}
+  .roleTag{margin-left:6px;padding:2px 8px;border-radius:999px;font-size:12px}
+  .role-free{background:#333;color:#ddd}
+  .role-subscriber{background:#2a6;color:#fff}
+  .role-moderator{background:#c33;color:#fff}
+  .role-owner{background:gold;color:#111;font-weight:700}
 </style>
 </head>
 <body>
@@ -37,8 +42,6 @@ const sb = supabase.createClient(
 
 const results = document.getElementById('results');
 const qInput  = document.getElementById('q');
-
-// read ?q= from URL
 const qs = new URLSearchParams(location.search);
 const initialQ = qs.get('q') || '';
 qInput.value = initialQ;
@@ -46,41 +49,41 @@ qInput.value = initialQ;
 async function runSearch(query){
   if (!query){ results.textContent = 'Type a name and press Search.'; return; }
   results.textContent = 'Searching…';
-
-  // Case-insensitive search on username
   const { data, error } = await sb
     .from('profiles')
-    .select('id, username')
-    .ilike('username', '%' + query + '%')   // ilike = case-insensitive LIKE
+    .select('id, username, role')
+    .ilike('username', '%' + query + '%')
     .order('username', { ascending: true })
     .limit(50);
-
   if (error){ results.textContent = 'Error: ' + error.message; return; }
-  if (!data || data.length === 0){ results.textContent = 'No users found.'; return; }
+  if (!data || !data.length){ results.textContent = 'No users found.'; return; }
 
-  results.innerHTML = data.map(u => `
-    <div class="row">
-      <div>
-        <div><strong>@${u.username}</strong></div>
-        <div class="muted">${u.id}</div>
+  results.innerHTML = data.map(u=>{
+    const roleClass = {
+      free:'role-free', subscriber:'role-subscriber',
+      moderator:'role-moderator', owner:'role-owner'
+    }[u.role||'free'];
+    const roleTag = `<span class="roleTag ${roleClass}">${u.role||'free'}</span>`;
+    return `
+      <div class="row">
+        <div>
+          <div><strong>@${u.username}</strong> ${roleTag}</div>
+          <div class="muted">${u.id}</div>
+        </div>
+        <div>
+          <a href="user.html?u=${encodeURIComponent(u.username)}"
+             style="background:#444;padding:8px 12px;border-radius:6px;color:#fff;text-decoration:none">View</a>
+        </div>
       </div>
-      <div>
-        <a href="user.html?u=${encodeURIComponent(u.username)}" style="background:#444;padding:8px 12px;border-radius:6px;color:#fff;text-decoration:none">View</a>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
-document.getElementById('searchForm').addEventListener('submit', (e)=>{
+document.getElementById('searchForm').addEventListener('submit', e=>{
   e.preventDefault();
   const q = qInput.value.trim();
-  if (q) {
-    history.replaceState({}, '', 'users.html?q=' + encodeURIComponent(q));
-    runSearch(q);
-  }
+  if (q){ history.replaceState({}, '', 'users.html?q='+encodeURIComponent(q)); runSearch(q); }
 });
-
-// Auto-run if ?q= is present
 if (initialQ) runSearch(initialQ);
 </script>
 </body>
