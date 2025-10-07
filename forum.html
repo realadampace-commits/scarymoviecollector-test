@@ -29,9 +29,9 @@
   </div>
   <h2 style="margin-top:8px">Forum</h2>
 
-  <!-- Moderator: create a top-level category -->
+  <!-- Moderator/Owner: create a top-level category -->
   <div id="modTop" class="card" style="display:none">
-    <h3 style="margin:0 0 8px">Moderator: New Category</h3>
+    <h3 style="margin:0 0 8px">Moderator Tools: New Category</h3>
     <div class="row">
       <input id="catTitle" placeholder="Category title (e.g., Horror Movies)"/>
       <button id="addCat" class="btn" style="background:#2a6">Create</button>
@@ -71,11 +71,12 @@
       const { data:p } = await sb.from('profiles').select('role').eq('id',session.user.id).maybeSingle();
       myRole = p?.role || 'free';
     }
-    if (myRole==='moderator') modTop.style.display='block';
-    await loadTopLevel();
+    const isModOrOwner = (myRole==='moderator' || myRole==='owner'); // CHANGED
+    if (isModOrOwner) modTop.style.display='block'; // CHANGED
+    await loadTopLevel(isModOrOwner);
   })();
 
-  async function loadTopLevel(){
+  async function loadTopLevel(isModOrOwner){
     setStatus('Loading categories…');
     const { data: cats, error } = await sb
       .from('forum_categories')
@@ -90,7 +91,7 @@
           <strong>${escapeHtml(c.title)}</strong>
           <div class="row">
             <a class="btn" href="forum_category.html?id=${c.id}">Open</a>
-            ${myRole==='moderator'
+            ${isModOrOwner
               ? `<button class="btn" data-act="addSub" data-id="${c.id}">Add Sub</button>
                  <button class="btn" style="background:#933" data-act="delCat" data-id="${c.id}">Delete</button>`
               : ''
@@ -103,36 +104,34 @@
 
   function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
-  listEl.addEventListener('click', async (e)=>{
-    const btn = e.target.closest('button[data-act]');
-    if (!btn) return;
-    const act = btn.dataset.act;
-    const id  = btn.dataset.id;
-
-    if (act==='addSub'){
-      const t = prompt('Subcategory title?'); if(!t) return;
-      const { data:{ session } } = await sb.auth.getSession();
-      const uid = session?.user?.id || null;
-      const { error } = await sb.from('forum_categories').insert({ title:t.trim(), parent_id:id, created_by:uid });
-      if (error) return setModMsg('Error: '+error.message,'err');
-      setModMsg('Created.','ok');
-      // sub added under this top-level; no need to show here—open the category to manage children
-    }
-    if (act==='delCat'){
-      if(!confirm('Delete this category and all descendants (posts & replies included)?')) return;
-      const { error } = await sb.from('forum_categories').delete().eq('id', id);
-      if (error) return setModMsg('Error: '+error.message,'err');
-      setModMsg('Deleted.','ok'); await loadTopLevel();
-    }
+  addCat?.addEventListener('click', async ()=>{
+    const title=(catTitle.value||'').trim();
+    if(!title) return setModMsg('Title required.','err');
+    setModMsg('Creating…');
+    const { error } = await sb.from('forum_categories').insert({ title, parent_id: null });
+    if (error) return setModMsg('Error: '+error.message,'err');
+    setModMsg('Created!','ok'); catTitle.value='';
+    const isModOrOwner = (myRole==='moderator' || myRole==='owner');
+    await loadTopLevel(isModOrOwner);
   });
 
-  addCat.addEventListener('click', async ()=>{
-    const t = (catTitle.value||'').trim(); if(!t) return setModMsg('Enter a title.','err');
-    const { data:{ session } } = await sb.auth.getSession();
-    const uid = session?.user?.id || null;
-    const { error } = await sb.from('forum_categories').insert({ title:t, parent_id:null, created_by:uid });
-    if (error) return setModMsg('Error: '+error.message,'err');
-    catTitle.value=''; setModMsg('Created.','ok'); await loadTopLevel();
+  listEl.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-act]');
+    if(!btn) return;
+    const act = btn.dataset.act, id = btn.dataset.id;
+    if (act==='addSub'){
+      const title = prompt('Subcategory title?'); if(!title) return;
+      const { error } = await sb.from('forum_categories').insert({ title, parent_id:id });
+      if (error) return alert('Error: '+error.message);
+      const isModOrOwner = (myRole==='moderator' || myRole==='owner');
+      await loadTopLevel(isModOrOwner);
+    } else if (act==='delCat'){
+      if(!confirm('Delete this category (and any subcategories)?')) return;
+      const { error } = await sb.from('forum_categories').delete().eq('id', id);
+      if (error) return alert('Error: '+error.message);
+      const isModOrOwner = (myRole==='moderator' || myRole==='owner');
+      await loadTopLevel(isModOrOwner);
+    }
   });
 })();
 </script>
