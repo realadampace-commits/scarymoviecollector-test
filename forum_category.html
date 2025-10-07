@@ -80,82 +80,116 @@
 
   let myRole='free', me=null;
 
-  function setModMsg(t, cls='muted'){ modMsgEl.className=cls; modMsgEl.textContent=t; }
-  function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+  const setModMsg=(t,cls='muted')=>{modMsgEl.className=cls;modMsgEl.textContent=t;};
+  const escapeHtml=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
   (async function init(){
-    try{
-      if (!catId){ location.href='forum.html'; return; }
+    if (!catId){ location.href='forum.html'; return; }
 
-      const { data:{ session } } = await sb.auth.getSession();
-      me = session?.user || null;
-      if (me){
-        const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
-        myRole = p?.role || 'free';
-      }
-      if (myRole==='moderator') modBox.style.display='block';
+    const { data:{ session } } = await sb.auth.getSession();
+    me = session?.user || null;
+    if (me){
+      const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
+      myRole = p?.role || 'free';
+    }
+    if (myRole==='moderator') modBox.style.display='block';
 
-      // load category
-      const { data: cat, error: ce } = await sb.from('forum_categories').select('id,title').eq('id', catId).maybeSingle();
-      if (ce) { catTitleEl.textContent='Error loading category'; console.error(ce); return; }
-      if (!cat){ catTitleEl.textContent='Category not found'; return; }
-      catTitleEl.textContent = cat.title;
+    // load category title
+    const { data: cat, error: ce } = await sb.from('forum_categories').select('id,title').eq('id', catId).maybeSingle();
+    if (ce){ catTitleEl.textContent='Error loading category'; console.error(ce); return; }
+    if (!cat){ catTitleEl.textContent='Category not found'; return; }
+    catTitleEl.textContent = cat.title;
 
-      // children?
-      const { data: kids, error: ke } = await sb.from('forum_categories')
-        .select('id,title')
-        .eq('parent_id', catId)
-        .order('title',{ascending:true});
-      if (ke){ console.error(ke); }
+    // load children
+    const { data: kids, error: ke } = await sb.from('forum_categories')
+      .select('id,title')
+      .eq('parent_id', catId)
+      .order('title',{ascending:true});
 
-      if (kids && kids.length){
-        childrenCard.style.display='block';
-        childrenList.innerHTML = kids.map(c=>`
-          <li class="node">
+    if (ke){ console.error(ke); }
+
+    if (kids?.length){
+      // not a leaf: show subcategories only
+      childrenCard.style.display='block';
+      childrenList.innerHTML = kids.map(c=>`
+        <li class="node">
+          <div class="row">
+            <strong>${escapeHtml(c.title)}</strong>
             <div class="row">
-              <strong>${escapeHtml(c.title)}</strong>
-              <div class="row">
-                <a class="btn" href="forum_category.html?id=${c.id}">Open</a>
-                ${myRole==='moderator'
-                  ? `<button class="btn" data-act="addSub" data-id="${c.id}">Add Sub</button>
-                     <button class="btn" style="background:#933" data-act="delCat" data-id="${c.id}">Delete</button>`
-                  : ''
-                }
-              </div>
+              <a class="btn" href="forum_category.html?id=${c.id}">Open</a>
+              ${myRole==='moderator'
+                ? `<button class="btn" data-act="addSub" data-id="${c.id}">Add Sub</button>
+                   <button class="btn" style="background:#933" data-act="delCat" data-id="${c.id}">Delete</button>`
+                : ''
+              }
             </div>
-          </li>
-        `).join('');
-      } else {
-        // leaf: show posts
-        postsCard.style.display='block';
-        if (myRole!=='free'){
-          const newBtn = document.createElement('a');
-          newBtn.href = `forum_new_post.html?cat=${catId}`;
-          newBtn.className = 'btn';
-          newBtn.style.background = '#2a6';
-          newBtn.textContent = 'New Post';
-          postActions.appendChild(newBtn);
-        }
-        await loadPosts();
+          </div>
+        </li>
+      `).join('');
+    } else {
+      // leaf: show posts
+      postsCard.style.display='block';
+      if (myRole!=='free'){
+        const newBtn = document.createElement('a');
+        newBtn.href = `forum_new_post.html?cat=${catId}`;
+        newBtn.className = 'btn';
+        newBtn.style.background = '#2a6';
+        newBtn.textContent = 'New Post';
+        postActions.appendChild(newBtn);
       }
-    }catch(err){
-      console.error(err);
-      catTitleEl.textContent = 'Category (error loading)';
+      await loadPosts();
     }
   })();
 
   async function loadPosts(){
     postsStatus.textContent='Loading…';
-    const { data: posts, error } = await sb
+
+    // 1) posts (no joins)
+    const { data: posts, error: pe } = await sb
       .from('forum_posts')
-      .select('id,title,created_at, author:author_id(username,avatar_url,post_count,reply_count)')
+      .select('id,title,created_at,author_id')
       .eq('category_id', catId)
       .order('created_at',{ascending:false});
-    if (error){ postsStatus.textContent='Error: '+error.message; return; }
-    postsStatus.textContent = posts?.length ? '' : 'No posts yet.';
+    if (pe){ postsStatus.textContent='Error: '+pe.message; return; }
 
-    postsList.innerHTML = (posts||[]).map(p=>{
-      const count = Number(p.author?.post_count||0) + Number(p.author?.reply_count||0);
+    if (!posts?.length){ postsStatus.textContent='No posts yet.'; postsList.innerHTML=''; return; }
+
+    // 2) authors
+    const authorIds = [...new Set(posts.map(p=>p.author_id).filter(Boolean))];
+    let authorsById = {};
+    if (authorIds.length){
+      const { data: authors, error: ae } = await sb
+        .from('profiles')
+        .select('id,username,avatar_url,frame_url,frame_scale,post_count,reply_count')
+        .in('id', authorIds);
+      if (!ae && authors){
+        authorsById = Object.fromEntries(authors.map(a=>[a.id,a]));
+      }
+    }
+
+    // 3) replies for these posts (for the per-post reply count)
+    const postIds = posts.map(p=>p.id);
+    let replyCountByPost = {};
+    if (postIds.length){
+      const { data: reps, error: re } = await sb
+        .from('forum_replies')
+        .select('post_id')
+        .in('post_id', postIds);
+      if (!re && reps){
+        for (const r of reps){
+          replyCountByPost[r.post_id] = (replyCountByPost[r.post_id]||0) + 1;
+        }
+      }
+    }
+
+    postsStatus.textContent='';
+    postsList.innerHTML = posts.map(p=>{
+      const a = authorsById[p.author_id];
+      const authorHtml = a?.username
+        ? `<a href="user.html?u=${encodeURIComponent(a.username)}">@${a.username}</a>`
+        : 'unknown';
+      const totalContrib = Number(a?.post_count||0) + Number(a?.reply_count||0);
+      const rcount = replyCountByPost[p.id] || 0;
       return `
         <div class="post">
           <div class="row">
@@ -163,8 +197,7 @@
             <span class="muted">${new Date(p.created_at).toLocaleString()}</span>
           </div>
           <div class="muted" style="margin-top:6px">
-            by ${p.author?.username ? `<a href="user.html?u=${encodeURIComponent(p.author.username)}">@${p.author.username}</a>` : 'unknown'}
-            • Posts: ${count}
+            by ${authorHtml} • Replies: ${rcount} • Posts: ${totalContrib}
           </div>
         </div>
       `;
@@ -184,8 +217,7 @@
       const uid = session?.user?.id || null;
       const { error } = await sb.from('forum_categories').insert({ title:t.trim(), parent_id:id, created_by:uid });
       if (error) return setModMsg('Error: '+error.message,'err');
-      setModMsg('Created.','ok');
-      location.reload();
+      setModMsg('Created.','ok'); location.reload();
     }
     if (act==='delCat'){
       if(!confirm('Delete this category and all descendants (posts & replies included)?')) return;
