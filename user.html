@@ -24,13 +24,14 @@
   .role-free{background:#333;color:#ddd}
   .role-subscriber{background:#2a6;color:#fff}
   .role-moderator{background:#c33;color:#fff}
+  .role-owner{background:gold;color:#111;font-weight:700}
 
   .sectionHead{display:flex;align-items:center;justify-content:space-between;margin-top:20px}
   .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;text-decoration:none}
+  .panel{margin-top:12px;background:#1b1b1b;padding:12px;border-radius:10px}
 </style>
 </head>
 <body>
-<!-- Shared menu -->
 <app-menu></app-menu>
 <script type="module" src="/menu.js"></script>
 
@@ -49,10 +50,10 @@
     </div>
   </div>
 
-  <!-- Showcase -->
+  <div id="rolePanel" class="panel" style="display:none"></div>
+
   <div id="showcase"></div>
 
-  <!-- Portfolio -->
   <div class="sectionHead">
     <h3 style="margin:0" id="portfolioHeading">Recent Uploads</h3>
     <a id="portfolioToggle" class="btn" href="#">View full portfolio</a>
@@ -68,23 +69,9 @@ const sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
 
-// helper: load first photo as preview_url for each item
-async function attachPreviews(items){
-  if (!items?.length) return items;
-  const ids = items.map(i=>i.id);
-  const { data: imgs } = await sb.from('items_images')
-    .select('item_id,image_url,position,created_at')
-    .in('item_id', ids)
-    .order('position',{ascending:true})
-    .order('created_at',{ascending:true});
-  const first={}; (imgs||[]).forEach(im=>{ if(!first[im.item_id]) first[im.item_id]=im.image_url; });
-  return items.map(i=>({ ...i, preview_url:first[i.id]||null }));
-}
-
 const qs = new URLSearchParams(location.search);
 const uname = qs.get('u');
 const showAll = qs.get('all') === '1';
-
 const itemsEl = document.getElementById('items');
 const emptyEl = document.getElementById('empty');
 const showcaseEl = document.getElementById('showcase');
@@ -95,29 +82,39 @@ const uAvaImg = document.getElementById('uAvaImg');
 const uAvaFrame = document.getElementById('uAvaFrame');
 const portfolioToggle = document.getElementById('portfolioToggle');
 const portfolioHeading = document.getElementById('portfolioHeading');
+const rolePanel = document.getElementById('rolePanel');
 
-(async function loadProfile(){
+let me=null, myRole='free', targetProfile=null;
+
+(async function init(){
   if (!uname){ titleEl.textContent = 'User not found'; return; }
 
-  // include frame fields
-  const { data: profile, error: pErr } = await sb
+  const { data:{ session } } = await sb.auth.getSession();
+  me = session?.user || null;
+  if (me){
+    const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
+    myRole = p?.role || 'free';
+  }
+
+  const { data: profile, error } = await sb
     .from('profiles')
     .select('id, username, avatar_url, bio, showcase_ids, role, frame_url, frame_scale')
     .eq('username', uname)
     .maybeSingle();
-
-  if (pErr || !profile){ titleEl.textContent = 'User not found'; return; }
+  if (error || !profile){ titleEl.textContent = 'User not found'; return; }
+  targetProfile = profile;
 
   titleEl.textContent = '@' + profile.username;
   bioEl.textContent = profile.bio || '';
   if (profile.avatar_url) uAvaImg.src = profile.avatar_url;
 
-  // role badge
   const role = profile.role || 'free';
-  const roleClass = role === 'moderator' ? 'role-moderator' : role === 'subscriber' ? 'role-subscriber' : 'role-free';
+  const roleClass = {
+    free:'role-free', subscriber:'role-subscriber',
+    moderator:'role-moderator', owner:'role-owner'
+  }[role] || 'role-free';
   roleTagWrap.innerHTML = `<span class="roleTag ${roleClass}">${role}</span>`;
 
-  // frame overlay
   if (profile.frame_url) {
     uAvaFrame.style.backgroundImage = `url('${profile.frame_url}')`;
     uAvaFrame.style.setProperty('--frameScale', profile.frame_scale ?? 1);
@@ -126,71 +123,76 @@ const portfolioHeading = document.getElementById('portfolioHeading');
     uAvaFrame.style.display = 'none';
   }
 
-  // toggle link (?all=1)
+  if (me && myRole !== 'free' && me.id !== profile.id){
+    await setupRolePanel(role);
+  }
+
   portfolioHeading.textContent = showAll ? 'All Items' : 'Recent Uploads';
   portfolioToggle.textContent = showAll ? 'Show last 5' : 'View full portfolio';
   const newQs = new URLSearchParams(qs);
-  if (showAll) { newQs.delete('all'); } else { newQs.set('all','1'); }
+  if (showAll) newQs.delete('all'); else newQs.set('all','1');
   portfolioToggle.href = 'user.html?' + newQs.toString();
 
-  // Showcase (if any)
-  if (profile.showcase_ids && profile.showcase_ids.length) {
-    const { data: showcaseItems } = await sb
-      .from('items')
-      .select('id,title,user_value')
-      .in('id', profile.showcase_ids)
-      .limit(5);
-
-    const withPrev = await attachPreviews(showcaseItems||[]);
-    if (withPrev.length) {
-      showcaseEl.innerHTML = `
-        <h3 style="margin-top:20px;margin-bottom:0">Showcase</h3>
-        <div class="grid" style="margin-top:12px">
-          ${withPrev.map(it=>`
-            <a class="card" href="item.html?id=${it.id}" style="color:inherit;text-decoration:none">
-              <div class="thumb">${it.preview_url ? `<img src="${it.preview_url}" alt="">` : 'No image'}</div>
-              <div class="meta"><strong>${it.title}</strong><br>$${(it.user_value||0).toLocaleString()}</div>
-            </a>
-          `).join('')}
-        </div>`;
-    }
-  }
-
-  // Portfolio items
   await loadPortfolioItems(profile.id, showAll);
 })();
+
+async function setupRolePanel(currentRole){
+  let html = '';
+  if (myRole === 'owner'){
+    html += `<strong>Owner Controls:</strong><br>
+    <label>Change Role:</label>
+    <select id="roleSelect">
+      <option value="free"${currentRole==='free'?' selected':''}>Free</option>
+      <option value="subscriber"${currentRole==='subscriber'?' selected':''}>Subscriber</option>
+      <option value="moderator"${currentRole==='moderator'?' selected':''}>Moderator</option>
+    </select>
+    <button id="saveRole" class="btn">Save</button>
+    <span id="roleMsg" class="muted"></span>`;
+  } else if (myRole === 'moderator'){
+    if (currentRole === 'moderator' || currentRole === 'owner'){
+      html = `<span class="muted">You cannot modify this user’s rank.</span>`;
+    } else {
+      html = `<strong>Moderator Controls:</strong><br>
+      <label>Change Role:</label>
+      <select id="roleSelect">
+        <option value="free"${currentRole==='free'?' selected':''}>Free</option>
+        <option value="subscriber"${currentRole==='subscriber'?' selected':''}>Subscriber</option>
+      </select>
+      <button id="saveRole" class="btn">Save</button>
+      <span id="roleMsg" class="muted"></span>`;
+    }
+  }
+  rolePanel.innerHTML = html;
+  rolePanel.style.display = html ? 'block' : 'none';
+
+  const saveBtn = document.getElementById('saveRole');
+  if (saveBtn){
+    saveBtn.onclick = async ()=>{
+      const newRole = document.getElementById('roleSelect').value;
+      const msgEl = document.getElementById('roleMsg');
+      msgEl.textContent = 'Saving…';
+      const { error } = await sb.from('profiles').update({ role:newRole }).eq('id', targetProfile.id);
+      msgEl.textContent = error ? 'Error: '+error.message : 'Role updated.';
+      if (!error) location.reload();
+    };
+  }
+}
 
 async function loadPortfolioItems(ownerId, all) {
   const q = sb.from('items')
     .select('id,title,user_value,created_at')
     .eq('owner_id', ownerId)
     .order('created_at', { ascending:false });
-
   if (!all) q.limit(5);
-
   const { data: items, error } = await q;
-  if (error) {
-    console.error('Items load error:', error);
-    itemsEl.innerHTML = '<div class="muted">Error loading items.</div>';
-    return;
-  }
-
-  if (!items || items.length === 0) {
-    emptyEl.style.display = 'block';
-    itemsEl.innerHTML = '';
-    return;
-  }
-
-  const withPrev = await attachPreviews(items);
-  emptyEl.style.display = 'none';
-  itemsEl.innerHTML = withPrev.map(it => `
+  if (error) return console.error('Load error:', error);
+  if (!items || !items.length){ emptyEl.style.display='block'; return; }
+  emptyEl.style.display='none';
+  itemsEl.innerHTML = items.map(it=>`
     <a class="card" href="item.html?id=${it.id}" style="color:inherit;text-decoration:none">
-      <div class="thumb">${it.preview_url ? `<img src="${it.preview_url}" alt="">` : 'No image'}</div>
-      <div class="meta">
-        <strong>${it.title}</strong><br>$${(it.user_value||0).toLocaleString()}
-      </div>
-    </a>
-  `).join('');
+      <div class="thumb">No image</div>
+      <div class="meta"><strong>${it.title}</strong><br>$${(it.user_value||0).toLocaleString()}</div>
+    </a>`).join('');
 }
 </script>
 </body>
