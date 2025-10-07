@@ -118,7 +118,8 @@ function dmsg(t, cls='muted'){ detailsMsg.className=cls; detailsMsg.textContent=
     .eq('id', itemId).maybeSingle();
 
   ownerId = it.data?.owner_id || null;
-  if (!(ownerId && (ownerId===me.id || myRole==='moderator'))) {
+  const isModOrOwner = (myRole==='moderator' || myRole==='owner');
+  if (!(ownerId && (ownerId===me.id || isModOrOwner))) {
     alert('You do not have permission to edit this item.');
     location.href='item.html?id='+itemId;
     return;
@@ -212,3 +213,4 @@ delBtn.addEventListener('click', async ()=>{
 </script>
 </body>
 </html>
+
