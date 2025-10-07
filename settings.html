@@ -340,7 +340,7 @@ clearFrameBtn.addEventListener('click', async ()=>{
 // moderator/owner upload (allow owner too)
 uploadFrameBtn.addEventListener('click', async ()=>{
   const { data: me } = await sb.from('profiles').select('role').eq('id',user.id).maybeSingle();
-  if(!(me?.role==='moderator' || me?.role==='owner')) return setMsg(uploadMsg,'Only moderators or owners can upload.','err');
+  if(!(me?.role==='owner')) return setMsg(uploadMsg,'Only the owner can upload.','err');
   const f=frameFile.files[0]; if(!f) return setMsg(uploadMsg,'Choose a PNG with transparency.','err');
   const scaleVal=parseFloat(frameScaleInput.value||'1');
   setMsg(uploadMsg,'Uploading…');
@@ -374,3 +374,4 @@ logoutGlobalBtn.addEventListener('click', async ()=>{ setMsg(logoutMsg,'Signing 
 </script>
 </body>
 </html>
+
