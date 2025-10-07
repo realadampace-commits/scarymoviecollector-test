@@ -180,6 +180,21 @@ async function setupRolePanel(currentRole){
   }
 }
 
+async function attachPreviews(items){
+  if (!items?.length) return items;
+  const ids = items.map(i=>i.id);
+  const { data: imgs, error } = await sb
+    .from('items_images')
+    .select('item_id,image_url,position,created_at')
+    .in('item_id', ids)
+    .order('position',{ascending:true})
+    .order('created_at',{ascending:true});
+  if (error) { console.warn('preview query error:', error); return items; }
+  const first = {};
+  (imgs||[]).forEach(im => { if (!first[im.item_id]) first[im.item_id] = im.image_url; });
+  return items.map(i => ({ ...i, preview_url: first[i.id] || null }));
+}
+
 async function loadPortfolioItems(ownerId, all) {
   const q = sb.from('items')
     .select('id,title,user_value,created_at')
