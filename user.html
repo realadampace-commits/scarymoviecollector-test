@@ -98,7 +98,7 @@ let me=null, myRole='free', targetProfile=null;
 
   const { data: profile, error } = await sb
     .from('profiles')
-    .select('id, username, avatar_url, bio, showcase_ids, role, frame_url, frame_scale')
+    .select('id, username, avatar_url, bio, showcase_ids, role, frame_url, frame_scale, frame_offset_x, frame_offset_y')
     .eq('username', uname)
     .maybeSingle();
   if (error || !profile){ titleEl.textContent = 'User not found'; return; }
