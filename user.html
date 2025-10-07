@@ -118,6 +118,8 @@ let me=null, myRole='free', targetProfile=null;
   if (profile.frame_url) {
     uAvaFrame.style.backgroundImage = `url('${profile.frame_url}')`;
     uAvaFrame.style.setProperty('--frameScale', profile.frame_scale ?? 1);
+    uAvaFrame.style.setProperty('--frameX', profile.frame_offset_x ?? 0) + 'px');
+    uAvaFrame.style.setProperty('--frameY', profile.frame_offset_y ?? 0) + 'px');
     uAvaFrame.style.display = 'block';
   } else {
     uAvaFrame.style.display = 'none';
