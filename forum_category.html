@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Category — Scream Collector</title>
+<title>Forum Category — Scream Collector</title>
 <style>
   :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
@@ -14,8 +14,6 @@
   .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
   .node{padding:12px;border:1px solid #2a2a2a;background:#161616;border-radius:10px;margin-bottom:10px}
   .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;text-decoration:none}
-  input{padding:8px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
-  .post{padding:12px;border:1px solid #2a2a2a;background:#161616;border-radius:10px;margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -24,32 +22,30 @@
 
 <div class="wrap">
   <a href="forum.html">← Forum</a>
-  <h2 id="catTitle">Category</h2>
+  <h2 id="catTitle" style="margin-top:8px">Loading…</h2>
 
-  <!-- For moderators: create a subcategory here -->
+  <!-- Moderator/Owner box -->
   <div id="modBox" class="card" style="display:none">
-    <h3 style="margin:0 0 8px">Moderator: Add Subcategory</h3>
+    <h3 style="margin:0 0 8px">Moderator Tools</h3>
     <div class="row">
-      <input id="subTitle" placeholder="Subcategory title (e.g., Scream 2)"/>
-      <button id="addSub" class="btn" style="background:#2a6">Create</button>
+      <input id="subTitle" placeholder="New subcategory title"/>
+      <button id="addSub" class="btn" style="background:#2a6">Add Subcategory</button>
       <span id="modMsg" class="muted"></span>
     </div>
   </div>
 
-  <!-- If category has children, list them here. Otherwise, show posts. -->
   <div id="childrenCard" class="card" style="display:none">
     <h3 style="margin:0 0 8px">Subcategories</h3>
     <ul id="childrenList" class="list"></ul>
-    <div class="muted">Open one to continue. You can only create posts in the deepest category.</div>
   </div>
 
   <div id="postsCard" class="card" style="display:none">
-    <div class="row" style="margin-bottom:8px">
+    <div class="row">
       <h3 style="margin:0">Posts</h3>
       <div id="postActions"></div>
     </div>
     <div id="postsStatus" class="muted">Loading…</div>
-    <div id="postsList"></div>
+    <ul id="postsList" class="list"></ul>
   </div>
 </div>
 
@@ -92,7 +88,8 @@
       const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
       myRole = p?.role || 'free';
     }
-    if (myRole==='moderator') modBox.style.display='block';
+    const isModOrOwner = (myRole==='moderator' || myRole==='owner'); // CHANGED
+    if (isModOrOwner) modBox.style.display='block'; // CHANGED
 
     // load category title
     const { data: cat, error: ce } = await sb.from('forum_categories').select('id,title').eq('id', catId).maybeSingle();
@@ -106,10 +103,7 @@
       .eq('parent_id', catId)
       .order('title',{ascending:true});
 
-    if (ke){ console.error(ke); }
-
     if (kids?.length){
-      // not a leaf: show subcategories only
       childrenCard.style.display='block';
       childrenList.innerHTML = kids.map(c=>`
         <li class="node">
@@ -117,7 +111,7 @@
             <strong>${escapeHtml(c.title)}</strong>
             <div class="row">
               <a class="btn" href="forum_category.html?id=${c.id}">Open</a>
-              ${myRole==='moderator'
+              ${isModOrOwner
                 ? `<button class="btn" data-act="addSub" data-id="${c.id}">Add Sub</button>
                    <button class="btn" style="background:#933" data-act="delCat" data-id="${c.id}">Delete</button>`
                 : ''
@@ -141,10 +135,35 @@
     }
   })();
 
+  addSub?.addEventListener('click', async ()=>{
+    const title = (subTitle.value||'').trim();
+    if(!title) return setModMsg('Title required.','err');
+    setModMsg('Creating…');
+    const { error } = await sb.from('forum_categories').insert({ title, parent_id: catId });
+    if (error) return setModMsg('Error: '+error.message,'err');
+    setModMsg('Added!','ok'); subTitle.value='';
+    location.reload();
+  });
+
+  childrenList.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-act]');
+    if(!btn) return;
+    const act=btn.dataset.act, id=btn.dataset.id;
+    if(act==='addSub'){
+      const title = prompt('Subcategory title?'); if(!title) return;
+      const { error } = await sb.from('forum_categories').insert({ title, parent_id:id });
+      if (error) return alert('Error: '+error.message);
+      location.reload();
+    } else if(act==='delCat'){
+      if(!confirm('Delete this subcategory?')) return;
+      const { error } = await sb.from('forum_categories').delete().eq('id', id);
+      if (error) return alert('Error: '+error.message);
+      location.reload();
+    }
+  });
+
   async function loadPosts(){
     postsStatus.textContent='Loading…';
-
-    // 1) posts (no joins)
     const { data: posts, error: pe } = await sb
       .from('forum_posts')
       .select('id,title,created_at,author_id')
@@ -153,79 +172,16 @@
     if (pe){ postsStatus.textContent='Error: '+pe.message; return; }
 
     if (!posts?.length){ postsStatus.textContent='No posts yet.'; postsList.innerHTML=''; return; }
-
-    // 2) authors
-    const authorIds = [...new Set(posts.map(p=>p.author_id).filter(Boolean))];
-    let authorsById = {};
-    if (authorIds.length){
-      const { data: authors, error: ae } = await sb
-        .from('profiles')
-        .select('id,username,avatar_url,frame_url,frame_scale,post_count,reply_count')
-        .in('id', authorIds);
-      if (!ae && authors){
-        authorsById = Object.fromEntries(authors.map(a=>[a.id,a]));
-      }
-    }
-
-    // 3) replies for these posts (for the per-post reply count)
-    const postIds = posts.map(p=>p.id);
-    let replyCountByPost = {};
-    if (postIds.length){
-      const { data: reps, error: re } = await sb
-        .from('forum_replies')
-        .select('post_id')
-        .in('post_id', postIds);
-      if (!re && reps){
-        for (const r of reps){
-          replyCountByPost[r.post_id] = (replyCountByPost[r.post_id]||0) + 1;
-        }
-      }
-    }
-
     postsStatus.textContent='';
-    postsList.innerHTML = posts.map(p=>{
-      const a = authorsById[p.author_id];
-      const authorHtml = a?.username
-        ? `<a href="user.html?u=${encodeURIComponent(a.username)}">@${a.username}</a>`
-        : 'unknown';
-      const totalContrib = Number(a?.post_count||0) + Number(a?.reply_count||0);
-      const rcount = replyCountByPost[p.id] || 0;
-      return `
-        <div class="post">
-          <div class="row">
-            <a href="forum_post.html?id=${p.id}"><strong>${escapeHtml(p.title)}</strong></a>
-            <span class="muted">${new Date(p.created_at).toLocaleString()}</span>
-          </div>
-          <div class="muted" style="margin-top:6px">
-            by ${authorHtml} • Replies: ${rcount} • Posts: ${totalContrib}
-          </div>
+    postsList.innerHTML = posts.map(p=>`
+      <li class="node">
+        <div class="row">
+          <a class="btn" href="forum_post.html?id=${p.id}">${escapeHtml(p.title||'(untitled)')}</a>
+          <span class="muted">${new Date(p.created_at).toLocaleString()}</span>
         </div>
-      `;
-    }).join('');
+      </li>
+    `).join('');
   }
-
-  // moderator actions on child list
-  childrenList.addEventListener('click', async (e)=>{
-    const btn = e.target.closest('button[data-act]');
-    if (!btn) return;
-    const act = btn.dataset.act;
-    const id  = btn.dataset.id;
-
-    if (act==='addSub'){
-      const t = prompt('Subcategory title?'); if(!t) return;
-      const { data:{ session } } = await sb.auth.getSession();
-      const uid = session?.user?.id || null;
-      const { error } = await sb.from('forum_categories').insert({ title:t.trim(), parent_id:id, created_by:uid });
-      if (error) return setModMsg('Error: '+error.message,'err');
-      setModMsg('Created.','ok'); location.reload();
-    }
-    if (act==='delCat'){
-      if(!confirm('Delete this category and all descendants (posts & replies included)?')) return;
-      const { error } = await sb.from('forum_categories').delete().eq('id', id);
-      if (error) return setModMsg('Error: '+error.message,'err');
-      setModMsg('Deleted.','ok'); location.reload();
-    }
-  });
 })();
 </script>
 </body>
