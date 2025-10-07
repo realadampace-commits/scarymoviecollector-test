@@ -18,7 +18,7 @@
   .header{display:flex;align-items:center;gap:12px}
   .ava{position:relative;width:48px;height:48px;border-radius:50%;background:#333;overflow:hidden;flex:0 0 auto}
   .ava img{width:100%;height:100%;object-fit:cover;display:block}
-  .frame{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;transform: translate(var(--frameX, 0px), var(--frameY, 0px)) scale(var(--frameScale, 1))
+  .frame{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;transform: translate(var(--frameX, 0px), var(--frameY, 0px)) scale(var(--frameScale, 1))}
 
   .title{font-size:22px;margin:0}
   .meta{font-size:13px;opacity:.75}
@@ -219,7 +219,7 @@
         <div class="reply" data-id="${r.id}">
           <div class="ava">
             <img src="${a?.avatar_url || ''}" alt="">
-            ${a?.frame_url ? `<span class="frame" style="background-image:url('${a.frame_url}'); --frameScale:${a.frame_scale??1}"></span>` : ''}
+            ${a?.frame_url ? `<span class="frame" style="background-image:url('${a.frame_url}'); --frameScale:${a.frame_scale??1}; --frameX:${a.frame_offset_x??0}px; --frameY:${a.frame_offset_y??0}px;"></span>` : ''}
           </div>
           <div style="flex:1">
             <div class="metaRow">
