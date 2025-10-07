@@ -228,8 +228,8 @@ const sanitizeUsername=(u)=>u.toLowerCase().replace(/[^a-z0-9_.-]/g,'').slice(0,
   if(role==='free'){ lockOverlay.style.display='flex'; framesRow.classList.add('dim'); }
   else { subsTools.style.display='flex'; await loadFrames(); }
 
-  // Upload gate: moderators OR owners
-  if(role==='moderator' || role==='owner'){ modTools.style.display='block'; }
+  // Upload gate: owner only
+  if(role==='owner'){ modTools.style.display='block'; }
 })();
 
 async function loadFrames(){
@@ -374,5 +374,6 @@ logoutGlobalBtn.addEventListener('click', async ()=>{ setMsg(logoutMsg,'Signing 
 </script>
 </body>
 </html>
+
 
 
