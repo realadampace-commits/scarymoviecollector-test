@@ -23,11 +23,11 @@
     position:absolute;inset:0;
     background-size:contain;background-position:center;background-repeat:no-repeat;
     pointer-events:none;transform-origin:center;
-    transform:scale(var(--frameScale,1));
+    transform:translate(var(--frameX, 0px), var(--frameY, 0px)) scale(var(--frameScale, 1));
   }
   /* cosmetics gallery */
   .hscroll{display:flex;gap:12px;overflow:auto;padding-bottom:6px}
-  .frameCard{min-width:140px;background:#181818;border-radius:10px;border:1px solid #2a2a2a;padding:8px;text-align:center;cursor:pointer}
+  .frameCard{min-width:140px;background:#181818;border-radius:10px;border:1px solid #2a2a2a;padding:8px;text-align:center;cursor:pointer;position:relative}
   .frameThumb{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:#0f0f0f;border-radius:8px;overflow:hidden}
   .frameThumb img{max-width:100%;max-height:100%}
   .sel{outline:2px solid #4ade80}
@@ -146,6 +146,50 @@
   </div>
 </div>
 
+<!-- Frame Editor Modal -->
+<div id="frameEditor" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+     z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#1c1c1c;color:#eee;border-radius:12px;max-width:520px;width:90%;
+              padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.5)">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Edit Frame</h3>
+      <button id="feClose" style="background:#333;border:none;border-radius:6px;padding:6px 10px;cursor:pointer">Close</button>
+    </div>
+
+    <div style="display:flex;gap:16px;align-items:center;margin:12px 0">
+      <div class="avatarWrap">
+        <div class="avatar" id="feAva"></div>
+        <div id="feOverlay" class="frameOverlay"></div>
+      </div>
+      <div style="flex:1">
+        <div style="display:grid;grid-template-columns:80px 1fr auto;align-items:center;gap:8px">
+          <label>X:</label>
+          <input id="feX" type="range" min="-80" max="80" step="1">
+          <span id="feXv" class="muted"></span>
+
+          <label>Y:</label>
+          <input id="feY" type="range" min="-80" max="80" step="1">
+          <span id="feYv" class="muted"></span>
+
+          <label>Scale:</label>
+          <input id="feS" type="range" min="0.5" max="2" step="0.01">
+          <span id="feSv" class="muted"></span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="feSave" style="background:#2a6;border:none;border-radius:6px;padding:8px 12px;cursor:pointer">
+        Save
+      </button>
+      <button id="feSaveApply" style="background:#4a6;border:none;border-radius:6px;padding:8px 12px;cursor:pointer">
+        Save & Apply
+      </button>
+    </div>
+    <div id="feMsg" class="muted" style="margin-top:6px"></div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const sb = supabase.createClient(
@@ -194,6 +238,24 @@ const frameFile=document.getElementById('frameFile');
 const uploadFrameBtn=document.getElementById('uploadFrame');
 const uploadMsg=document.getElementById('uploadMsg');
 
+// --- Frame Editor refs ---
+const fe = {
+  root: document.getElementById('frameEditor'),
+  close: document.getElementById('feClose'),
+  ava: document.getElementById('feAva'),
+  overlay: document.getElementById('feOverlay'),
+  x: document.getElementById('feX'),
+  y: document.getElementById('feY'),
+  s: document.getElementById('feS'),
+  xv: document.getElementById('feXv'),
+  yv: document.getElementById('feYv'),
+  sv: document.getElementById('feSv'),
+  save: document.getElementById('feSave'),
+  saveApply: document.getElementById('feSaveApply'),
+  msg: document.getElementById('feMsg'),
+  state: { id:null, url:'', x:0, y:0, s:1 }
+};
+
 let user=null, role='free';
 let selectedFrameUrl=null, selectedFrameScale=1.0;
 let currentFrameUrl=null, currentFrameScale=1.0;
@@ -207,7 +269,7 @@ const sanitizeUsername=(u)=>u.toLowerCase().replace(/[^a-z0-9_.-]/g,'').slice(0,
   user=session.user;
 
   const { data: profile } = await sb.from('profiles')
-    .select('username, avatar_url, bio, showcase_ids, role, frame_url, frame_scale')
+    .select('username, avatar_url, bio, showcase_ids, role, frame_url, frame_scale, frame_offset_x, frame_offset_y')
     .eq('id', user.id).maybeSingle();
 
   role=profile?.role||'free';
@@ -218,6 +280,8 @@ const sanitizeUsername=(u)=>u.toLowerCase().replace(/[^a-z0-9_.-]/g,'').slice(0,
   if(currentFrameUrl){
     frameOverlay.style.backgroundImage=`url('${currentFrameUrl}')`;
     frameOverlay.style.setProperty('--frameScale', currentFrameScale);
+    frameOverlay.style.setProperty('--frameX', (profile?.frame_offset_x ?? 0) + 'px');
+    frameOverlay.style.setProperty('--frameY', (profile?.frame_offset_y ?? 0) + 'px');
   }
   if(profile?.username) usernameInput.value=profile.username;
   if(profile?.bio) bioInput.value=profile.bio;
@@ -235,7 +299,7 @@ const sanitizeUsername=(u)=>u.toLowerCase().replace(/[^a-z0-9_.-]/g,'').slice(0,
 async function loadFrames(){
   framesRow.innerHTML='<div class="muted">Loading frames…</div>';
   const { data: frames, error } = await sb
-    .from('frames').select('id,title,image_url,scale,created_by').order('created_at',{ascending:false});
+    .from('frames').select('id,title,image_url,scale,offset_x,offset_y,created_by,created_at').order('created_at',{ascending:false});
   if(error){ framesRow.innerHTML='<div class="muted err">Failed to load frames.</div>'; return; }
   if(!frames?.length){ framesRow.innerHTML='<div class="muted">No frames uploaded yet.</div>'; return; }
 
@@ -246,6 +310,17 @@ async function loadFrames(){
       <div class="muted" style="margin-top:6px;font-size:13px">
         ${fr.title||'Frame'} · ${Math.round((fr.scale??1)*100)}%
       </div>
+      ${role==='owner' ? `
+        <div style="margin-top:6px">
+          <button class="editFrameBtn" data-id="${fr.id}"
+                  data-url="${fr.image_url}"
+                  data-scale="${fr.scale ?? 1}"
+                  data-x="${fr.offset_x ?? 0}"
+                  data-y="${fr.offset_y ?? 0}"
+                  style="background:#444;border:none;border-radius:6px;padding:6px 10px;cursor:pointer">
+            Edit
+          </button>
+        </div>` : ''}
     </div>
   `).join('');
 
@@ -257,6 +332,26 @@ async function loadFrames(){
       selectedFrameScale=parseFloat(card.dataset.scale||'1');
       frameOverlay.style.backgroundImage=`url('${selectedFrameUrl}')`;
       frameOverlay.style.setProperty('--frameScale', selectedFrameScale);
+      // Try to read x/y from sibling edit button if present
+      const btn = card.querySelector('.editFrameBtn');
+      if (btn) {
+        frameOverlay.style.setProperty('--frameX', (parseFloat(btn.dataset.x||'0')) + 'px');
+        frameOverlay.style.setProperty('--frameY', (parseFloat(btn.dataset.y||'0')) + 'px');
+      }
+    });
+  });
+
+  // Owner-only editor buttons
+  framesRow.querySelectorAll('.editFrameBtn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openFrameEditor({
+        id:   btn.dataset.id,
+        url:  btn.dataset.url,
+        scale:parseFloat(btn.dataset.scale||'1'),
+        x:    parseFloat(btn.dataset.x||'0'),
+        y:    parseFloat(btn.dataset.y||'0')
+      });
     });
   });
 }
@@ -317,27 +412,38 @@ sendResetBtn.addEventListener('click', async ()=>{
 // save / clear frame selection
 saveFrameBtn.addEventListener('click', async ()=>{
   if(!selectedFrameUrl) return setMsg(frameMsg,'Pick a frame first.','err');
+  // Try to get offsets from the selected card's edit button
+  const selCard = framesRow.querySelector('.frameCard.sel');
+  let offX = 0, offY = 0;
+  if (selCard) {
+    const btn = selCard.querySelector('.editFrameBtn');
+    if (btn) { offX = parseFloat(btn.dataset.x||'0'); offY = parseFloat(btn.dataset.y||'0'); }
+  }
   const { error }=await sb.from('profiles')
-    .update({ frame_url:selectedFrameUrl, frame_scale:selectedFrameScale })
+    .update({ frame_url:selectedFrameUrl, frame_scale:selectedFrameScale, frame_offset_x: offX, frame_offset_y: offY })
     .eq('id',user.id);
   if(error) return setMsg(frameMsg,'Error: '+error.message,'err');
   currentFrameUrl=selectedFrameUrl; currentFrameScale=selectedFrameScale;
+  frameOverlay.style.setProperty('--frameX', offX + 'px');
+  frameOverlay.style.setProperty('--frameY', offY + 'px');
   setMsg(frameMsg,'Frame applied!','ok');
 });
 clearFrameBtn.addEventListener('click', async ()=>{
   const { error }=await sb.from('profiles')
-    .update({ frame_url:null, frame_scale:1.0 })
+    .update({ frame_url:null, frame_scale:1.0, frame_offset_x:0, frame_offset_y:0 })
     .eq('id',user.id);
   if(error) return setMsg(frameMsg,'Error: '+error.message,'err');
   selectedFrameUrl=null; selectedFrameScale=1.0;
   currentFrameUrl=null; currentFrameScale=1.0;
   frameOverlay.style.backgroundImage='none';
   frameOverlay.style.setProperty('--frameScale',1);
+  frameOverlay.style.setProperty('--frameX','0px');
+  frameOverlay.style.setProperty('--frameY','0px');
   framesRow.querySelectorAll('.frameCard').forEach(c=>c.classList.remove('sel'));
   setMsg(frameMsg,'Frame removed.','ok');
 });
 
-// moderator/owner upload (allow owner too)
+// owner-only upload
 uploadFrameBtn.addEventListener('click', async ()=>{
   const { data: me } = await sb.from('profiles').select('role').eq('id',user.id).maybeSingle();
   if(!(me?.role==='owner')) return setMsg(uploadMsg,'Only the owner can upload.','err');
@@ -354,26 +460,86 @@ uploadFrameBtn.addEventListener('click', async ()=>{
     title:frameTitle.value.trim()||null,
     image_url:url,
     created_by:user.id,
-    scale:isFinite(scaleVal)?scaleVal:1.0
+    scale:isFinite(scaleVal)?scaleVal:1.0,
+    offset_x: 0,
+    offset_y: 0
   });
   if(ins.error) return setMsg(uploadMsg,'Save error: '+ins.error.message,'err');
   setMsg(uploadMsg,'Frame uploaded!','ok');
   frameTitle.value=''; frameFile.value=''; await loadFrames();
 });
 
-// sign out helpers
-async function safeSignOut(scope){
-  try{
-    const { error }=await sb.auth.signOut(scope?{scope}:undefined);
-    if(error && error.message!=='Auth session missing!'){ setMsg(logoutMsg,'Error: '+error.message,'err'); return false; }
-    return true;
-  }catch(e){ setMsg(logoutMsg,'Error: '+(e?.message||e),'err'); return false; }
+// --- Frame Editor logic ---
+function openFrameEditor({id,url,x,y,scale}) {
+  if (role !== 'owner') return; // UI gate
+  fe.state = { id, url, x, y, s: scale ?? 1 };
+  fe.ava.innerHTML = avatarBox.innerHTML; // show current avatar in the mini preview
+  fe.overlay.style.backgroundImage = `url('${url}')`;
+  fe.overlay.style.setProperty('--frameX', x + 'px');
+  fe.overlay.style.setProperty('--frameY', y + 'px');
+  fe.overlay.style.setProperty('--frameScale', (scale ?? 1));
+
+  fe.x.value = x; fe.y.value = y; fe.s.value = scale ?? 1;
+  fe.xv.textContent = x + 'px';
+  fe.yv.textContent = y + 'px';
+  fe.sv.textContent = (scale ?? 1).toFixed(2) + '×';
+  fe.msg.textContent = '';
+
+  fe.root.style.display = 'flex';
 }
-logoutLocalBtn.addEventListener('click', async ()=>{ setMsg(logoutMsg,'Signing out…'); if(await safeSignOut(null)) location.href='index.html'; });
-logoutGlobalBtn.addEventListener('click', async ()=>{ setMsg(logoutMsg,'Signing out everywhere…'); if(await safeSignOut('global')) location.href='index.html'; });
+
+fe.close.addEventListener('click', ()=> fe.root.style.display = 'none');
+
+[fe.x, fe.y, fe.s].forEach(inp=>{
+  inp.addEventListener('input', ()=>{
+    const x = Number(fe.x.value), y = Number(fe.y.value), s = Number(fe.s.value);
+    fe.overlay.style.setProperty('--frameX', x + 'px');
+    fe.overlay.style.setProperty('--frameY', y + 'px');
+    fe.overlay.style.setProperty('--frameScale', s);
+    fe.xv.textContent = x + 'px';
+    fe.yv.textContent = y + 'px';
+    fe.sv.textContent = s.toFixed(2) + '×';
+    fe.state.x = x; fe.state.y = y; fe.state.s = s;
+  });
+});
+
+fe.save.addEventListener('click', async ()=>{
+  fe.msg.textContent = 'Saving…';
+  const { error } = await sb.from('frames').update({
+    offset_x: fe.state.x,
+    offset_y: fe.state.y,
+    scale:    fe.state.s
+  }).eq('id', fe.state.id);
+  fe.msg.textContent = error ? ('Error: ' + error.message) : 'Saved.';
+  if (!error) { await loadFrames(); } // refresh gallery labels
+});
+
+fe.saveApply.addEventListener('click', async ()=>{
+  fe.msg.textContent = 'Saving & applying…';
+  const up1 = await sb.from('frames').update({
+    offset_x: fe.state.x,
+    offset_y: fe.state.y,
+    scale:    fe.state.s
+  }).eq('id', fe.state.id);
+
+  if (up1.error) { fe.msg.textContent = 'Error: ' + up1.error.message; return; }
+
+  await sb.from('profiles').update({
+    frame_url:      fe.state.url,
+    frame_scale:    fe.state.s,
+    frame_offset_x: fe.state.x,
+    frame_offset_y: fe.state.y
+  }).eq('id', user.id);
+
+  // update live preview
+  frameOverlay.style.backgroundImage = `url('${fe.state.url}')`;
+  frameOverlay.style.setProperty('--frameScale', fe.state.s);
+  frameOverlay.style.setProperty('--frameX', fe.state.x + 'px');
+  frameOverlay.style.setProperty('--frameY', fe.state.y + 'px');
+
+  fe.msg.textContent = 'Saved & applied.';
+  await loadFrames();
+});
 </script>
 </body>
 </html>
-
-
-
