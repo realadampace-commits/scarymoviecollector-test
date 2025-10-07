@@ -18,9 +18,7 @@
   .userHead{display:flex;align-items:center;gap:12px}
   .ava{position:relative;width:56px;height:56px;border-radius:50%;background:#333;overflow:hidden;flex:0 0 auto}
   .ava img{width:100%;height:100%;object-fit:cover;display:block}
-  .frame{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;transform:scale(var(--frameScale,1))}
-  .frame{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;transform:scale(var(--frameX,0))}
-  .frame{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;transform:scale(var(--frameY,0))}
+  .frame{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;transform: translate(var(--frameX, 0px), var(--frameY, 0px)) scale(var(--frameScale, 1));}
 
   .roleTag{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:12px;vertical-align:middle}
   .role-free{background:#333;color:#ddd}
@@ -120,8 +118,8 @@ let me=null, myRole='free', targetProfile=null;
   if (profile.frame_url) {
     uAvaFrame.style.backgroundImage = `url('${profile.frame_url}')`;
     uAvaFrame.style.setProperty('--frameScale', profile.frame_scale ?? 1);
-    uAvaFrame.style.setProperty('--frameX', profile.frame_offset_x ?? 0) + 'px');
-    uAvaFrame.style.setProperty('--frameY', profile.frame_offset_y ?? 0) + 'px');
+    uAvaFrame.style.setProperty('--frameX', (profile.frame_offset_x ?? 0) + 'px');
+    uAvaFrame.style.setProperty('--frameY', (profile.frame_offset_y ?? 0) + 'px');
     uAvaFrame.style.display = 'block';
   } else {
     uAvaFrame.style.display = 'none';
