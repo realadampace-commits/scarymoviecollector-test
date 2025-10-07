@@ -2,18 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Forum Category — Scream Collector</title>
+<title>Category — Scream Collector</title>
 <style>
-  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#dc143c}
+  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4}
   body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
   a{color:#9ecbff;text-decoration:none}
   .wrap{max-width:1000px;margin:0 auto;padding:24px}
   .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
   .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
-  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .list{display:grid;gap:10px;margin-top:8px}
-  .item{background:#171717;border:1px solid #2a2a2a;border-radius:10px;padding:10px;display:flex;align-items:center;justify-content:space-between}
+  .list{list-style:none;margin:0;padding:0}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .node{padding:12px;border:1px solid #2a2a2a;background:#161616;border-radius:10px;margin-bottom:10px}
   .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;text-decoration:none}
+  input{padding:8px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
+  .post{padding:12px;border:1px solid #2a2a2a;background:#161616;border-radius:10px;margin-bottom:10px}
 </style>
 </head>
 <body>
@@ -22,105 +24,172 @@
 
 <div class="wrap">
   <a href="forum.html">← Forum</a>
-  <h2 id="catTitle">Loading…</h2>
+  <h2 id="catTitle">Category</h2>
 
-  <div id="subsCard" class="card" style="display:none">
-    <h3 style="margin-top:0">Subcategories</h3>
-    <div id="subs" class="list"></div>
+  <!-- For moderators: create a subcategory here -->
+  <div id="modBox" class="card" style="display:none">
+    <h3 style="margin:0 0 8px">Moderator: Add Subcategory</h3>
+    <div class="row">
+      <input id="subTitle" placeholder="Subcategory title (e.g., Scream 2)"/>
+      <button id="addSub" class="btn" style="background:#2a6">Create</button>
+      <span id="modMsg" class="muted"></span>
+    </div>
+  </div>
+
+  <!-- If category has children, list them here. Otherwise, show posts. -->
+  <div id="childrenCard" class="card" style="display:none">
+    <h3 style="margin:0 0 8px">Subcategories</h3>
+    <ul id="childrenList" class="list"></ul>
+    <div class="muted">Open one to continue. You can only create posts in the deepest category.</div>
   </div>
 
   <div id="postsCard" class="card" style="display:none">
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <h3 style="margin:0">Threads</h3>
-      <a id="newPostBtn" class="btn" style="display:none;background:#2a6">New Post</a>
+    <div class="row" style="margin-bottom:8px">
+      <h3 style="margin:0">Posts</h3>
+      <div id="postActions"></div>
     </div>
-    <div id="posts" class="list"></div>
+    <div id="postsStatus" class="muted">Loading…</div>
+    <div id="postsList"></div>
   </div>
-
-  <div id="msg" class="muted"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const sb = supabase.createClient(
- 'https://wktxpukjmvmhzpctttjx.supabase.co',
- 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
-);
-const qs=new URLSearchParams(location.search);
-const catId=qs.get('id');
+(function(){
+  const sb = supabase.createClient(
+    'https://wktxpukjmvmhzpctttjx.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+  );
 
-const catTitle=document.getElementById('catTitle');
-const subsCard=document.getElementById('subsCard');
-const subsEl=document.getElementById('subs');
-const postsCard=document.getElementById('postsCard');
-const postsEl=document.getElementById('posts');
-const newPostBtn=document.getElementById('newPostBtn');
-const msg=document.getElementById('msg');
+  const qs = new URLSearchParams(location.search);
+  const catId = qs.get('id');
 
-let me=null, myRole='free';
+  const catTitleEl = document.getElementById('catTitle');
+  const modBox = document.getElementById('modBox');
+  const subTitle = document.getElementById('subTitle');
+  const addSub = document.getElementById('addSub');
+  const modMsg = document.getElementById('modMsg');
 
-(async function init(){
-  const { data:{ session } } = await sb.auth.getSession();
-  me = session?.user || null;
-  if (me) {
-    const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
-    myRole = p?.role || 'free';
-  }
+  const childrenCard = document.getElementById('childrenCard');
+  const childrenList = document.getElementById('childrenList');
 
-  const { data: cat } = await sb.from('forum_categories').select('id,title').eq('id',catId).maybeSingle();
-  if(!cat){ catTitle.textContent='Category not found'; return; }
-  catTitle.textContent = cat.title;
+  const postsCard = document.getElementById('postsCard');
+  const postsList = document.getElementById('postsList');
+  const postsStatus = document.getElementById('postsStatus');
+  const postActions = document.getElementById('postActions');
 
-  // fetch children
-  const kids = await sb.from('forum_categories').select('id,title').eq('parent_id',catId).order('title',{ascending:true});
-  const subcats = kids.data || [];
-  if (subcats.length){
-    subsCard.style.display='block';
-    subsEl.innerHTML = subcats.map(c=>`
-      <div class="item">
-        <div><strong>${c.title}</strong></div>
-        <div class="row">
-          <a class="btn" href="forum_category.html?id=${c.id}">Open</a>
-        </div>
-      </div>
-    `).join('');
-  } else {
-    // leaf → show threads list
-    postsCard.style.display='block';
+  let myRole='free', me=null;
 
-    // free cannot create
-    if (myRole==='subscriber' || myRole==='moderator') {
-      newPostBtn.style.display='inline-block';
-      newPostBtn.href = 'forum_new_post.html?cat=' + catId;
+  (async function init(){
+    if (!catId){ location.href='forum.html'; return; }
+
+    const { data:{ session } } = await sb.auth.getSession();
+    me = session?.user || null;
+    if (me){
+      const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
+      myRole = p?.role || 'free';
     }
+    if (myRole==='moderator') modBox.style.display='block';
 
-    await loadThreads();
-  }
-})();
+    // load category
+    const { data: cat } = await sb.from('forum_categories').select('id,title').eq('id', catId).maybeSingle();
+    if (!cat){ catTitleEl.textContent='Category not found'; return; }
+    catTitleEl.textContent = cat.title;
 
-async function loadThreads(){
-  // show author + reply count
-  const { data: threads, error } = await sb
-    .from('forum_posts')
-    .select('id,title,created_at,author:author_id(username),forum_replies(count)')
-    .eq('category_id',catId)
-    .order('created_at',{ascending:false});
-  if (error){ postsEl.innerHTML='<div class="muted err">Error loading threads</div>'; return; }
-  if (!threads?.length){ postsEl.innerHTML='<div class="muted">No posts yet.</div>'; return; }
+    // find children
+    const { data: kids } = await sb.from('forum_categories')
+      .select('id,title')
+      .eq('parent_id', catId)
+      .order('title',{ascending:true});
 
-  postsEl.innerHTML = threads.map(t=>{
-    const rc = (t.forum_replies && t.forum_replies.length) ? t.forum_replies[0].count : 0;
-    return `
-      <div class="item">
-        <div>
-          <a href="forum_post.html?id=${t.id}"><strong>${t.title}</strong></a>
-          <div class="muted">by ${t.author?.username ? '@'+t.author.username : 'unknown'} • ${new Date(t.created_at).toLocaleString()}</div>
+    if (kids?.length){
+      // non-leaf: show children only, no posts
+      childrenCard.style.display='block';
+      childrenList.innerHTML = kids.map(c=>`
+        <li class="node">
+          <div class="row">
+            <strong>${escapeHtml(c.title)}</strong>
+            <div class="row">
+              <a class="btn" href="forum_category.html?id=${c.id}">Open</a>
+              ${myRole==='moderator'
+                ? `<button class="btn" data-act="addSub" data-id="${c.id}">Add Sub</button>
+                   <button class="btn" style="background:#933" data-act="delCat" data-id="${c.id}">Delete</button>`
+                : ''
+              }
+            </div>
+          </div>
+        </li>
+      `).join('');
+    } else {
+      // leaf: show posts + new post (subscribers/mods)
+      postsCard.style.display='block';
+      if (myRole!=='free'){
+        const newBtn = document.createElement('a');
+        newBtn.href = `forum_new_post.html?cat=${catId}`;
+        newBtn.className = 'btn';
+        newBtn.style.background = '#2a6';
+        newBtn.textContent = 'New Post';
+        postActions.appendChild(newBtn);
+      }
+      await loadPosts();
+    }
+  })();
+
+  async function loadPosts(){
+    postsStatus.textContent='Loading…';
+    const { data: posts, error } = await sb
+      .from('forum_posts')
+      .select('id,title,created_at, author:author_id(username,avatar_url,post_count,reply_count)')
+      .eq('category_id', catId)
+      .order('created_at',{ascending:false});
+    if (error){ postsStatus.textContent='Error: '+error.message; return; }
+    postsStatus.textContent = posts?.length ? '' : 'No posts yet.';
+
+    postsList.innerHTML = (posts||[]).map(p=>{
+      const count = Number(p.author?.post_count||0) + Number(p.author?.reply_count||0);
+      return `
+        <div class="post">
+          <div class="row">
+            <a href="forum_post.html?id=${p.id}"><strong>${escapeHtml(p.title)}</strong></a>
+            <span class="muted">${new Date(p.created_at).toLocaleString()}</span>
+          </div>
+          <div class="muted" style="margin-top:6px">
+            by ${p.author?.username ? `<a href="user.html?u=${encodeURIComponent(p.author.username)}">@${p.author.username}</a>` : 'unknown'}
+            • Posts: ${count}
+          </div>
         </div>
-        <div class="muted">Replies: ${rc}</div>
-      </div>
-    `;
-  }).join('');
-}
+      `;
+    }).join('');
+  }
+
+  function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+  // moderator actions on child list
+  childrenList.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    const id  = btn.dataset.id;
+
+    if (act==='addSub'){
+      const t = prompt('Subcategory title?'); if(!t) return;
+      const { data:{ session } } = await sb.auth.getSession();
+      const uid = session?.user?.id || null;
+      const { error } = await sb.from('forum_categories').insert({ title:t.trim(), parent_id:id, created_by:uid });
+      if (error) return modMsg('Error: '+error.message,'err');
+      modMsg('Created.','ok');
+      location.reload();
+    }
+    if (act==='delCat'){
+      if(!confirm('Delete this category and all descendants (posts & replies included)?')) return;
+      const { error } = await sb.from('forum_categories').delete().eq('id', id);
+      if (error) return modMsg('Error: '+error.message,'err');
+      modMsg('Deleted.','ok'); location.reload();
+    }
+  });
+
+  function modMsg(t, cls='muted'){ modMsgEl.className=cls; modMsgEl.textContent=t; }
+})();
 </script>
 </body>
 </html>
