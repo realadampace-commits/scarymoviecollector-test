@@ -202,13 +202,14 @@ async function loadPortfolioItems(ownerId, all) {
     .order('created_at', { ascending:false });
   if (!all) q.limit(5);
   const { data: items, error } = await q;
-  if (error) return console.error('Load error:', error);
-  if (!items || !items.length){ emptyEl.style.display='block'; return; }
-  emptyEl.style.display='none';
-  itemsEl.innerHTML = items.map(it=>`
+    if (error) return console.error('Load error:', error);
+    if (!items || !items.length){ emptyEl.style.display='block'; itemsEl.innerHTML=''; return; }
+    const withPrev = await attachPreviews(items);
+    emptyEl.style.display='none';
+    itemsEl.innerHTML = withPrev.map(it=>`
     <a class="card" href="item.html?id=${it.id}" style="color:inherit;text-decoration:none">
-      <div class="thumb">No image</div>
-      <div class="meta"><strong>${it.title}</strong><br>$${(it.user_value||0).toLocaleString()}</div>
+    <div class="thumb">${it.preview_url ? `<img src="${it.preview_url}" alt="">` : 'No image'}</div>
+    <div class="meta"><strong>${it.title}</strong><br>$${(it.user_value||0).toLocaleString()}</div>
     </a>`).join('');
 }
 </script>
