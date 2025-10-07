@@ -68,7 +68,7 @@
   const modBox = document.getElementById('modBox');
   const subTitle = document.getElementById('subTitle');
   const addSub = document.getElementById('addSub');
-  const modMsg = document.getElementById('modMsg');
+  const modMsgEl = document.getElementById('modMsg');
 
   const childrenCard = document.getElementById('childrenCard');
   const childrenList = document.getElementById('childrenList');
@@ -80,58 +80,67 @@
 
   let myRole='free', me=null;
 
+  function setModMsg(t, cls='muted'){ modMsgEl.className=cls; modMsgEl.textContent=t; }
+  function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
   (async function init(){
-    if (!catId){ location.href='forum.html'; return; }
+    try{
+      if (!catId){ location.href='forum.html'; return; }
 
-    const { data:{ session } } = await sb.auth.getSession();
-    me = session?.user || null;
-    if (me){
-      const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
-      myRole = p?.role || 'free';
-    }
-    if (myRole==='moderator') modBox.style.display='block';
-
-    // load category
-    const { data: cat } = await sb.from('forum_categories').select('id,title').eq('id', catId).maybeSingle();
-    if (!cat){ catTitleEl.textContent='Category not found'; return; }
-    catTitleEl.textContent = cat.title;
-
-    // find children
-    const { data: kids } = await sb.from('forum_categories')
-      .select('id,title')
-      .eq('parent_id', catId)
-      .order('title',{ascending:true});
-
-    if (kids?.length){
-      // non-leaf: show children only, no posts
-      childrenCard.style.display='block';
-      childrenList.innerHTML = kids.map(c=>`
-        <li class="node">
-          <div class="row">
-            <strong>${escapeHtml(c.title)}</strong>
-            <div class="row">
-              <a class="btn" href="forum_category.html?id=${c.id}">Open</a>
-              ${myRole==='moderator'
-                ? `<button class="btn" data-act="addSub" data-id="${c.id}">Add Sub</button>
-                   <button class="btn" style="background:#933" data-act="delCat" data-id="${c.id}">Delete</button>`
-                : ''
-              }
-            </div>
-          </div>
-        </li>
-      `).join('');
-    } else {
-      // leaf: show posts + new post (subscribers/mods)
-      postsCard.style.display='block';
-      if (myRole!=='free'){
-        const newBtn = document.createElement('a');
-        newBtn.href = `forum_new_post.html?cat=${catId}`;
-        newBtn.className = 'btn';
-        newBtn.style.background = '#2a6';
-        newBtn.textContent = 'New Post';
-        postActions.appendChild(newBtn);
+      const { data:{ session } } = await sb.auth.getSession();
+      me = session?.user || null;
+      if (me){
+        const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
+        myRole = p?.role || 'free';
       }
-      await loadPosts();
+      if (myRole==='moderator') modBox.style.display='block';
+
+      // load category
+      const { data: cat, error: ce } = await sb.from('forum_categories').select('id,title').eq('id', catId).maybeSingle();
+      if (ce) { catTitleEl.textContent='Error loading category'; console.error(ce); return; }
+      if (!cat){ catTitleEl.textContent='Category not found'; return; }
+      catTitleEl.textContent = cat.title;
+
+      // children?
+      const { data: kids, error: ke } = await sb.from('forum_categories')
+        .select('id,title')
+        .eq('parent_id', catId)
+        .order('title',{ascending:true});
+      if (ke){ console.error(ke); }
+
+      if (kids && kids.length){
+        childrenCard.style.display='block';
+        childrenList.innerHTML = kids.map(c=>`
+          <li class="node">
+            <div class="row">
+              <strong>${escapeHtml(c.title)}</strong>
+              <div class="row">
+                <a class="btn" href="forum_category.html?id=${c.id}">Open</a>
+                ${myRole==='moderator'
+                  ? `<button class="btn" data-act="addSub" data-id="${c.id}">Add Sub</button>
+                     <button class="btn" style="background:#933" data-act="delCat" data-id="${c.id}">Delete</button>`
+                  : ''
+                }
+              </div>
+            </div>
+          </li>
+        `).join('');
+      } else {
+        // leaf: show posts
+        postsCard.style.display='block';
+        if (myRole!=='free'){
+          const newBtn = document.createElement('a');
+          newBtn.href = `forum_new_post.html?cat=${catId}`;
+          newBtn.className = 'btn';
+          newBtn.style.background = '#2a6';
+          newBtn.textContent = 'New Post';
+          postActions.appendChild(newBtn);
+        }
+        await loadPosts();
+      }
+    }catch(err){
+      console.error(err);
+      catTitleEl.textContent = 'Category (error loading)';
     }
   })();
 
@@ -162,8 +171,6 @@
     }).join('');
   }
 
-  function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
-
   // moderator actions on child list
   childrenList.addEventListener('click', async (e)=>{
     const btn = e.target.closest('button[data-act]');
@@ -176,19 +183,17 @@
       const { data:{ session } } = await sb.auth.getSession();
       const uid = session?.user?.id || null;
       const { error } = await sb.from('forum_categories').insert({ title:t.trim(), parent_id:id, created_by:uid });
-      if (error) return modMsg('Error: '+error.message,'err');
-      modMsg('Created.','ok');
+      if (error) return setModMsg('Error: '+error.message,'err');
+      setModMsg('Created.','ok');
       location.reload();
     }
     if (act==='delCat'){
       if(!confirm('Delete this category and all descendants (posts & replies included)?')) return;
       const { error } = await sb.from('forum_categories').delete().eq('id', id);
-      if (error) return modMsg('Error: '+error.message,'err');
-      modMsg('Deleted.','ok'); location.reload();
+      if (error) return setModMsg('Error: '+error.message,'err');
+      setModMsg('Deleted.','ok'); location.reload();
     }
   });
-
-  function modMsg(t, cls='muted'){ modMsgEl.className=cls; modMsgEl.textContent=t; }
 })();
 </script>
 </body>
