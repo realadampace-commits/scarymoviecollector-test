@@ -202,7 +202,7 @@
     if (ids.length){
       const { data: profs } = await sb
         .from('profiles')
-        .select('id,username,avatar_url,frame_url,frame_scale')
+        .select('id,username,avatar_url,frame_url,frame_scale,frame_offset_y,frame_offset_x')
         .in('id', ids);
       if (profs) authors = Object.fromEntries(profs.map(p=>[p.id,p]));
     }
