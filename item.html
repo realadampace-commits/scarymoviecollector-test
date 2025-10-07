@@ -210,7 +210,8 @@ function setVoteMsg(t, ok=false){ voteMsg.textContent=t; voteMsg.style.color = o
   if (me) {
     const my = await sb.from('profiles').select('role').eq('id', me.id).maybeSingle();
     const role = my.data?.role || 'free';
-    if (me.id === item.owner_id || role === 'moderator') {
+    const isModOrOwner = (role==='moderator' || role==='owner');
+    if (me.id === item.owner_id || isModOrOwner) {
       ownerTools.style.display = 'flex';
       editBtn.href = 'edit.html?id=' + item.id;
       deleteBtn.onclick = async ()=>{
@@ -325,3 +326,4 @@ saveSuggestionBtn.addEventListener('click', async ()=>{
 </script>
 </body>
 </html>
+
