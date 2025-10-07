@@ -4,24 +4,35 @@
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Account Settings</title>
 <style>
-  :root{--bg:#111;--panel:#1c1c1c;--ink:#eee;--muted:#a9adb4}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  :root{--panel:#1c1c1c;--muted:#a9adb4}
+  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
+  .wrap{max-width:840px;margin:0 auto;padding:24px}
   a{color:#9ecbff;text-decoration:none}
-  .wrap{max-width:780px;margin:0 auto;padding:24px}
   .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
   .row{display:grid;grid-template-columns:160px 1fr;gap:16px;align-items:center}
-  input,button{padding:10px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
+  input,button,textarea{padding:10px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
   button{border:none;background:crimson;cursor:pointer}
   .muted{color:var(--muted)}
   .ok{color:#9f9}.err{color:#f88}
-  .avatar{width:120px;height:120px;border-radius:999px;background:#222;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+  .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  /* avatar + frame */
+  .avatarWrap{position:relative;width:120px;height:120px}
+  .avatar{width:120px;height:120px;border-radius:50%;background:#222;overflow:hidden;display:flex;align-items:center;justify-content:center}
   .avatar img{max-width:100%;max-height:100%}
-  .frame{position:absolute;inset:0;background-position:center;background-size:contain;background-repeat:no-repeat;pointer-events:none;transform:scale(var(--frameScale,1))}
-  .actions{display:flex;gap:8px;flex-wrap:wrap}
-  .topbar{display:flex;justify-content:space-between;align-items:center}
-  .btn-secondary{background:#444}
-  .btn-danger{background:#c33}
-  .hint{font-size:12px}
+  .frameOverlay{
+    position:absolute;inset:0;
+    background-size:contain;background-position:center;background-repeat:no-repeat;
+    pointer-events:none;transform-origin:center;
+    transform:scale(var(--frameScale,1));
+  }
+  /* cosmetics gallery */
+  .hscroll{display:flex;gap:12px;overflow:auto;padding-bottom:6px}
+  .frameCard{min-width:140px;background:#181818;border-radius:10px;border:1px solid #2a2a2a;padding:8px;text-align:center;cursor:pointer}
+  .frameThumb{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:#0f0f0f;border-radius:8px;overflow:hidden}
+  .frameThumb img{max-width:100%;max-height:100%}
+  .sel{outline:2px solid #4ade80}
+  .dim{opacity:.35;filter:grayscale(.9)}
+  .lock{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;border-radius:12px;font-weight:600}
 </style>
 </head>
 <body>
@@ -29,298 +40,337 @@
 <script type="module" src="/menu.js"></script>
 
 <div class="wrap">
-  <div class="topbar">
+  <div style="display:flex;justify-content:space-between;align-items:center">
     <a href="index.html">← Home</a>
-    <a href="portfolio.html" class="btn-secondary" style="background:#444;padding:8px 12px;border-radius:6px;color:#fff;text-decoration:none">My Portfolio</a>
+    <a href="portfolio.html" style="background:#444;padding:8px 12px;border-radius:6px;color:#fff;text-decoration:none">My Portfolio</a>
   </div>
   <h2>Account Settings</h2>
+  <div id="roleBanner" class="muted" style="margin-top:6px"></div>
 
-  <!-- Profile picture -->
+  <!-- Avatar -->
   <div class="card">
     <h3>Profile Picture</h3>
     <div class="row">
-      <div class="avatar" id="avatarBox"><span class="muted">No image</span></div>
-      <div class="actions">
+      <div class="avatarWrap">
+        <div class="avatar" id="avatarBox"><span class="muted">No image</span></div>
+        <div id="frameOverlay" class="frameOverlay"></div>
+      </div>
+      <div class="tools">
         <input type="file" id="avatarFile" accept="image/*" />
         <button id="uploadAvatar">Upload</button>
-        <button id="removeAvatar" class="btn-danger">Remove</button>
-        <div id="avatarMsg" class="muted"></div>
+        <span id="avatarMsg" class="muted"></span>
       </div>
     </div>
-    <p class="hint muted" style="margin-top:8px">Tip: square images look best.</p>
   </div>
 
   <!-- Username -->
   <div class="card">
     <h3>Change Username</h3>
     <div class="row">
-      <label for="username" class="muted">New username</label>
-      <div class="actions" style="display:flex;gap:8px">
-        <input id="username" placeholder="e.g. nate008"/>
+      <label class="muted">New username</label>
+      <div class="tools">
+        <input id="username" placeholder="e.g., nate008"/>
         <button id="saveUsername">Save</button>
+        <span id="userMsg" class="muted"></span>
       </div>
     </div>
-    <div id="userMsg" class="muted" style="margin-top:8px"></div>
   </div>
 
-  <!-- Profile Frame (Moderators & Owners) -->
-  <div class="card" id="frameCard" style="display:none">
-    <h3>Profile Frame (Mods & Owners)</h3>
-    <div class="row">
-      <div>
-        <div class="avatar" style="width:120px;height:120px;background:#000">
-          <img id="framePreviewAva" alt="" style="display:none"/>
-          <span id="framePreview" class="frame"></span>
-        </div>
-      </div>
-      <div class="actions" style="align-items:center">
-        <input type="file" id="frameFile" accept="image/png" />
-        <label class="muted">Scale: <input type="range" id="frameScale" min="0.5" max="1.5" step="0.01" value="1" style="vertical-align:middle"></label>
-        <button id="uploadFrame" class="btn-secondary">Upload Frame</button>
-        <button id="saveFrameScale" class="btn-secondary">Save Scale</button>
-        <button id="removeFrame" class="btn-danger">Remove Frame</button>
-        <div id="frameMsg" class="muted"></div>
-      </div>
+  <!-- Bio -->
+  <div class="card">
+    <h3>Bio</h3>
+    <textarea id="bioInput" placeholder="Tell people about yourself…" style="width:100%;height:80px;"></textarea>
+    <div class="tools" style="margin-top:8px">
+      <button id="saveBio">Save Bio</button>
+      <span id="bioMsg" class="muted"></span>
     </div>
-    <p class="hint muted" style="margin-top:8px">Upload a transparent PNG. This overlays your avatar on your profile and user pages.</p>
+  </div>
+
+  <!-- Showcase -->
+  <div class="card">
+    <h3>Showcase Favorites</h3>
+    <p class="muted" style="margin-top:6px">Paste up to 5 item IDs (from item URLs) separated by commas.</p>
+    <div class="tools">
+      <input id="showcaseInput" placeholder="65a7f..., b91c4..., ..." style="flex:1"/>
+      <button id="saveShowcase">Save Showcase</button>
+      <span id="showcaseMsg" class="muted"></span>
+    </div>
+  </div>
+
+  <!-- Cosmetics: Frames (gallery + apply) -->
+  <div class="card" style="position:relative">
+    <h3 style="margin-bottom:10px">Cosmetics → Profile Picture Frames</h3>
+
+    <div id="lock" class="lock" style="display:none">Subscribe to unlock</div>
+
+    <div id="framesRow" class="hscroll"></div>
+
+    <div class="tools" id="subsTools" style="display:none;margin-top:8px">
+      <button id="saveFrame" style="background:#2a6">Use Selected Frame</button>
+      <button id="clearFrame" style="background:#555">Remove Frame</button>
+      <span id="frameMsg" class="muted"></span>
+    </div>
+
+    <!-- Moderator/Owner upload tools -->
+    <div id="modTools" style="display:none;margin-top:14px;border-top:1px dashed #333;padding-top:12px">
+      <h4 style="margin:0 0 6px">Moderator/Owner: Upload new frame</h4>
+      <div class="tools">
+        <input id="frameTitle" placeholder="Frame title (optional)"/>
+        <input id="frameScale" type="number" step="0.01" min="0.5" max="2" value="1.08" style="width:110px" title="Scale"/>
+        <input id="frameFile" type="file" accept="image/*" />
+        <button id="uploadFrame">Upload Frame</button>
+        <span id="uploadMsg" class="muted"></span>
+      </div>
+      <div class="muted" style="font-size:12px">Recommended: square PNG with transparency (e.g., 1024×1024).</div>
+    </div>
   </div>
 
   <!-- Password -->
   <div class="card">
     <h3>Change Password (Email Confirmation)</h3>
-    <p class="muted" style="margin-top:6px">
-      We’ll send a secure reset link to your email. Click it to choose a new password.
-    </p>
-    <div class="actions" style="margin-top:8px">
+    <p class="muted">We’ll send a secure reset link to your email.</p>
+    <div class="tools">
       <button id="sendReset">Send Password Reset Email</button>
-      <div id="pwdMsg" class="muted"></div>
+      <span id="pwdMsg" class="muted"></span>
     </div>
   </div>
 
   <!-- Logout -->
   <div class="card">
     <h3>Sign out</h3>
-    <p class="muted" style="margin-top:6px">Sign out of this browser, or all devices.</p>
-    <div class="actions" style="margin-top:8px">
-      <button id="logoutLocal"  class="btn-secondary">Sign out (this device)</button>
-      <button id="logoutGlobal" class="btn-danger">Sign out (all devices)</button>
-      <div id="logoutMsg" class="muted"></div>
+    <div class="tools">
+      <button id="logoutLocal"  style="background:#666">Sign out (this device)</button>
+      <button id="logoutGlobal" style="background:#c33">Sign out (all devices)</button>
+      <span id="logoutMsg" class="muted"></span>
     </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const PROJECT_URL = 'https://wktxpukjmvmhzpctttjx.supabase.co';  // no trailing slash
-const ANON_KEY    = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY';
-const sb = supabase.createClient(PROJECT_URL, ANON_KEY);
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+const AVATAR_BUCKET='avatars', FRAMES_BUCKET='frames';
 
-const AVATAR_BUCKET = 'avatars';
-const FRAMES_BUCKET = 'frames'; // Create this public bucket in Supabase Storage
+const roleBanner=document.getElementById('roleBanner');
+const avatarBox=document.getElementById('avatarBox');
+const avatarFile=document.getElementById('avatarFile');
+const uploadAvatarBtn=document.getElementById('uploadAvatar');
+const avatarMsg=document.getElementById('avatarMsg');
+const frameOverlay=document.getElementById('frameOverlay');
 
-const avatarBox = document.getElementById('avatarBox');
-const avatarFile = document.getElementById('avatarFile');
-const uploadAvatarBtn = document.getElementById('uploadAvatar');
-const removeAvatarBtn = document.getElementById('removeAvatar');
-const avatarMsg = document.getElementById('avatarMsg');
+const usernameInput=document.getElementById('username');
+const saveUsernameBtn=document.getElementById('saveUsername');
+const userMsg=document.getElementById('userMsg');
 
-const usernameInput = document.getElementById('username');
-const saveUsernameBtn = document.getElementById('saveUsername');
-const userMsg = document.getElementById('userMsg');
+const bioInput=document.getElementById('bioInput');
+const saveBioBtn=document.getElementById('saveBio');
+const bioMsg=document.getElementById('bioMsg');
 
-const sendResetBtn = document.getElementById('sendReset');
-const pwdMsg = document.getElementById('pwdMsg');
+const showcaseInput=document.getElementById('showcaseInput');
+const saveShowcaseBtn=document.getElementById('saveShowcase');
+const showcaseMsg=document.getElementById('showcaseMsg');
 
-const logoutMsg = document.getElementById('logoutMsg');
-const logoutLocalBtn = document.getElementById('logoutLocal');
-const logoutGlobalBtn = document.getElementById('logoutGlobal');
+const pwdMsg=document.getElementById('pwdMsg');
+const sendResetBtn=document.getElementById('sendReset');
 
-const frameCard = document.getElementById('frameCard');
-const frameFile = document.getElementById('frameFile');
-const uploadFrameBtn = document.getElementById('uploadFrame');
-const saveFrameScaleBtn = document.getElementById('saveFrameScale');
-const removeFrameBtn = document.getElementById('removeFrame');
-const frameMsg = document.getElementById('frameMsg');
-const framePreview = document.getElementById('framePreview');
-const framePreviewAva = document.getElementById('framePreviewAva');
+const logoutMsg=document.getElementById('logoutMsg');
+const logoutLocalBtn=document.getElementById('logoutLocal');
+const logoutGlobalBtn=document.getElementById('logoutGlobal');
 
-let user = null;
-let profile = null;
+const framesRow=document.getElementById('framesRow');
+const subsTools=document.getElementById('subsTools');
+const modTools=document.getElementById('modTools');
+const saveFrameBtn=document.getElementById('saveFrame');
+const clearFrameBtn=document.getElementById('clearFrame');
+const frameMsg=document.getElementById('frameMsg');
+const lockOverlay=document.getElementById('lock');
 
-// helpers
-const setMsg = (el, text, cls='muted') => { el.className = cls; el.textContent = text; };
-const sanitizeUsername = (u) => u.toLowerCase().replace(/[^a-z0-9_.-]/g,'').slice(0,30);
+const frameTitle=document.getElementById('frameTitle');
+const frameScaleInput=document.getElementById('frameScale');
+const frameFile=document.getElementById('frameFile');
+const uploadFrameBtn=document.getElementById('uploadFrame');
+const uploadMsg=document.getElementById('uploadMsg');
 
-// init
+let user=null, role='free';
+let selectedFrameUrl=null, selectedFrameScale=1.0;
+let currentFrameUrl=null, currentFrameScale=1.0;
+
+const setMsg=(el,txt,cls='muted')=>{el.className=cls; el.textContent=txt;};
+const sanitizeUsername=(u)=>u.toLowerCase().replace(/[^a-z0-9_.-]/g,'').slice(0,30);
+
 (async function init(){
   const { data:{ session } } = await sb.auth.getSession();
-  if (!session){ alert('Please log in first.'); location.href = 'login.html'; return; }
-  user = session.user;
+  if(!session){ alert('Please log in first.'); location.href='login.html'; return; }
+  user=session.user;
 
-  // fetch profile
-  const { data: prof } = await sb.from('profiles')
-    .select('username, avatar_url, role, frame_url, frame_scale')
-    .eq('id', user.id)
-    .maybeSingle();
+  const { data: profile } = await sb.from('profiles')
+    .select('username, avatar_url, bio, showcase_ids, role, frame_url, frame_scale')
+    .eq('id', user.id).maybeSingle();
 
-  profile = prof || {};
+  role=profile?.role||'free';
+  currentFrameUrl=profile?.frame_url||null;
+  currentFrameScale=profile?.frame_scale??1.0;
 
-  // avatar preview
-  if (profile?.avatar_url) {
-    avatarBox.innerHTML = `<img src="${profile.avatar_url}" alt="avatar">`;
-    framePreviewAva.src = profile.avatar_url;
-    framePreviewAva.style.display = 'block';
+  if(profile?.avatar_url) avatarBox.innerHTML=`<img src="${profile.avatar_url}" alt="avatar">`;
+  if(currentFrameUrl){
+    frameOverlay.style.backgroundImage=`url('${currentFrameUrl}')`;
+    frameOverlay.style.setProperty('--frameScale', currentFrameScale);
   }
+  if(profile?.username) usernameInput.value=profile.username;
+  if(profile?.bio) bioInput.value=profile.bio;
+  if(profile?.showcase_ids?.length) showcaseInput.value=profile.showcase_ids.join(', ');
+  roleBanner.textContent=`Your role: ${role}`;
 
-  // username field
-  if (profile?.username) usernameInput.value = profile.username;
+  // Gallery gating: subscribers, moderators, owners see frames & can apply
+  if(role==='free'){ lockOverlay.style.display='flex'; framesRow.classList.add('dim'); }
+  else { subsTools.style.display='flex'; await loadFrames(); }
 
-  // frame preview & gate
-  const myRole = profile?.role || 'free';
-  if (myRole === 'moderator' || myRole === 'owner') {
-    frameCard.style.display = 'block';
-    if (profile?.frame_url) {
-      framePreview.style.backgroundImage = `url('${profile.frame_url}')`;
-      const s = profile?.frame_scale ?? 1;
-      framePreview.style.setProperty('--frameScale', s);
-      document.getElementById('frameScale').value = s;
-    }
-  }
+  // Upload gate: moderators OR owners
+  if(role==='moderator' || role==='owner'){ modTools.style.display='block'; }
 })();
 
+async function loadFrames(){
+  framesRow.innerHTML='<div class="muted">Loading frames…</div>';
+  const { data: frames, error } = await sb
+    .from('frames').select('id,title,image_url,scale,created_by').order('created_at',{ascending:false});
+  if(error){ framesRow.innerHTML='<div class="muted err">Failed to load frames.</div>'; return; }
+  if(!frames?.length){ framesRow.innerHTML='<div class="muted">No frames uploaded yet.</div>'; return; }
+
+  framesRow.innerHTML = frames.map(fr=>`
+    <div class="frameCard ${fr.image_url===currentFrameUrl?'sel':''}"
+         data-url="${fr.image_url}" data-scale="${fr.scale??1}">
+      <div class="frameThumb"><img src="${fr.image_url}" alt=""></div>
+      <div class="muted" style="margin-top:6px;font-size:13px">
+        ${fr.title||'Frame'} · ${Math.round((fr.scale??1)*100)}%
+      </div>
+    </div>
+  `).join('');
+
+  framesRow.querySelectorAll('.frameCard').forEach(card=>{
+    card.addEventListener('click',()=>{
+      framesRow.querySelectorAll('.frameCard').forEach(c=>c.classList.remove('sel'));
+      card.classList.add('sel');
+      selectedFrameUrl=card.dataset.url;
+      selectedFrameScale=parseFloat(card.dataset.scale||'1');
+      frameOverlay.style.backgroundImage=`url('${selectedFrameUrl}')`;
+      frameOverlay.style.setProperty('--frameScale', selectedFrameScale);
+    });
+  });
+}
+
 // avatar upload
-uploadAvatarBtn.addEventListener('click', async () => {
-  if (!avatarFile.files[0]) {
-    return setMsg(avatarMsg, 'Choose an image first.', 'err');
-  }
-  const file = avatarFile.files[0];
-  const safe = file.name.replace(/[^\w.\-]+/g, '_');
-  const path = `${user.id}/avatar-${Date.now()}-${safe}`;
-  setMsg(avatarMsg, 'Uploading…');
-
-  const up = await sb.storage.from(AVATAR_BUCKET).upload(path, file, { upsert: true, contentType: file.type });
-  if (up.error) return setMsg(avatarMsg, 'Upload error: ' + up.error.message, 'err');
-
-  const { data: publicData } = sb.storage.from(AVATAR_BUCKET).getPublicUrl(path);
-  const publicUrl = publicData.publicUrl;
-
-  const upd = await sb.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
-  if (upd.error) return setMsg(avatarMsg, 'Failed saving avatar URL: ' + upd.error.message, 'err');
-
-  avatarBox.innerHTML = `<img src="${publicUrl}" alt="avatar">`;
-  framePreviewAva.src = publicUrl;
-  framePreviewAva.style.display = 'block';
-  setMsg(avatarMsg, 'Avatar updated!', 'ok');
+uploadAvatarBtn.addEventListener('click', async ()=>{
+  if(!avatarFile.files[0]) return setMsg(avatarMsg,'Choose an image first.','err');
+  const file=avatarFile.files[0];
+  const safe=file.name.replace(/[^\w.\-]+/g,'_');
+  const path=`${user.id}/avatar-${Date.now()}-${safe}`;
+  setMsg(avatarMsg,'Uploading…');
+  const up=await sb.storage.from(AVATAR_BUCKET).upload(path,file,{upsert:true,contentType:file.type});
+  if(up.error) return setMsg(avatarMsg,'Upload error: '+up.error.message,'err');
+  const { data:pub }=sb.storage.from(AVATAR_BUCKET).getPublicUrl(path);
+  const url=pub.publicUrl;
+  const upd=await sb.from('profiles').update({avatar_url:url}).eq('id',user.id);
+  if(upd.error) return setMsg(avatarMsg,'Failed saving avatar URL: '+upd.error.message,'err');
+  avatarBox.innerHTML=`<img src="${url}" alt="avatar">`;
+  setMsg(avatarMsg,'Avatar updated!','ok');
 });
 
-removeAvatarBtn.addEventListener('click', async ()=>{
-  setMsg(avatarMsg, 'Removing…');
-  const upd = await sb.from('profiles').update({ avatar_url: null }).eq('id', user.id);
-  if (upd.error) return setMsg(avatarMsg, 'Error: ' + upd.error.message, 'err');
-  avatarBox.innerHTML = `<span class="muted">No image</span>`;
-  framePreviewAva.removeAttribute('src');
-  framePreviewAva.style.display = 'none';
-  setMsg(avatarMsg, 'Removed.', 'ok');
-});
-
-// username save
+// username
 saveUsernameBtn.addEventListener('click', async ()=>{
-  const uname = sanitizeUsername(usernameInput.value || '');
-  if (!uname) return setMsg(userMsg, 'Please enter a valid username.', 'err');
+  let uname=sanitizeUsername(usernameInput.value.trim());
+  if(!uname) return setMsg(userMsg,'Username cannot be empty.','err');
+  const { data:exists }=await sb.from('profiles').select('id').ilike('username',uname).neq('id',user.id).limit(1);
+  if(exists && exists.length>0) return setMsg(userMsg,'Username already taken.','err');
+  const upd=await sb.from('profiles').update({username:uname}).eq('id',user.id);
+  if(upd.error) return setMsg(userMsg,'Failed updating username: '+upd.error.message,'err');
+  setMsg(userMsg,'Username updated!','ok');
+});
 
-  setMsg(userMsg, 'Saving…');
-  // optional uniqueness check
-  const { data: existing } = await sb.from('profiles').select('id').eq('username', uname).neq('id', user.id).limit(1);
-  if (existing && existing.length) return setMsg(userMsg, 'Username is taken.', 'err');
+// bio
+saveBioBtn.addEventListener('click', async ()=>{
+  const bio=bioInput.value.trim();
+  const { error }=await sb.from('profiles').update({bio}).eq('id',user.id);
+  if(error) return setMsg(bioMsg,'Error: '+error.message,'err');
+  setMsg(bioMsg,'Bio updated!','ok');
+});
 
-  const upd = await sb.from('profiles').update({ username: uname }).eq('id', user.id);
-  if (upd.error) return setMsg(userMsg, 'Failed updating username: ' + upd.error.message, 'err');
-
-  setMsg(userMsg, 'Username updated!', 'ok');
+// showcase
+saveShowcaseBtn.addEventListener('click', async ()=>{
+  const arr=showcaseInput.value.split(',').map(x=>x.trim()).filter(Boolean).slice(0,5);
+  const { error }=await sb.from('profiles').update({showcase_ids:arr}).eq('id',user.id);
+  if(error) return setMsg(showcaseMsg,'Error: '+error.message,'err');
+  setMsg(showcaseMsg,'Showcase updated!','ok');
 });
 
 // password reset
 sendResetBtn.addEventListener('click', async ()=>{
-  setMsg(pwdMsg, 'Sending reset email…');
-  const redirectTo = window.location.origin + '/reset.html';
-  const { error } = await sb.auth.resetPasswordForEmail(user.email, { redirectTo });
-  if (error) return setMsg(pwdMsg, 'Error: ' + error.message, 'err');
-  setMsg(pwdMsg, 'Check your email for the reset link.', 'ok');
+  setMsg(pwdMsg,'Sending reset email…');
+  const redirectTo=window.location.origin+'/reset.html';
+  const { error }=await sb.auth.resetPasswordForEmail(user.email,{redirectTo});
+  if(error) return setMsg(pwdMsg,'Error: '+error.message,'err');
+  setMsg(pwdMsg,'Check your email for the reset link.','ok');
 });
 
-// robust sign out (handles "Auth session missing!")
-async function safeSignOut(scope) {
-  try {
-    const { error } = await sb.auth.signOut(scope ? { scope } : undefined);
-    if (error && error.message !== 'Auth session missing!') {
-      setMsg(logoutMsg, 'Error: ' + error.message, 'err');
-      return false;
-    }
-    return true;
-  } catch (e) {
-    setMsg(logoutMsg, 'Error: ' + (e?.message || e), 'err');
-    return false;
-  }
-}
-
-logoutLocalBtn.addEventListener('click', async ()=>{
-  setMsg(logoutMsg, 'Signing out…');
-  const ok = await safeSignOut(null);
-  if (ok) { setMsg(logoutMsg, 'Signed out.', 'ok'); location.href = 'index.html'; }
+// save / clear frame selection
+saveFrameBtn.addEventListener('click', async ()=>{
+  if(!selectedFrameUrl) return setMsg(frameMsg,'Pick a frame first.','err');
+  const { error }=await sb.from('profiles')
+    .update({ frame_url:selectedFrameUrl, frame_scale:selectedFrameScale })
+    .eq('id',user.id);
+  if(error) return setMsg(frameMsg,'Error: '+error.message,'err');
+  currentFrameUrl=selectedFrameUrl; currentFrameScale=selectedFrameScale;
+  setMsg(frameMsg,'Frame applied!','ok');
+});
+clearFrameBtn.addEventListener('click', async ()=>{
+  const { error }=await sb.from('profiles')
+    .update({ frame_url:null, frame_scale:1.0 })
+    .eq('id',user.id);
+  if(error) return setMsg(frameMsg,'Error: '+error.message,'err');
+  selectedFrameUrl=null; selectedFrameScale=1.0;
+  currentFrameUrl=null; currentFrameScale=1.0;
+  frameOverlay.style.backgroundImage='none';
+  frameOverlay.style.setProperty('--frameScale',1);
+  framesRow.querySelectorAll('.frameCard').forEach(c=>c.classList.remove('sel'));
+  setMsg(frameMsg,'Frame removed.','ok');
 });
 
-logoutGlobalBtn.addEventListener('click', async ()=>{
-  setMsg(logoutMsg, 'Signing out everywhere…');
-  const ok = await safeSignOut('global');
-  if (ok) { setMsg(logoutMsg, 'Signed out.', 'ok'); location.href = 'index.html'; }
-});
-
-// ==== Frame tools (Mods & Owners) ====
+// moderator/owner upload (allow owner too)
 uploadFrameBtn.addEventListener('click', async ()=>{
-  // gate by role
-  const { data: me } = await sb.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  const r = me?.role || 'free';
-  if (!(r === 'moderator' || r === 'owner')) return setMsg(frameMsg, 'Only moderators or owners can upload.', 'err');
-
-  const f = frameFile.files[0];
-  if (!f) return setMsg(frameMsg, 'Choose a transparent PNG.', 'err');
-
-  if (f.type !== 'image/png') return setMsg(frameMsg, 'PNG required (with transparency).', 'err');
-
-  setMsg(frameMsg, 'Uploading…');
-  const safe = f.name.replace(/[^\w.\-]+/g, '_');
-  const path = `${user.id}/frame-${Date.now()}-${safe}`;
-
-  const up = await sb.storage.from(FRAMES_BUCKET).upload(path, f, { upsert: true, contentType: f.type });
-  if (up.error) return setMsg(frameMsg, 'Upload error: ' + up.error.message, 'err');
-
-  const { data: pub } = sb.storage.from(FRAMES_BUCKET).getPublicUrl(path);
-  const url = pub.publicUrl;
-
-  const upd = await sb.from('profiles').update({ frame_url: url }).eq('id', user.id);
-  if (upd.error) return setMsg(frameMsg, 'Failed saving frame URL: ' + upd.error.message, 'err');
-
-  framePreview.style.backgroundImage = `url('${url}')`;
-  framePreview.style.setProperty('--frameScale', (document.getElementById('frameScale').value || 1));
-  setMsg(frameMsg, 'Frame uploaded!', 'ok');
+  const { data: me } = await sb.from('profiles').select('role').eq('id',user.id).maybeSingle();
+  if(!(me?.role==='moderator' || me?.role==='owner')) return setMsg(uploadMsg,'Only moderators or owners can upload.','err');
+  const f=frameFile.files[0]; if(!f) return setMsg(uploadMsg,'Choose a PNG with transparency.','err');
+  const scaleVal=parseFloat(frameScaleInput.value||'1');
+  setMsg(uploadMsg,'Uploading…');
+  const safe=f.name.replace(/[^\w.\-]+/g,'_');
+  const path=`${user.id}/frame-${Date.now()}-${safe}`;
+  const up=await sb.storage.from(FRAMES_BUCKET).upload(path,f,{upsert:true,contentType:f.type});
+  if(up.error) return setMsg(uploadMsg,'Upload error: '+up.error.message,'err');
+  const { data: pub }=sb.storage.from(FRAMES_BUCKET).getPublicUrl(path);
+  const url=pub.publicUrl;
+  const ins=await sb.from('frames').insert({
+    title:frameTitle.value.trim()||null,
+    image_url:url,
+    created_by:user.id,
+    scale:isFinite(scaleVal)?scaleVal:1.0
+  });
+  if(ins.error) return setMsg(uploadMsg,'Save error: '+ins.error.message,'err');
+  setMsg(uploadMsg,'Frame uploaded!','ok');
+  frameTitle.value=''; frameFile.value=''; await loadFrames();
 });
 
-saveFrameScaleBtn.addEventListener('click', async ()=>{
-  const scale = Number(document.getElementById('frameScale').value || 1);
-  const upd = await sb.from('profiles').update({ frame_scale: scale }).eq('id', user.id);
-  if (upd.error) return setMsg(frameMsg, 'Error: ' + upd.error.message, 'err');
-  framePreview.style.setProperty('--frameScale', scale);
-  setMsg(frameMsg, 'Scale saved.', 'ok');
-});
-
-removeFrameBtn.addEventListener('click', async ()=>{
-  const upd = await sb.from('profiles').update({ frame_url: null, frame_scale: 1 }).eq('id', user.id);
-  if (upd.error) return setMsg(frameMsg, 'Error: ' + upd.error.message, 'err');
-  framePreview.style.backgroundImage = '';
-  framePreview.style.setProperty('--frameScale', 1);
-  document.getElementById('frameScale').value = 1;
-  setMsg(frameMsg, 'Frame removed.', 'ok');
-});
+// sign out helpers
+async function safeSignOut(scope){
+  try{
+    const { error }=await sb.auth.signOut(scope?{scope}:undefined);
+    if(error && error.message!=='Auth session missing!'){ setMsg(logoutMsg,'Error: '+error.message,'err'); return false; }
+    return true;
+  }catch(e){ setMsg(logoutMsg,'Error: '+(e?.message||e),'err'); return false; }
+}
+logoutLocalBtn.addEventListener('click', async ()=>{ setMsg(logoutMsg,'Signing out…'); if(await safeSignOut(null)) location.href='index.html'; });
+logoutGlobalBtn.addEventListener('click', async ()=>{ setMsg(logoutMsg,'Signing out everywhere…'); if(await safeSignOut('global')) location.href='index.html'; });
 </script>
 </body>
 </html>
