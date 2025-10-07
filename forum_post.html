@@ -161,6 +161,8 @@
     if (postAuthor?.frame_url){
       pAvaFrame.style.backgroundImage = `url('${postAuthor.frame_url}')`;
       pAvaFrame.style.setProperty('--frameScale', postAuthor.frame_scale ?? 1);
+      pAvaFrame.style.setProperty('--frameX', (postAuthor.frame_offset_x ?? 0) + 'px');
+      pAvaFrame.style.setProperty('--frameY', (postAuthor.frame_offset_y ?? 0) + 'px');
       pAvaFrame.style.display='block';
     } else {
       pAvaFrame.style.display='none';
