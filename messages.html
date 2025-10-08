@@ -72,7 +72,7 @@ async function loadInbox(){
   const list = document.getElementById('list');
   status.textContent = 'Loading…';
 
-  // fetch my threads
+  // fetch my threads, order by thread.created_at
   const { data: parts, error } = await sb
     .from('dm_participants')
     .select('thread_id,last_read_at, dm_threads!inner(created_at), profiles:user_id(username,avatar_url)')
@@ -83,7 +83,7 @@ async function loadInbox(){
 
   const threadIds = [...new Set(parts.map(p=>p.thread_id))];
 
-  // fetch the other participant profile for each thread
+  // fetch the other participant's profile for each thread
   const { data: others } = await sb
     .from('dm_participants')
     .select('thread_id, profiles:user_id(username,avatar_url)')
@@ -91,12 +91,11 @@ async function loadInbox(){
     .neq('user_id', me.id);
   const otherByThread = Object.fromEntries((others || []).map(o => [o.thread_id, o.profiles]));
 
-  // latest messages per thread
+  // latest message per thread
   const { data: latest } = await sb.from('dm_latest')
     .select('*').in('thread_id', threadIds);
   const latestByThread = Object.fromEntries((latest||[]).map(m=>[m.thread_id, m]));
 
-  // compute unread
   list.innerHTML = parts.map(p=>{
     const m = latestByThread[p.thread_id];
     const other = otherByThread[p.thread_id];
@@ -116,11 +115,9 @@ async function loadInbox(){
     `;
   }).join('');
 
-  // click to open
+  // open thread
   list.querySelectorAll('.thread').forEach(el=>{
-    el.addEventListener('click',()=>{
-      location.href = 'dm.html?id=' + el.dataset.id;
-    });
+    el.addEventListener('click',()=>{ location.href = 'dm.html?id=' + el.dataset.id; });
   });
 
   status.textContent = '';
@@ -145,22 +142,31 @@ async function startChat(){
   if (!raw){ msgEl.textContent='Enter a username.'; return; }
   msgEl.textContent='Starting…';
 
+  // partial match on username
   const { data: them } = await sb.from('profiles')
     .select('id,username').ilike('username', `%${raw}%`).maybeSingle();
   if (!them){ msgEl.textContent='User not found.'; return; }
   if (them.id === me.id){ msgEl.textContent='That’s you 🙂'; return; }
 
+  // reuse existing thread if present
   const existing = await findExistingThread(me.id, them.id);
   if (existing){ location.href = 'dm.html?id=' + existing; return; }
 
+  // create thread and insert participants sequentially (to satisfy RLS)
   const tId = crypto.randomUUID();
+
   const { error: te } = await sb.from('dm_threads').insert({ id: tId });
   if (te){ msgEl.textContent='Error: ' + te.message; return; }
 
-  await sb.from('dm_participants').insert([
-    { thread_id: tId, user_id: me.id,   last_read_at: null },
-    { thread_id: tId, user_id: them.id, last_read_at: null }
-  ]);
+  const { error: p1e } = await sb.from('dm_participants').insert({
+    thread_id: tId, user_id: me.id, last_read_at: null
+  });
+  if (p1e){ msgEl.textContent='Error (me): ' + p1e.message; return; }
+
+  const { error: p2e } = await sb.from('dm_participants').insert({
+    thread_id: tId, user_id: them.id, last_read_at: null
+  });
+  if (p2e){ msgEl.textContent='Error (them): ' + p2e.message; return; }
 
   msgEl.textContent = 'Done.';
   location.href = 'dm.html?id=' + tId;
