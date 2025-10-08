@@ -26,6 +26,7 @@
 <body>
 <app-menu></app-menu>
 <script type="module" src="/menu.js"></script>
+
 <div class="wrap">
   <a href="index.html">← Home</a>
   <h2>Messages</h2>
@@ -76,21 +77,29 @@ async function loadInbox(){
     .from('dm_participants')
     .select('thread_id,last_read_at, dm_threads!inner(created_at), profiles:user_id(username,avatar_url)')
     .eq('user_id', me.id)
-    .order('dm_threads.created_at', { ascending:false });
+    .order('created_at', { ascending:false, foreignTable: 'dm_threads' });
   if (error){ status.textContent='Error: '+error.message; return; }
   if (!parts?.length){ status.textContent='No conversations yet.'; list.innerHTML=''; return; }
 
-  // latest messages per thread
   const threadIds = [...new Set(parts.map(p=>p.thread_id))];
+
+  // fetch the other participant profile for each thread
+  const { data: others } = await sb
+    .from('dm_participants')
+    .select('thread_id, profiles:user_id(username,avatar_url)')
+    .in('thread_id', threadIds)
+    .neq('user_id', me.id);
+  const otherByThread = Object.fromEntries((others || []).map(o => [o.thread_id, o.profiles]));
+
+  // latest messages per thread
   const { data: latest } = await sb.from('dm_latest')
     .select('*').in('thread_id', threadIds);
   const latestByThread = Object.fromEntries((latest||[]).map(m=>[m.thread_id, m]));
 
-  // compute unread: latest.created_at > my last_read_at
+  // compute unread
   list.innerHTML = parts.map(p=>{
     const m = latestByThread[p.thread_id];
-    const other = p.profiles; // by design, the SELECT above returns "me" rows only; we need the *other* user.
-    // If you prefer, query the "other" with a second call; for brevity we'll display "Conversation".
+    const other = otherByThread[p.thread_id];
     const preview = m?.body ? m.body : '(no messages yet)';
     const unread = m && (!p.last_read_at || new Date(m.created_at) > new Date(p.last_read_at));
     return `
@@ -118,7 +127,6 @@ async function loadInbox(){
 }
 
 function subscribeInbox(){
-  // live update on new messages
   sb.channel('dm_inbox')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_messages' }, async () => {
       await loadInbox();
@@ -126,7 +134,7 @@ function subscribeInbox(){
     .subscribe();
 }
 
-// Start new chat with @username
+// Start new chat
 document.getElementById('startBtn').addEventListener('click', startChat);
 document.getElementById('userSearch').addEventListener('keydown', e=>{
   if(e.key==='Enter'){ e.preventDefault(); startChat(); }
@@ -137,26 +145,28 @@ async function startChat(){
   if (!raw){ msgEl.textContent='Enter a username.'; return; }
   msgEl.textContent='Starting…';
 
-  const { data: them } = await sb.from('profiles').select('id,username').ilike('username', raw).maybeSingle();
+  const { data: them } = await sb.from('profiles')
+    .select('id,username').ilike('username', `%${raw}%`).maybeSingle();
   if (!them){ msgEl.textContent='User not found.'; return; }
   if (them.id === me.id){ msgEl.textContent='That’s you 🙂'; return; }
 
-  // Create thread + participants if not existing (client-side idempotency: search an existing one)
   const existing = await findExistingThread(me.id, them.id);
   if (existing){ location.href = 'dm.html?id=' + existing; return; }
 
-  const { data: t, error: te } = await sb.from('dm_threads').insert({}).select('id').single();
+  const tId = crypto.randomUUID();
+  const { error: te } = await sb.from('dm_threads').insert({ id: tId });
   if (te){ msgEl.textContent='Error: ' + te.message; return; }
+
   await sb.from('dm_participants').insert([
-    { thread_id: t.id, user_id: me.id,   last_read_at: null },
-    { thread_id: t.id, user_id: them.id, last_read_at: null }
+    { thread_id: tId, user_id: me.id,   last_read_at: null },
+    { thread_id: tId, user_id: them.id, last_read_at: null }
   ]);
-  msgEl.textContent='Done.';
-  location.href = 'dm.html?id=' + t.id;
+
+  msgEl.textContent = 'Done.';
+  location.href = 'dm.html?id=' + tId;
 }
 
 async function findExistingThread(a, b){
-  // find thread ids where I'm a participant, then check if b also participates
   const { data: mine } = await sb.from('dm_participants').select('thread_id').eq('user_id', a);
   const tIds = (mine||[]).map(r=>r.thread_id);
   if (!tIds.length) return null;
@@ -165,7 +175,9 @@ async function findExistingThread(a, b){
   return both?.[0]?.thread_id || null;
 }
 
-function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function escapeHtml(s){ 
+  return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); 
+}
 </script>
 </body>
 </html>
