@@ -133,7 +133,7 @@ let me=null, myRole='free', targetProfile=null;
   portfolioToggle.textContent = showAll ? 'Show last 5' : 'View full portfolio';
   const newQs = new URLSearchParams(qs);
   if (showAll) newQs.delete('all'); else newQs.set('all','1');
-  portfolioToggle.href = 'user.html?' + newQs.toString();
+  portfolioToggle.href = `portfolio.html?u=${encodeURIComponent(profile.username)}`;
 
   await loadPortfolioItems(profile.id, showAll);
 })();
