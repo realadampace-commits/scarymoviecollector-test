@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Messages</title>
+<style>
+  :root{--panel:#1b1b1b;--muted:#a9adb4;--ink:#eee;--accent:#2a6}
+  body{margin:0;background:#111;color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  a{color:#9ecbff;text-decoration:none}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px}
+  .grid{display:grid;grid-template-columns:320px 1fr;gap:16px}
+  .card{background:var(--panel);border-radius:12px;padding:12px}
+  .muted{color:var(--muted)}
+  .thread{display:flex;gap:10px;align-items:center;padding:10px;border-radius:10px;cursor:pointer}
+  .thread:hover{background:#222}
+  .ava{width:36px;height:36px;border-radius:50%;overflow:hidden;background:#333;flex:0 0 auto}
+  .ava img{width:100%;height:100%;object-fit:cover}
+  .title{display:flex;align-items:center;gap:6px}
+  .unread{background:#dc143c;color:#fff;border-radius:999px;padding:0 6px;font-size:12px}
+  .row{display:flex;gap:8px;align-items:center}
+  input,button{padding:10px;border-radius:8px;border:1px solid #333;background:#222;color:#eee}
+  button{background:var(--accent);border:none;cursor:pointer}
+  .preview{opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+<div class="wrap">
+  <a href="index.html">← Home</a>
+  <h2>Messages</h2>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="row">
+      <input id="userSearch" placeholder="Start new chat with @username"/>
+      <button id="startBtn">Start</button>
+      <span id="startMsg" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3 style="margin:0 0 8px">Inbox</h3>
+      <div id="list" style="display:grid;gap:6px"></div>
+      <div id="status" class="muted" style="margin-top:8px"></div>
+    </div>
+    <div class="card">
+      <div id="preview" class="muted">Select a conversation.</div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+let me = null;
+
+(async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session){ location.href='login.html?next=messages.html'; return; }
+  me = session.user;
+  await loadInbox();
+  subscribeInbox();
+})();
+
+async function loadInbox(){
+  const status = document.getElementById('status');
+  const list = document.getElementById('list');
+  status.textContent = 'Loading…';
+
+  // fetch my threads
+  const { data: parts, error } = await sb
+    .from('dm_participants')
+    .select('thread_id,last_read_at, dm_threads!inner(created_at), profiles:user_id(username,avatar_url)')
+    .eq('user_id', me.id)
+    .order('dm_threads.created_at', { ascending:false });
+  if (error){ status.textContent='Error: '+error.message; return; }
+  if (!parts?.length){ status.textContent='No conversations yet.'; list.innerHTML=''; return; }
+
+  // latest messages per thread
+  const threadIds = [...new Set(parts.map(p=>p.thread_id))];
+  const { data: latest } = await sb.from('dm_latest')
+    .select('*').in('thread_id', threadIds);
+  const latestByThread = Object.fromEntries((latest||[]).map(m=>[m.thread_id, m]));
+
+  // compute unread: latest.created_at > my last_read_at
+  list.innerHTML = parts.map(p=>{
+    const m = latestByThread[p.thread_id];
+    const other = p.profiles; // by design, the SELECT above returns "me" rows only; we need the *other* user.
+    // If you prefer, query the "other" with a second call; for brevity we'll display "Conversation".
+    const preview = m?.body ? m.body : '(no messages yet)';
+    const unread = m && (!p.last_read_at || new Date(m.created_at) > new Date(p.last_read_at));
+    return `
+      <div class="thread" data-id="${p.thread_id}">
+        <span class="ava">${other?.avatar_url ? `<img src="${other.avatar_url}" alt="">` : ''}</span>
+        <div style="flex:1">
+          <div class="title">
+            <strong>${other?.username ? '@'+other.username : 'Conversation'}</strong>
+            ${unread ? '<span class="unread">new</span>' : ''}
+          </div>
+          <div class="preview">${escapeHtml(preview)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // click to open
+  list.querySelectorAll('.thread').forEach(el=>{
+    el.addEventListener('click',()=>{
+      location.href = 'dm.html?id=' + el.dataset.id;
+    });
+  });
+
+  status.textContent = '';
+}
+
+function subscribeInbox(){
+  // live update on new messages
+  sb.channel('dm_inbox')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_messages' }, async () => {
+      await loadInbox();
+    })
+    .subscribe();
+}
+
+// Start new chat with @username
+document.getElementById('startBtn').addEventListener('click', startChat);
+document.getElementById('userSearch').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){ e.preventDefault(); startChat(); }
+});
+async function startChat(){
+  const msgEl = document.getElementById('startMsg');
+  const raw = (document.getElementById('userSearch').value||'').trim().replace(/^@/,'');
+  if (!raw){ msgEl.textContent='Enter a username.'; return; }
+  msgEl.textContent='Starting…';
+
+  const { data: them } = await sb.from('profiles').select('id,username').ilike('username', raw).maybeSingle();
+  if (!them){ msgEl.textContent='User not found.'; return; }
+  if (them.id === me.id){ msgEl.textContent='That’s you 🙂'; return; }
+
+  // Create thread + participants if not existing (client-side idempotency: search an existing one)
+  const existing = await findExistingThread(me.id, them.id);
+  if (existing){ location.href = 'dm.html?id=' + existing; return; }
+
+  const { data: t, error: te } = await sb.from('dm_threads').insert({}).select('id').single();
+  if (te){ msgEl.textContent='Error: ' + te.message; return; }
+  await sb.from('dm_participants').insert([
+    { thread_id: t.id, user_id: me.id,   last_read_at: null },
+    { thread_id: t.id, user_id: them.id, last_read_at: null }
+  ]);
+  msgEl.textContent='Done.';
+  location.href = 'dm.html?id=' + t.id;
+}
+
+async function findExistingThread(a, b){
+  // find thread ids where I'm a participant, then check if b also participates
+  const { data: mine } = await sb.from('dm_participants').select('thread_id').eq('user_id', a);
+  const tIds = (mine||[]).map(r=>r.thread_id);
+  if (!tIds.length) return null;
+  const { data: both } = await sb.from('dm_participants')
+    .select('thread_id').in('thread_id', tIds).eq('user_id', b).limit(1);
+  return both?.[0]?.thread_id || null;
+}
+
+function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+</script>
+</body>
+</html>
