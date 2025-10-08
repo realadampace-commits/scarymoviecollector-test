@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Search Items</title>
+<style>
+  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#2a6}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  a{color:#9ecbff;text-decoration:none}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px}
+  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
+  .muted{color:var(--muted)}
+  .controls{display:flex;gap:10px;align-items:center}
+  .controls input{flex:1;padding:12px;border-radius:10px;border:1px solid #333;background:#222;color:#eee}
+  .controls button{padding:12px 16px;border:none;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:14px}
+  .item{background:#1c1c1c;border-radius:10px;overflow:hidden}
+  .thumb{height:160px;background:#222;display:flex;align-items:center;justify-content:center}
+  .thumb img{max-width:100%;max-height:100%}
+  .meta{padding:10px}
+  .owner{display:flex;align-items:center;gap:8px;opacity:.85;font-size:12px;margin-top:4px}
+  .ava{width:20px;height:20px;border-radius:50%;background:#333;overflow:hidden}
+  .ava img{width:100%;height:100%;object-fit:cover;display:block}
+</style>
+</head>
+<body>
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+
+<div class="wrap">
+  <a href="index.html">← Home</a>
+
+  <div class="card">
+    <h2 style="margin:0 0 10px">Search Items</h2>
+    <div class="controls">
+      <input id="q" type="search" placeholder="Search by title, description, or @username (e.g. mask, ghostface, @nate)…" />
+      <button id="go">Search</button>
+    </div>
+    <div id="status" class="muted" style="margin-top:8px">Type something to search.</div>
+  </div>
+
+  <div id="results" class="grid"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+
+// Attach first photo from items_images as preview_url
+async function attachPreviews(items){
+  if (!items?.length) return items;
+  const ids = items.map(i=>i.id);
+  const { data: imgs, error } = await sb
+    .from('items_images')
+    .select('item_id,image_url,position,created_at')
+    .in('item_id', ids)
+    .order('position',{ascending:true})
+    .order('created_at',{ascending:true});
+  if (error) { console.warn('preview query error:', error); return items; }
+  const first = {};
+  (imgs||[]).forEach(im => { if (!first[im.item_id]) first[im.item_id] = im.image_url; });
+  return items.map(i => ({ ...i, preview_url: first[i.id] || null }));
+}
+
+const qEl = document.getElementById('q');
+const goEl = document.getElementById('go');
+const resultsEl = document.getElementById('results');
+const statusEl = document.getElementById('status');
+
+let debounceTimer=null;
+qEl.addEventListener('input', ()=>{
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(runSearch, 300);
+});
+qEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); runSearch(); } });
+goEl.addEventListener('click', runSearch);
+
+async function runSearch(){
+  const raw = (qEl.value||'').trim();
+  const term = raw.startsWith('@') ? raw.slice(1) : raw;
+  if (!term){ resultsEl.innerHTML=''; statusEl.textContent='Type something to search.'; return; }
+
+  statusEl.textContent = 'Searching…';
+
+  // PostgREST OR across title/description/owner username (joined as profiles)
+  // NOTE: % needs to wrap the value for ilike
+  const like = `%${term}%`;
+
+  const { data, error } = await sb.from('items')
+    .select('id,title,description,user_value,created_at,owner_id,profiles:owner_id(username,avatar_url)')
+    .or(`title.ilike.${like},description.ilike.${like},profiles.username.ilike.${like}`)
+    .order('created_at',{ascending:false})
+    .limit(60);
+
+  if (error){
+    console.error(error);
+    statusEl.textContent = 'Error: ' + error.message;
+    resultsEl.innerHTML = '';
+    return;
+  }
+
+  if (!data || !data.length){
+    statusEl.textContent = 'No results.';
+    resultsEl.innerHTML = '';
+    return;
+  }
+
+  const withPrev = await attachPreviews(data);
+
+  statusEl.textContent = `Found ${withPrev.length} item${withPrev.length===1?'':'s'}.`;
+  resultsEl.innerHTML = withPrev.map(it=>{
+    const ava = it.profiles?.avatar_url
+      ? `<span class="ava"><img src="${it.profiles.avatar_url}" alt=""></span>`
+      : `<span class="ava"></span>`;
+    const uname = it.profiles?.username ? '@'+it.profiles.username : 'user';
+    return `
+      <div class="item">
+        <a href="item.html?id=${it.id}" style="color:inherit;text-decoration:none">
+          <div class="thumb">${it.preview_url ? `<img src="${it.preview_url}" alt="">` : 'No image'}</div>
+          <div class="meta">
+            <div><strong>${escapeHtml(it.title||'(untitled)')}</strong></div>
+            <div class="owner">${ava}<span>${uname}</span></div>
+            <div class="muted" style="margin-top:4px">$${(it.user_value||0).toLocaleString()}</div>
+          </div>
+        </a>
+      </div>
+    `;
+  }).join('');
+}
+
+function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// If query provided via ?q= in the URL, use it
+const urlQ = new URLSearchParams(location.search).get('q');
+if (urlQ){ qEl.value = urlQ; runSearch(); }
+</script>
+</body>
+</html>
