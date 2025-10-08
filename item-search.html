@@ -80,18 +80,37 @@ goEl.addEventListener('click', runSearch);
 
 async function runSearch(){
   const raw = (qEl.value||'').trim();
-  const term = raw.startsWith('@') ? raw.slice(1) : raw;
+  const term = raw.replace(/^@/, '');                    // allow @username searches
   if (!term){ resultsEl.innerHTML=''; statusEl.textContent='Type something to search.'; return; }
 
   statusEl.textContent = 'Searching…';
 
-  // PostgREST OR across title/description/owner username (joined as profiles)
-  // NOTE: % needs to wrap the value for ilike
-  const like = `%${term}%`;
+  // PostgREST uses * for wildcards in (i)like
+  const like = `*${term}*`;
+
+  // 1) Find owners by username (case-insensitive)
+  const { data: owners, error: ownersErr } = await sb
+    .from('profiles')
+    .select('id,username,avatar_url')
+    .ilike('username', like)
+    .limit(200);
+
+  if (ownersErr) { statusEl.textContent = 'Error: ' + ownersErr.message; return; }
+  const ownerIds = (owners || []).map(o => o.id);
+
+  // 2) Build OR over title/description, plus owner_id.in.(...) if we have owners
+  const orParts = [
+    `title.ilike.${like}`,
+    `description.ilike.${like}`
+  ];
+  if (ownerIds.length){
+    // comma-separated list inside parentheses
+    orParts.push(`owner_id.in.(${ownerIds.join(',')})`);
+  }
 
   const { data, error } = await sb.from('items')
     .select('id,title,description,user_value,created_at,owner_id,profiles:owner_id(username,avatar_url)')
-    .or(`title.ilike.${like},description.ilike.${like},profiles.username.ilike.${like}`)
+    .or(orParts.join(','))
     .order('created_at',{ascending:false})
     .limit(60);
 
@@ -101,7 +120,6 @@ async function runSearch(){
     resultsEl.innerHTML = '';
     return;
   }
-
   if (!data || !data.length){
     statusEl.textContent = 'No results.';
     resultsEl.innerHTML = '';
