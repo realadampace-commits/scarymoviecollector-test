@@ -47,15 +47,16 @@ const sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
 
-document.getElementById('send').addEventListener('click', sendMsg);
-document.getElementById('text').addEventListener('keydown', e=>{
- if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); }
-});
-
 const qs = new URLSearchParams(location.search);
 const threadId = qs.get('id');
 
 let me = null, other = null;
+
+// Bind send handlers early so errors surface even if header hasn't loaded yet
+document.getElementById('send').addEventListener('click', sendMsg);
+document.getElementById('text').addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); }
+});
 
 (async function init(){
   if (!threadId){ location.href='messages.html'; return; }
@@ -63,7 +64,7 @@ let me = null, other = null;
   if (!session){ location.href='login.html?next=' + encodeURIComponent('dm.html?id='+threadId); return; }
   me = session.user;
 
-  // confirm I'm a participant & find the other user
+  // confirm participant & find the other user
   const { data: parts, error } = await sb
     .from('dm_participants')
     .select('user_id, profiles:user_id(username,avatar_url)')
@@ -72,16 +73,12 @@ let me = null, other = null;
   if (!parts.some(p=>p.user_id===me.id)){ document.getElementById('head').textContent='Access denied.'; return; }
   other = parts.find(p=>p.user_id!==me.id)?.profiles || { username:'user' };
 
-  document.getElementById('head').innerHTML = `Chat with <a href="user.html?u=${encodeURIComponent(other.username)}">@${other.username}</a>`;
+  document.getElementById('head').innerHTML =
+    `Chat with <a href="user.html?u=${encodeURIComponent(other.username)}">@${other.username}</a>`;
 
   await loadMessages();
-  markRead();                 // mark last_read_at now
-  subscribeThread();          // realtime
-
-  document.getElementById('send').addEventListener('click', sendMsg);
-  document.getElementById('text').addEventListener('keydown', e=>{
-    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); }
-  });
+  await markRead();
+  subscribeThread();
 })();
 
 async function loadMessages(){
@@ -106,10 +103,9 @@ async function loadMessages(){
 
 function subscribeThread(){
   sb.channel('dm_'+threadId)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_messages', filter: 'thread_id=eq.'+threadId }, async (payload)=>{
-      const m = payload.new;
-      appendMessage(m);
-      if (m.author_id !== me.id) { markRead(); }
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_messages', filter: 'thread_id=eq.'+threadId }, (payload)=>{
+      appendMessage(payload.new);
+      if (payload.new.author_id !== me.id) { markRead(); }
     })
     .subscribe();
 }
@@ -130,10 +126,17 @@ function appendMessage(m){
 async function sendMsg(){
   const box = document.getElementById('text');
   const text = (box.value||'').trim();
-  if (!text) return;
+  if (!text){ return; }
   document.getElementById('status').textContent = 'Sending…';
-  const { error } = await sb.from('dm_messages').insert({ thread_id: threadId, author_id: me.id, body: text });
-  if (error){ document.getElementById('status').textContent='Error: '+error.message; return; }
+  const { error } = await sb.from('dm_messages').insert({
+    thread_id: threadId,
+    author_id: me.id,
+    body: text
+  });
+  if (error){
+    document.getElementById('status').textContent = 'Error: ' + error.message;
+    return;
+  }
   box.value = '';
   document.getElementById('status').textContent = '';
 }
@@ -145,7 +148,9 @@ async function markRead(){
     .eq('user_id', me.id);
 }
 
-function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
 </script>
 </body>
 </html>
