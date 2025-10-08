@@ -47,6 +47,11 @@ const sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
 
+document.getElementById('send').addEventListener('click', sendMsg);
+document.getElementById('text').addEventListener('keydown', e=>{
+ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); }
+});
+
 const qs = new URLSearchParams(location.search);
 const threadId = qs.get('id');
 
