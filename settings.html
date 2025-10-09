@@ -272,7 +272,7 @@ function _setMsg(el,txt,cls='muted'){ if(!el) return; el.className=cls; el.textC
 // Save wallet button
 saveUsdc?.addEventListener('click', async ()=>{
   if (!usdcAddr) return;
-  const v = (usdcAddr.value||'').trim();
+  const v = (usdcAddr.value||'').trim().toLowerCase();
   if(!/^0x[a-fA-F0-9]{40}$/.test(v)) return _setMsg(usdcMsg,'Invalid address.','err');
   const { data:{ session } } = await sb.auth.getSession();
   if (!session) return _setMsg(usdcMsg,'Please sign in.','err');
@@ -590,4 +590,5 @@ fe.saveApply.addEventListener('click', async ()=>{
 </script>
 </body>
 </html>
+
 
