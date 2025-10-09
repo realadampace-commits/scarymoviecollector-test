@@ -99,7 +99,10 @@ const sb = supabase.createClient(
   'https://wktxpukjmvmhzpctttjx.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
-const USDC_BASE = "0x833589fCD6EDb6E08f4c7C32D4f71b54bdA02913";
+// Normalize to a proper EIP-55 checksummed address
+const USDC_BASE = ethers.utils.getAddress(
+  '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913' // lower-case input; ethers returns the checksummed version
+);
 const USDC_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
   "function decimals() public view returns (uint8)"
@@ -130,39 +133,66 @@ let me=null, item=null;
   setupBuyFeature();
 })();
 
-async function setupBuyFeature(){
+async function setupBuyFeature() {
   const buyCard = document.getElementById('buyCard');
   const buyBtn = document.getElementById('buyBtn');
   const buyMsg = document.getElementById('buyMsg');
 
-  try{
-    if(!item.for_sale) return;
-    const sellerAddr = (item.profiles?.usdc_base_address || '').trim().toLowerCase();
-    if(!/^0x[a-f0-9]{40}$/.test(sellerAddr)){ console.warn('Invalid seller wallet'); return; }
+  try {
+    if (!item.for_sale) return;
 
-    buyCard.style.display='block';
-    buyBtn.addEventListener('click', async ()=>{
-      buyMsg.textContent='Connecting wallet...';
-      if(!window.ethereum){ buyMsg.textContent='No wallet found'; return; }
+    // Normalize seller wallet with Ethers (fixes checksum errors)
+    let sellerAddr;
+    try {
+      sellerAddr = ethers.utils.getAddress(
+        (item.profiles?.usdc_base_address || '').trim()
+      );
+    } catch {
+      console.warn('Invalid or missing seller wallet');
+      return;
+    }
+
+    // Normalize USDC contract to proper checksum format
+    const USDC_BASE = ethers.utils.getAddress(
+      '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'
+    );
+
+    buyCard.style.display = 'block';
+
+    buyBtn.addEventListener('click', async () => {
+      buyMsg.textContent = 'Connecting wallet...';
+      if (!window.ethereum) {
+        buyMsg.textContent = 'No wallet found (MetaMask / Coinbase).';
+        return;
+      }
 
       const provider = new ethers.providers.Web3Provider(window.ethereum);
-      await provider.send("eth_requestAccounts", []);
+      await provider.send('eth_requestAccounts', []);
       const signer = provider.getSigner();
+
       const network = await provider.getNetwork();
-      if(network.chainId !== 8453){ buyMsg.textContent='Switch to Base network.'; return; }
+      if (network.chainId !== 8453) {
+        buyMsg.textContent = 'Please switch to Base network.';
+        return;
+      }
 
       const usdc = new ethers.Contract(USDC_BASE, USDC_ABI, signer);
       const price = ethers.utils.parseUnits(item.user_value.toString(), 6);
 
-      buyMsg.textContent='Sending payment...';
-      try{
+      buyMsg.textContent = 'Sending payment...';
+      try {
         const tx = await usdc.transfer(sellerAddr, price);
-        buyMsg.textContent='Waiting for confirmation...';
+        buyMsg.textContent = 'Waiting for confirmation...';
         await tx.wait();
-        buyMsg.textContent='✅ Payment complete! Tx hash: '+tx.hash;
-      }catch(err){ buyMsg.textContent='Payment failed: '+err.message; }
+        buyMsg.textContent = '✅ Payment complete! Tx hash: ' + tx.hash;
+      } catch (err) {
+        console.error(err);
+        buyMsg.textContent = 'Payment failed: ' + (err.message || err);
+      }
     });
-  }catch(e){ console.error(e); }
+  } catch (e) {
+    console.error(e);
+  }
 }
 </script>
 </body>
