@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Orders</title>
+<style>
+  :root{--panel:#1b1b1b;--muted:#a9adb4;--ink:#eee;--ok:#2a6;--danger:#933;--accent:#2a6}
+  body{margin:0;background:#111;color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  a{color:#9ecbff;text-decoration:none}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
+  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .tab{background:#222;color:#eee;border:1px solid #333;border-radius:999px;padding:8px 12px;cursor:pointer}
+  .tab.active{background:#2a6;border-color:#2a6}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:12px}
+  .order{background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:12px;display:grid;gap:8px}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+  .pill{border-radius:999px;padding:2px 8px;font-size:12px}
+  .paid{background:#1f2937;color:#93c5fd}.shipped{background:#1e293b;color:#fcd34d}.completed{background:#123524;color:#86efac}
+  .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;text-decoration:none}
+  .btn.ok{background:var(--ok)} .btn.danger{background:var(--danger)}
+  input{padding:8px;border-radius:8px;border:1px solid #333;background:#222;color:#eee}
+  .small{font-size:12px;opacity:.9}
+</style>
+</head>
+<body>
+<app-menu></app-menu>
+<script type="module" src="/menu.js"></script>
+
+<div class="wrap">
+  <a href="index.html">← Home</a>
+  <h2 style="margin:10px 0 6px">Orders</h2>
+  <div class="muted small">View purchases and sales (USDC on Base).</div>
+
+  <div class="card">
+    <div class="tabs">
+      <button id="tabBuy"  class="tab active">Buying</button>
+      <button id="tabSell" class="tab">Selling</button>
+      <span id="status" class="muted" style="margin-left:auto"></span>
+    </div>
+
+    <div id="buyPane">
+      <div id="buyList"  class="grid" style="margin-top:8px"></div>
+      <div id="buyEmpty" class="muted" style="margin-top:8px;display:none">No purchases yet.</div>
+    </div>
+
+    <div id="sellPane" style="display:none">
+      <div id="sellList"  class="grid" style="margin-top:8px"></div>
+      <div id="sellEmpty" class="muted" style="margin-top:8px;display:none">No sales yet.</div>
+    </div>
+  </div>
+
+  <div class="card small">
+    <strong>Note:</strong> Tx links go to BaseScan. Sellers can add a tracking number and mark as shipped; buyers can mark an order as received to complete it.
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const sb = supabase.createClient(
+  'https://wktxpukjmvmhzpctttjx.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+);
+
+const tabBuy  = document.getElementById('tabBuy');
+const tabSell = document.getElementById('tabSell');
+const buyPane = document.getElementById('buyPane');
+const sellPane= document.getElementById('sellPane');
+const statusEl= document.getElementById('status');
+
+const buyList  = document.getElementById('buyList');
+const buyEmpty = document.getElementById('buyEmpty');
+const sellList = document.getElementById('sellList');
+const sellEmpty= document.getElementById('sellEmpty');
+
+let me=null;
+
+tabBuy.addEventListener('click', ()=>{ tabBuy.classList.add('active'); tabSell.classList.remove('active'); buyPane.style.display='block'; sellPane.style.display='none'; });
+tabSell.addEventListener('click',()=>{ tabSell.classList.add('active'); tabBuy.classList.remove('active'); sellPane.style.display='block'; buyPane.style.display='none'; });
+
+function fmtUSDC(micro){ return (Number(micro||0)/1_000_000).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) + ' USDC'; }
+function pill(status){
+  const cls = status==='completed'?'completed':status==='shipped'?'shipped':'paid';
+  const txt = status.charAt(0).toUpperCase()+status.slice(1);
+  return `<span class="pill ${cls}">${txt}</span>`;
+}
+function basescan(tx){ return tx ? `https://basescan.org/tx/${tx}` : '#'; }
+
+(async function init(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ location.href='login.html?next=orders.html'; return; }
+  me = session.user;
+  await loadAll();
+})();
+
+async function loadAll(){
+  statusEl.textContent='Loading…';
+
+  // BUYING
+  const b = await sb.from('orders').select(`
+    id,item_id,buyer_id,seller_id,price_usdc,currency,tx_hash,status,tracking_number,created_at,
+    items:item_id ( title ),
+    seller: seller_id ( username )
+  `).eq('buyer_id', me.id).order('created_at', { ascending:false });
+  renderBuy(b.data||[]);
+
+  // SELLING
+  const s = await sb.from('orders').select(`
+    id,item_id,buyer_id,seller_id,price_usdc,currency,tx_hash,status,tracking_number,created_at,
+    items:item_id ( title ),
+    buyer: buyer_id ( username )
+  `).eq('seller_id', me.id).order('created_at', { ascending:false });
+  renderSell(s.data||[]);
+
+  statusEl.textContent='';
+}
+
+function renderBuy(rows){
+  if (!rows.length){ buyEmpty.style.display='block'; buyList.innerHTML=''; return; }
+  buyEmpty.style.display='none';
+  buyList.innerHTML = rows.map(r=>{
+    const itemLink = `item.html?id=${r.item_id}`;
+    const tx = r.tx_hash ? `<a href="${basescan(r.tx_hash)}" target="_blank" rel="noopener">View tx ↗</a>` : '<span class="muted">No tx</span>';
+    const seller = r.seller?.username ? `<a href="user.html?u=${encodeURIComponent(r.seller.username)}">@${r.seller.username}</a>` : 'seller';
+    const act = r.status==='shipped'
+      ? `<button class="btn ok" data-received="${r.id}">Mark received</button>`
+      : '';
+    return `<div class="order" data-id="${r.id}">
+      <div class="row"><strong>Purchase</strong> ${pill(r.status)}</div>
+      <div><a href="${itemLink}">${r.items?.title || 'Item'}</a></div>
+      <div class="small muted">Seller: ${seller}</div>
+      <div class="row">
+        <div>${fmtUSDC(r.price_usdc)}</div>
+        <div class="small">${new Date(r.created_at).toLocaleString()}</div>
+      </div>
+      <div class="row">
+        <div class="small">${tx}</div>
+        <div>${act}</div>
+      </div>
+      ${r.tracking_number ? `<div class="small">Tracking: <code>${r.tracking_number}</code></div>`:''}
+    </div>`;
+  }).join('');
+
+  buyList.querySelectorAll('button[data-received]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.received;
+      btn.disabled = true;
+      await sb.from('orders').update({ status:'completed' }).eq('id', id);
+      await loadAll();
+    });
+  });
+}
+
+function renderSell(rows){
+  if (!rows.length){ sellEmpty.style.display='block'; sellList.innerHTML=''; return; }
+  sellEmpty.style.display='none';
+  sellList.innerHTML = rows.map(r=>{
+    const itemLink = `item.html?id=${r.item_id}`;
+    const tx = r.tx_hash ? `<a href="${basescan(r.tx_hash)}" target="_blank" rel="noopener">View tx ↗</a>` : '<span class="muted">No tx</span>';
+    const buyer = r.buyer?.username ? `<a href="user.html?u=${encodeURIComponent(r.buyer.username)}">@${r.buyer.username}</a>` : 'buyer';
+
+    const shipUi = (r.status==='paid' || r.status==='shipped') ? `
+      <div class="row" style="gap:6px;justify-content:flex-start">
+        <input type="text" placeholder="Tracking number" value="${r.tracking_number||''}" data-track="${r.id}" style="flex:1;min-width:160px">
+        <button class="btn ok" data-ship="${r.id}">${r.status==='paid'?'Mark shipped':'Update tracking'}</button>
+      </div>` : '';
+
+    return `<div class="order" data-id="${r.id}">
+      <div class="row"><strong>Sale</strong> ${pill(r.status)}</div>
+      <div><a href="${itemLink}">${r.items?.title || 'Item'}</a></div>
+      <div class="small muted">Buyer: ${buyer}</div>
+      <div class="row">
+        <div>${fmtUSDC(r.price_usdc)}</div>
+        <div class="small">${new Date(r.created_at).toLocaleString()}</div>
+      </div>
+      <div class="row">
+        <div class="small">${tx}</div>
+        <div></div>
+      </div>
+      ${shipUi}
+    </div>`;
+  }).join('');
+
+  sellList.querySelectorAll('button[data-ship]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.dataset.ship;
+      const input = sellList.querySelector(`input[data-track="${id}"]`);
+      const tracking = input ? input.value.trim() : null;
+      btn.disabled = true;
+      const next = { tracking_number: tracking || null, status: 'shipped' };
+      await sb.from('orders').update(next).eq('id', id);
+      await loadAll();
+    });
+  });
+}
+</script>
+</body>
+</html>
