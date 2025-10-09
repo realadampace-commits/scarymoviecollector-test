@@ -40,6 +40,12 @@
   .ownerTools{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<script>
+  // Single source of truth — checksummed at runtime by ethers
+  window.USDC_BASE = ethers.utils.getAddress(
+    '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913' // lowercase input; ethers returns proper checksum
+  );
+</script>
 </head>
 <body>
 <app-menu></app-menu>
@@ -100,9 +106,7 @@ const sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
 // Normalize to a proper EIP-55 checksummed address
-const USDC_BASE = ethers.utils.getAddress(
-  '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913' // lower-case input; ethers returns the checksummed version
-);
+
 const USDC_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
   "function decimals() public view returns (uint8)"
@@ -151,12 +155,7 @@ async function setupBuyFeature() {
       console.warn('Invalid or missing seller wallet');
       return;
     }
-
-    // Normalize USDC contract to proper checksum format
-    const USDC_BASE = ethers.utils.getAddress(
-      '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'
-    );
-
+    
     buyCard.style.display = 'block';
 
     buyBtn.addEventListener('click', async () => {
