@@ -45,8 +45,9 @@
     <a href="portfolio.html" style="background:#444;padding:8px 12px;border-radius:6px;color:#fff;text-decoration:none">My Portfolio</a>
   </div>
   <h2>Account Settings</h2>
-  <div id="roleBanner" class="muted" style="margin-top:6px">
-  <!-- USDC (Base) Wallet -->
+  <div id="roleBanner" class="muted" style="margin-top:6px"></div>
+  
+   <!-- USDC (Base) Wallet -->
   <div class="card">
     <h3>USDC (Base) Wallet</h3>
     <p class="muted">Enter your Base address (starts with 0x…) to receive USDC for sales. Required to sell. Only <strong>subscribers</strong> (and moderators/owner) can enable selling.</p>
@@ -56,7 +57,6 @@
       <span id="usdcMsg" class="muted"></span>
     </div>
   </div>
-</div>
 
   <!-- Avatar -->
   <div class="card">
@@ -248,6 +248,41 @@ const frameScaleInput=document.getElementById('frameScale');
 const frameFile=document.getElementById('frameFile');
 const uploadFrameBtn=document.getElementById('uploadFrame');
 const uploadMsg=document.getElementById('uploadMsg');
+
+// USDC wallet handling (Settings)
+const usdcAddr = document.getElementById('usdcAddr');
+const saveUsdc = document.getElementById('saveUsdc');
+const usdcMsg  = document.getElementById('usdcMsg');
+
+function _setMsg(el,txt,cls='muted'){ if(!el) return; el.className=cls; el.textContent=txt; }
+
+// Prefill the wallet if saved
+(async function init_usdc_wallet(){
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    if (!session) return;
+    const { data: p } = await sb.from('profiles')
+      .select('usdc_base_address')
+      .eq('id', session.user.id)
+      .maybeSingle();
+    if (p?.usdc_base_address && usdcAddr) usdcAddr.value = p.usdc_base_address;
+  }catch(_e){}
+})();
+
+// Save wallet button
+saveUsdc?.addEventListener('click', async ()=>{
+  if (!usdcAddr) return;
+  const v = (usdcAddr.value||'').trim();
+  if(!/^0x[a-fA-F0-9]{40}$/.test(v)) return _setMsg(usdcMsg,'Invalid address.','err');
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) return _setMsg(usdcMsg,'Please sign in.','err');
+  const { error } = await sb.from('profiles')
+    .update({ usdc_base_address: v })
+    .eq('id', session.user.id);
+  if (error) return _setMsg(usdcMsg,'Error: '+error.message,'err');
+  _setMsg(usdcMsg,'Saved.','ok');
+});
+
 
 // --- Frame Editor refs ---
 const fe = {
@@ -552,33 +587,7 @@ fe.saveApply.addEventListener('click', async ()=>{
   await loadFrames();
 });
 
-// USDC wallet handling
-const usdcAddr = document.getElementById('usdcAddr');
-const saveUsdc = document.getElementById('saveUsdc');
-const usdcMsg  = document.getElementById('usdcMsg');
-
-function _setMsg(el,txt,cls='muted'){ if(!el) return; el.className=cls; el.textContent=txt; }
-
-(async function init_usdc_wallet(){
-  try{
-    const { data:{ session } } = await sb.auth.getSession();
-    if (!session) return;
-    const { data: p } = await sb.from('profiles').select('usdc_base_address').eq('id', session.user.id).maybeSingle();
-    if (p?.usdc_base_address && usdcAddr) usdcAddr.value = p.usdc_base_address;
-  }catch(_e){}
-})();
-
-saveUsdc?.addEventListener('click', async ()=>{
-  if (!usdcAddr) return;
-  const v = (usdcAddr.value||'').trim();
-  if(!/^0x[a-fA-F0-9]{40}$/.test(v)) return _setMsg(usdcMsg,'Invalid address.','err');
-  const { data:{ session } } = await sb.auth.getSession();
-  if (!session) return _setMsg(usdcMsg,'Please sign in.','err');
-  const { error } = await sb.from('profiles').update({ usdc_base_address: v }).eq('id', session.user.id);
-  if (error) return _setMsg(usdcMsg,'Error: '+error.message,'err');
-  _setMsg(usdcMsg,'Saved.','ok');
-});
-
 </script>
 </body>
 </html>
+
