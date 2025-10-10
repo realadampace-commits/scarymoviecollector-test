@@ -192,24 +192,20 @@ function setVoteMsg(t, ok=false){ voteMsg.textContent=t; voteMsg.style.color = o
   me = session?.user || null;
   loginLink.href = 'login.html?next=' + encodeURIComponent('item.html?id='+itemId);
 
-  // 1) Load the item without joins (safe for RLS / columns)
+  // 1) Load the item (include for_sale here)
   const iq = await sb
     .from('items')
-    .select('id,title,description,user_value,created_at,owner_id')
+    .select('id,title,description,user_value,created_at,owner_id,for_sale')
     .eq('id', itemId)
     .maybeSingle();
 
-  if (iq.error) console.error('items query error:', iq.error);
-  if (!iq.data){ itemTitle.textContent='Item not found'; return; }
-  item = iq.data;
+    if (iq.error) console.error('items query error:', iq.error);
+    if (!iq.data){ itemTitle.textContent='Item not found'; return; }
+    item = iq.data;
 
-  // 2) Try to read sale flags separately (won’t break if unavailable)
-  try {
-    const sq = await sb.from('items').select('for_sale').eq('id', itemId).maybeSingle();
-    if (!sq.error && sq.data) item.for_sale = !!sq.data.for_sale;
-  } catch (e) {
-    console.warn('Sale fields not readable yet:', e);
-  }
+  // coerce for_sale to a proper boolean in case the DB returns 0/1 or 't'/'f'
+    const coerceBool = v => v === true || v === 1 || v === '1' || v === 'true' || v === 't';
+    item.for_sale = coerceBool(item.for_sale);
 
   // 3) Load owner (username + wallet for buy UI)
   const pq = await sb
@@ -430,3 +426,4 @@ async function setupBuyFeature(){
 </script>
 </body>
 </html>
+
