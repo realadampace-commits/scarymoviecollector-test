@@ -267,8 +267,15 @@ function setVoteMsg(t, ok=false){ voteMsg.textContent=t; voteMsg.style.color = o
   priceEl.textContent = money(basePrice);
   createdAt.textContent = 'Added ' + new Date(item.created_at).toLocaleString();
 
-  // sale line
-  saleLine.textContent = item.for_sale ? 'This item is listed for sale.' : 'Not for sale.';
+  // sale line (3-state)
+  if (item.for_sale === true) {
+    saleLine.textContent = 'This item is listed for sale.';
+  } else if (item.for_sale === false) {
+    saleLine.textContent = 'Not for sale.';
+  } else {
+    // unknown (likely hidden by RLS) — don’t claim “Not for sale”
+    saleLine.textContent = '—';
+  }
 
   // gallery render
   renderGallery();
@@ -402,10 +409,28 @@ async function setupBuyFeature(){
   const buyMsg = document.getElementById('buyMsg');
 
   try{
-    if (!item.for_sale) { 
-      saleLine.textContent = 'Not for sale.'; 
-      return; 
+    // If we explicitly know it's not for sale, stop.
+    if (item.for_sale === false) {
+      saleLine.textContent = 'Not for sale.';
+      return;
     }
+    
+    // If we don't know yet (null/undefined because of RLS), try a best-effort re-check.
+    if (item.for_sale !== true) {
+      try {
+        const sq = await sb.from('items').select('for_sale').eq('id', itemId).maybeSingle();
+        if (!sq.error && sq.data && (sq.data.for_sale === true || sq.data.for_sale === 't' || sq.data.for_sale === 'true' || sq.data.for_sale === 1)) {
+          item.for_sale = true;
+        } else if (!sq.error && sq.data && (sq.data.for_sale === false || sq.data.for_sale === 'f' || sq.data.for_sale === 'false' || sq.data.for_sale === 0)) {
+          item.for_sale = false;
+        }
+      } catch (_) {}
+    }
+
+    // After the refresh, if it's still not true, leave the line as-is (unknown) and don’t show Buy.
+    if (item.for_sale !== true) return;
+    
+    // We positively know it's for sale
     saleLine.textContent = 'This item is listed for sale.';
 
     // Seller wallet from owner profile already loaded
@@ -457,5 +482,6 @@ async function setupBuyFeature(){
 </script>
 </body>
 </html>
+
 
 
