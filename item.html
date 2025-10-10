@@ -192,21 +192,52 @@ function setVoteMsg(t, ok=false){ voteMsg.textContent=t; voteMsg.style.color = o
   me = session?.user || null;
   loginLink.href = 'login.html?next=' + encodeURIComponent('item.html?id='+itemId);
 
-  // 1) Load the item (include for_sale here)
-  const iq = await sb
+  // 1) Load the item (resilient to RLS on `for_sale`)
+  let coerceBool = v => v === true || v === 1 || v === '1' || v === 'true' || v === 't';
+  
+  let itemRow = null;
+  let saleFlag = null;
+  
+  // First try: include for_sale
+  let iq = await sb
     .from('items')
     .select('id,title,description,user_value,created_at,owner_id,for_sale')
     .eq('id', itemId)
     .maybeSingle();
-
-    if (iq.error) console.error('items query error:', iq.error);
-    if (!iq.data){ itemTitle.textContent='Item not found'; return; }
-    item = iq.data;
-
-  // coerce for_sale to a proper boolean in case the DB returns 0/1 or 't'/'f'
-    const coerceBool = v => v === true || v === 1 || v === '1' || v === 'true' || v === 't';
-    item.for_sale = coerceBool(item.for_sale);
-
+  
+  if (iq.error) console.warn('items w/for_sale error:', iq.error);
+  if (iq.data) {
+    itemRow = iq.data;
+    saleFlag = iq.data.for_sale;
+  } else {
+    // Fallback: fetch without for_sale (avoid RLS/column issues)
+    let iq2 = await sb
+      .from('items')
+      .select('id,title,description,user_value,created_at,owner_id')
+      .eq('id', itemId)
+      .maybeSingle();
+    if (iq2.error) console.warn('items fallback error:', iq2.error);
+    if (!iq2.data) {
+      itemTitle.textContent = 'Item not found';
+      return;
+    }
+    itemRow = iq2.data;
+  
+    // Best-effort fetch of for_sale only; ignore if blocked
+    try {
+      const sq = await sb
+        .from('items')
+        .select('for_sale')
+        .eq('id', itemId)
+        .maybeSingle();
+      if (!sq.error && sq.data) saleFlag = sq.data.for_sale;
+    } catch (e) {
+      console.warn('for_sale fetch blocked/failed:', e);
+    }
+  }
+  
+  item = itemRow;
+  item.for_sale = coerceBool(saleFlag);
   // 3) Load owner (username + wallet for buy UI)
   const pq = await sb
     .from('profiles')
@@ -426,4 +457,5 @@ async function setupBuyFeature(){
 </script>
 </body>
 </html>
+
 
