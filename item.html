@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,7 +21,6 @@
   .thumbs{display:flex;gap:10px;flex-wrap:wrap}
   .thumbs img{width:90px;height:90px;object-fit:cover;border-radius:8px;border:2px solid transparent;cursor:pointer}
   .thumbs img.sel{border-color:#4ade80}
-  /* lightbox */
   .overlay{position:fixed;inset:0;display:none;background:rgba(0,0,0,.85);z-index:999}
   .lightbox{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
   .lightbox img{max-width:92vw;max-height:92vh;border-radius:8px}
@@ -30,18 +28,8 @@
   .navBtn:hover{opacity:1}
   .navPrev{left:24px} .navNext{right:24px}
   .navClose{position:absolute;top:18px;right:18px;padding:8px 10px}
-  /* vote UI */
-  .voteBox{background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:14px}
-  .voteRow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .voteBtn{background:#333;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer}
-  .voteBtn.active{outline:2px solid #4ade80}
-  .voteInput{display:none;gap:8px;align-items:center}
-  .voteInput input{width:140px;background:#222;border:1px solid #333;color:#eee;padding:8px;border-radius:6px}
-  .voteStats{margin-top:10px;color:var(--muted)}
-  .bar{height:10px;background:#222;border-radius:999px;overflow:hidden}
-  .bar > span{display:block;height:100%;background:#2a6;width:0%}
-  .ownerTools{display:flex;gap:8px;flex-wrap:wrap}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 </head>
 <body>
 <app-menu></app-menu>
@@ -60,7 +48,6 @@
   <div class="muted" id="metaLine" style="margin-top:6px"></div>
 
   <div class="grid" style="margin-top:12px">
-    <!-- Left: gallery + description -->
     <div class="stack">
       <div class="card">
         <div class="mainImg" id="mainImg">No image</div>
@@ -72,43 +59,25 @@
       </div>
     </div>
 
-    <!-- Right: price + votes -->
     <div class="stack">
       <div class="card">
         <h3 style="margin:0 0 8px">Price</h3>
-        <div style="font-size:28px;font-weight:700" id="price">$0</div>
         <div class="muted" id="createdAt" style="margin-top:6px"></div>
+        <div id="priceUSD" style="margin-top:8px;font-size:15px"></div>
       </div>
 
-      <div class="card">
-        <h3 style="margin:0 0 8px">Community Vote</h3>
-        <div class="voteStats" id="aggText">Agree: 0 • Disagree: 0</div>
-        <div class="bar" style="margin-top:8px"><span id="agreeFill" style="width:0%"></span></div>
-        <div class="voteStats" id="avgLine" style="margin-top:6px">Average suggested: —</div>
-
-        <div class="voteBox" id="voteBox" style="display:none;margin-top:12px">
-          <div class="voteRow">
-            <button id="agreeBtn" class="voteBtn">Agree</button>
-            <button id="disagreeBtn" class="voteBtn">Disagree</button>
-            <span id="bandHint" class="voteStats"></span>
-          </div>
-          <div id="disagreeBlock" class="voteInput" style="margin-top:8px">
-            <label for="suggestPrice">Suggest price:</label>
-            <input id="suggestPrice" type="number" step="1" min="0"/>
-            <button id="saveSuggestion" class="voteBtn ok">Save</button>
-          </div>
-          <div class="voteStats" id="voteMsg"></div>
-        </div>
-
-        <div class="voteStats" id="guestMsg" style="display:none;margin-top:10px">
-          <a href="login.html?next=item.html%3Fid%3D" id="loginLink">Log in</a> to vote.
+      <div id="buyBox" class="card" style="display:none">
+        <h3 style="margin:0 0 8px">Buy with USDC (Base)</h3>
+        <div id="buyStatus" class="muted">Connect your wallet to purchase.</div>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button id="connectWallet" class="btn ok">Connect Wallet</button>
+          <button id="buyNow" class="btn main" style="display:none">Pay Now</button>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Lightbox overlay -->
 <div class="overlay" id="overlay">
   <div class="lightbox">
     <button class="navBtn navPrev" id="prevBtn" aria-label="Previous">&lt;</button>
@@ -125,12 +94,11 @@ const sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
 
-// DOM
 const itemTitle = document.getElementById('itemTitle');
 const metaLine  = document.getElementById('metaLine');
 const descEl    = document.getElementById('desc');
-const priceEl   = document.getElementById('price');
 const createdAt = document.getElementById('createdAt');
+const priceUSD  = document.getElementById('priceUSD');
 const ownerTools= document.getElementById('ownerTools');
 const editBtn   = document.getElementById('editBtn');
 const deleteBtn = document.getElementById('deleteBtn');
@@ -143,98 +111,78 @@ const prevBtn   = document.getElementById('prevBtn');
 const nextBtn   = document.getElementById('nextBtn');
 const closeBtn  = document.getElementById('closeBtn');
 
-// voting
-const voteBox = document.getElementById('voteBox');
-const agreeBtn = document.getElementById('agreeBtn');
-const disagreeBtn = document.getElementById('disagreeBtn');
-const disagreeBlock = document.getElementById('disagreeBlock');
-const suggestPriceEl = document.getElementById('suggestPrice');
-const saveSuggestionBtn = document.getElementById('saveSuggestion');
-const voteMsg = document.getElementById('voteMsg');
-const aggText = document.getElementById('aggText');
-const agreeFill = document.getElementById('agreeFill');
-const avgLine = document.getElementById('avgLine');
-const bandHint = document.getElementById('bandHint');
-const guestMsg = document.getElementById('guestMsg');
-const loginLink = document.getElementById('loginLink');
+const buyBox     = document.getElementById('buyBox');
+const buyStatus  = document.getElementById('buyStatus');
+const connectBtn = document.getElementById('connectWallet');
+const buyBtn     = document.getElementById('buyNow');
+
+const BASE_CHAIN_ID_HEX = '0x2105';
+const USDC_BASE = { chainId: BASE_CHAIN_ID_HEX, contract: '0x833589fCD6EDb6E08f4c7C32D4f71b54bdA02913', decimals: 6 };
+const ERC20_ABI = ["function balanceOf(address) view returns (uint256)","function transfer(address to, uint256 value) returns (bool)"];
+let provider=null, signer=null, buyerAddr=null;
 
 const qs = new URLSearchParams(location.search);
 const itemId = qs.get('id');
 
-let me=null, item=null;
-let basePrice=0, minBand=0, maxBand=0;
-let images=[], idx=0;
+let me=null, item=null, images=[], idx=0;
 
 function money(n){ return '$' + Number(n||0).toLocaleString(); }
-function setActive(which){
-  agreeBtn.classList.toggle('active', which==='agree');
-  disagreeBtn.classList.toggle('active', which==='disagree');
-  disagreeBlock.style.display = which==='disagree' ? 'flex' : 'none';
-}
-function setVoteMsg(t, ok=false){ voteMsg.textContent=t; voteMsg.style.color = ok ? '#9f9' : '#a9adb4'; }
 
 (async function init(){
   if(!itemId){ itemTitle.textContent='Item not found'; return; }
 
   const { data:{ session } } = await sb.auth.getSession();
   me = session?.user || null;
-  loginLink.href = 'login.html?next=' + encodeURIComponent('item.html?id='+itemId);
 
-  const q = await sb.from('items')
-    .select('id,title,description,user_value,created_at,owner_id,profiles:owner_id(username)')
+  const iq = await sb.from('items')
+    .select('id,title,description,user_value,created_at,owner_id,is_for_sale,price_usdc,sale_currency,profiles:owner_id(username,usdc_base_address)')
     .eq('id', itemId).maybeSingle();
-  if (!q.data){ itemTitle.textContent='Item not found'; return; }
-  item = q.data;
+  item = iq.data;
+  if(!item){ itemTitle.textContent='Item not found'; return; }
 
   const im = await sb.from('items_images')
     .select('id,image_url,position,created_at')
     .eq('item_id', itemId)
-    .order('position', {ascending:true})
-    .order('created_at', {ascending:true});
+    .order('position',{ascending:true})
+    .order('created_at',{ascending:true});
   images = im.data || [];
 
-  // render basics
   itemTitle.textContent = item.title || 'Untitled';
-  metaLine.innerHTML = `Owner: ${item.profiles?.username
-    ? `<a href="user.html?u=${encodeURIComponent(item.profiles.username)}">@${item.profiles.username}</a>`
-    : 'unknown'
-  }`;
+  metaLine.innerHTML = `Owner: ${item.profiles?.username ? `<a href="user.html?u=${encodeURIComponent(item.profiles.username)}">@${item.profiles.username}</a>` : 'unknown'}`;
   descEl.textContent = item.description || '—';
-  basePrice = Number(item.user_value||0);
-  priceEl.textContent = money(basePrice);
+  priceUSD.textContent = 'Owner value: ' + money(item.user_value||0);
   createdAt.textContent = 'Added ' + new Date(item.created_at).toLocaleString();
 
-  // gallery render
   renderGallery();
 
-  // owner/mod tools
-  if (me) {
+  if (me){
     const my = await sb.from('profiles').select('role').eq('id', me.id).maybeSingle();
-    const role = my.data?.role || 'free';
-    const isModOrOwner = (role==='moderator' || role==='owner');
-    if (me.id === item.owner_id || isModOrOwner) {
-      ownerTools.style.display = 'flex';
-      editBtn.href = 'edit.html?id=' + item.id;
+    const isModOrOwner = (my.data?.role==='moderator'||my.data?.role==='owner');
+    if (me.id===item.owner_id || isModOrOwner){
+      ownerTools.style.display='flex';
+      editBtn.href='edit.html?id='+item.id;
       deleteBtn.onclick = async ()=>{
         if(!confirm('Delete this item?')) return;
         const { error } = await sb.from('items').delete().eq('id', item.id);
-        if (error) return alert('Delete error: ' + error.message);
+        if(error) return alert('Delete error: '+error.message);
         location.href='portfolio.html';
       };
     }
   }
 
-  // voting
-  if (me) {
-    voteBox.style.display = 'block';
-    minBand = Math.round(basePrice*0.70);
-    maxBand = Math.round(basePrice*1.30);
-    bandHint.textContent = `If you disagree, suggest between ${money(minBand)} and ${money(maxBand)}.`;
-    await refreshMyVote();
-  } else {
-    guestMsg.style.display = 'block';
+  const sellerWallet = item.profiles?.usdc_base_address || null;
+  const isForSale = !!item.is_for_sale && item.sale_currency==='USDC_BASE' && item.price_usdc>0;
+  if (isForSale){
+    const saleNote = document.createElement('div');
+    saleNote.className='muted';
+    saleNote.style.marginTop='6px';
+    saleNote.textContent = `For sale: ${(item.price_usdc/1_000_000).toFixed(2)} USDC on Base`;
+    createdAt.insertAdjacentElement('afterend', saleNote);
   }
-  await refreshAggregates();
+  if (isForSale && me && me.id!==item.owner_id && sellerWallet){
+    buyBox.style.display='block';
+    buyStatus.textContent = `Price: ${(item.price_usdc/1_000_000).toFixed(2)} USDC — Network: Base`;
+  }
 })();
 
 function renderGallery(){
@@ -258,15 +206,8 @@ function renderGallery(){
   });
 }
 
-// Lightbox
-function openOverlay(){
-  if (!images.length) return;
-  overlay.style.display='block';
-  overlayImg.src = images[idx].image_url;
-}
-function closeOverlay(){
-  overlay.style.display='none';
-}
+function openOverlay(){ if (!images.length) return; overlay.style.display='block'; overlayImg.src=images[idx].image_url; }
+function closeOverlay(){ overlay.style.display='none'; }
 function prev(){ if (!images.length) return; idx=(idx-1+images.length)%images.length; overlayImg.src=images[idx].image_url; }
 function next(){ if (!images.length) return; idx=(idx+1)%images.length; overlayImg.src=images[idx].image_url; }
 overlay.addEventListener('click', (e)=>{ if(e.target===overlay) closeOverlay(); });
@@ -281,50 +222,67 @@ document.addEventListener('keydown', (e)=>{
   }
 });
 
-// My vote
-async function refreshMyVote(){
-  const { data: row } = await sb.from('item_votes')
-    .select('agree, suggested_price').eq('item_id', itemId).eq('voter_id', me.id).maybeSingle();
-  if(!row){ setActive(null); suggestPriceEl.value=''; setVoteMsg('You have not voted yet.'); return; }
-  if(row.agree){ setActive('agree'); setVoteMsg('You agree with the price.', true); }
-  else{ setActive('disagree'); suggestPriceEl.value=row.suggested_price??''; setVoteMsg('You disagree. Adjust your suggestion and save.', true); }
-}
-async function refreshAggregates(){
-  const { data: rows } = await sb.from('item_votes').select('agree, suggested_price').eq('item_id', itemId);
-  let agrees=0, disagrees=0, sum=0, n=0;
-  for(const r of rows||[]){ if(r.agree) agrees++; else {disagrees++; if(typeof r.suggested_price==='number'){sum+=r.suggested_price;n++;}}}
-  const total=agrees+disagrees, pct= total? Math.round(agrees*100/total):0;
-  agreeFill.style.width=pct+'%';
-  aggText.textContent=`Agree: ${agrees} • Disagree: ${disagrees} • ${pct}% agree`;
-  avgLine.textContent= n? `Average suggested: ${money(Math.round(sum/n))}` : 'Average suggested: —';
-}
-agreeBtn.addEventListener('click', async ()=>{
-  if(!me) return;
-  setActive('agree'); setVoteMsg('Saving…');
-  const { error } = await sb.from('item_votes').upsert(
-    { item_id:itemId, voter_id:me.id, agree:true, suggested_price:null }, { onConflict:'item_id,voter_id' }
-  );
-  if(error) return setVoteMsg('Error: '+error.message);
-  setVoteMsg('You agree with the price.', true); await refreshAggregates();
+connectBtn?.addEventListener('click', async ()=>{
+  try{
+    if (!window.ethereum){ buyStatus.textContent='No wallet found. Install MetaMask or Coinbase Wallet.'; return; }
+    await window.ethereum.request({ method:'eth_requestAccounts' });
+    const current = await window.ethereum.request({ method:'eth_chainId' });
+    if (current !== BASE_CHAIN_ID_HEX){
+      try{
+        await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId: BASE_CHAIN_ID_HEX }] });
+      }catch(e){
+        if (e.code===4902){
+          await window.ethereum.request({
+            method:'wallet_addEthereumChain',
+            params:[{ chainId: BASE_CHAIN_ID_HEX, chainName:'Base',
+              nativeCurrency:{ name:'ETH', symbol:'ETH', decimals:18 },
+              rpcUrls:['https://mainnet.base.org'], blockExplorerUrls:['https://basescan.org'] }]
+          });
+        } else { throw e; }
+      }
+    }
+    provider = new ethers.providers.Web3Provider(window.ethereum);
+    signer   = provider.getSigner();
+    buyerAddr= await signer.getAddress();
+    buyStatus.textContent = `Wallet: ${buyerAddr.slice(0,6)}…${buyerAddr.slice(-4)} — ready`;
+    buyBtn.style.display='';
+  }catch(e){
+    buyStatus.textContent = 'Wallet error: ' + (e?.message || e);
+  }
 });
-disagreeBtn.addEventListener('click', ()=>{
-  if(!me) return;
-  setActive('disagree'); setVoteMsg(`Enter a suggestion within ${money(minBand)}–${money(maxBand)}.`);
-  if(!suggestPriceEl.value) suggestPriceEl.value = Math.round(basePrice);
-});
-saveSuggestionBtn.addEventListener('click', async ()=>{
-  if(!me) return;
-  const val = Math.round(Number(suggestPriceEl.value||0));
-  if(!val) return setVoteMsg('Enter a number.');
-  if(val<Math.round(basePrice*0.70)||val>Math.round(basePrice*1.30)) return setVoteMsg(`Must be between ${money(Math.round(basePrice*0.70))} and ${money(Math.round(basePrice*1.30))}.`);
-  setVoteMsg('Saving…');
-  const { error } = await sb.from('item_votes').upsert(
-    { item_id:itemId, voter_id:me.id, agree:false, suggested_price:val }, { onConflict:'item_id,voter_id' }
-  );
-  if(error) return setVoteMsg('Error: '+error.message);
-  setVoteMsg('Saved your suggestion.', true); await refreshAggregates();
+
+buyBtn?.addEventListener('click', async ()=>{
+  try{
+    if (!signer){ buyStatus.textContent='Connect your wallet first.'; return; }
+    if (!item?.profiles?.usdc_base_address){ buyStatus.textContent='Seller wallet is missing.'; return; }
+
+    const seller = item.profiles.usdc_base_address;
+    const amount = ethers.BigNumber.from(String(item.price_usdc));
+    const usdc = new ethers.Contract(USDC_BASE.contract, ERC20_ABI, signer);
+
+    buyStatus.textContent='Sending USDC…';
+    const tx  = await usdc.transfer(seller, amount);
+    buyStatus.textContent='Waiting for confirmation…';
+    const rec = await tx.wait();
+
+    const { data:{ session } } = await sb.auth.getSession();
+    await sb.from('orders').insert({
+      item_id: item.id,
+      seller_id: item.owner_id,
+      buyer_id: session.user.id,
+      price_usdc: item.price_usdc,
+      currency: 'USDC',
+      method: 'USDC_BASE',
+      status: 'paid',
+      tx_hash: rec.transactionHash,
+      chain_id: BASE_CHAIN_ID_HEX
+    });
+
+    buyStatus.textContent='Payment confirmed. View it in Orders.';
+  }catch(e){
+    buyStatus.textContent = 'Payment failed: ' + (e?.error?.message || e?.message || e);
+  }
 });
 </script>
 </body>
 </html>
-
