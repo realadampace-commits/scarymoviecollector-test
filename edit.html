@@ -65,6 +65,7 @@
     </div>
     <div class="small" style="margin-top:6px">Up to 5 images total. First image is treated as the main image.</div>
   
+  <!-- Buy -->
   <div class="card">
     <h3 style="margin:0 0 8px">Selling (USDC on Base)</h3>
     <div class="tools">
@@ -74,6 +75,19 @@
       <input id="sellPriceUsdc" type="number" step="0.01" min="0.01" placeholder="Price in USDC" style="width:160px">
       <button id="saveSelling" style="background:#2a6">Save Selling</button>
       <span id="sellNote" class="muted">Requires subscriber/moderator/owner + your USDC wallet in Settings.</span>
+    </div>
+  </div>
+
+  <!-- Sold -->
+  <div class="panel" id="soldPanel" style="margin-top:16px">
+    <h3 style="margin:0 0 8px">Sale Status</h3>
+    <div id="soldState" class="muted" style="margin:0 0 8px">Loading…</div>
+    <div id="soldControls">
+      <label>Sold price (USD): </label>
+      <input id="soldPrice" type="number" min="0" step="1" style="width:140px">
+      <button id="markSold" class="btn" style="background:#2a6;margin-left:8px">Mark as Sold</button>
+      <button id="undoSold" class="btn" style="background:#444;margin-left:8px;display:none">Undo Sale</button>
+      <span id="soldMsg" class="muted" style="margin-left:10px"></span>
     </div>
   </div>
 
@@ -107,6 +121,15 @@ const delBtn=document.getElementById('delBtn');
 const msgEl=document.getElementById('msg');
 const capMsg=document.getElementById('capMsg');
 
+const soldPanel = document.getElementById('soldPanel');
+const soldState = document.getElementById('soldState');
+const soldPriceEl = document.getElementById('soldPrice');
+const markSoldBtn = document.getElementById('markSold');
+const undoSoldBtn = document.getElementById('undoSold');
+const soldMsg = document.getElementById('soldMsg');
+
+let isSold = false;
+
 let me=null, ownerId=null, myRole='free';
 let images=[];
 
@@ -127,8 +150,8 @@ function dmsg(t, cls='muted'){ detailsMsg.className=cls; detailsMsg.textContent=
 
   // fetch item to validate permission and load fields
   const it = await sb.from('items')
-    .select('id,owner_id,title,description,user_value')
-    .eq('id', itemId).maybeSingle();
+    .select('id,owner_id,title,description,user_value,for_sale,sold,sold_price,sold_at')
+    .eq('id', itemId).maybeSingle();  // load sale fields too
 
   ownerId = it.data?.owner_id || null;
   // const isModOrOwner = (myRole==='moderator' || myRole==='owner');
@@ -144,7 +167,47 @@ function dmsg(t, cls='muted'){ detailsMsg.className=cls; detailsMsg.textContent=
   priceEl.value = it.data?.user_value ?? '';
 
   await refreshImages();
+
+  isSold = !!it.data?.sold;
+  renderSoldPanel(it.data);
 })();
+
+function renderSoldPanel(row){
+  if (!row) { soldPanel.style.display='none'; return; }
+  isSold = !!row.sold;
+  if (isSold){
+    soldState.textContent = `Sold for $${Number(row.sold_price||0).toLocaleString()} on ${new Date(row.sold_at).toLocaleString()}`;
+    soldPriceEl.value = row.sold_price ?? '';
+    markSoldBtn.style.display = 'none';
+    undoSoldBtn.style.display = '';
+  } else {
+    soldState.textContent = 'Not sold';
+    markSoldBtn.style.display = '';
+    undoSoldBtn.style.display = 'none';
+  }
+}
+
+markSoldBtn.addEventListener('click', async ()=>{
+  const price = Math.round(Number(soldPriceEl.value||0));
+  if (!(price > 0)) { soldMsg.textContent = 'Enter a positive sold price.'; return; }
+  soldMsg.textContent = 'Saving…';
+  const { error, data } = await sb.from('items')
+    .update({ sold:true, sold_price:price, sold_at:new Date().toISOString(), for_sale:false })
+    .eq('id', itemId)
+    .select('sold,sold_price,sold_at').maybeSingle();
+  soldMsg.textContent = error ? ('Error: ' + error.message) : 'Marked as sold.';
+  if (!error) renderSoldPanel(data);
+});
+
+undoSoldBtn.addEventListener('click', async ()=>{
+  if (!confirm('Undo sale and mark item as not sold?')) return;
+  soldMsg.textContent = 'Saving…';
+  const { error, data } = await sb.from('items')
+    .update({ sold:false, sold_price:null, sold_at:null })
+    .eq('id', itemId)
+    .select('sold,sold_price,sold_at').maybeSingle();
+  soldMsg.textContent = error ? ('Error: ' + error.message) : 'Sale undone.';
+  if (!error) renderSoldPanel(data);
 
 saveDetails.addEventListener('click', async ()=>{
   const title = titleEl.value.trim();
@@ -286,5 +349,6 @@ saveSellingBtn?.addEventListener('click', async ()=>{
 </script>
 </body>
 </html>
+
 
 
