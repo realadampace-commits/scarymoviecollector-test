@@ -108,8 +108,9 @@ async function attachPreviews(items){
 
   // Load items for ownerId (same query; join to show owner info on cards)
   const { data, error } = await sb.from('items')
-    .select('id,title,user_value,created_at,owner_id,profiles:owner_id(username,avatar_url)')
+    .select('id,title,user_value,created_at,owner_id,profiles:owner_id(username,avatar_url),sold')
     .eq('owner_id', ownerId)
+    .or('sold.is.null,sold.eq.false')    // <— keep unsold only
     .order('created_at',{ascending:false});
 
   if (error){
@@ -159,4 +160,5 @@ async function attachPreviews(items){
 </script>
 </body>
 </html>
+
 
