@@ -41,6 +41,7 @@
   .bar > span{display:block;height:100%;background:#2a6;width:0%}
   .ownerTools{display:flex;gap:8px;flex-wrap:wrap}
 </style>
+<!-- Ethers (for on-chain USDC transfers) -->
 <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 </head>
 <body>
@@ -72,20 +73,20 @@
       </div>
     </div>
 
-    <!-- Right: price + votes -->
+    <!-- Right: price + buy + votes -->
     <div class="stack">
       <div class="card">
         <h3 style="margin:0 0 8px">Price</h3>
         <div style="font-size:28px;font-weight:700" id="price">$0</div>
+        <div class="muted" id="saleLine" style="margin-top:6px"></div>
 
-      <div id="buyBox" class="card" style="display:none">
-        <h3 style="margin:0 0 8px">Buy with USDC (Base)</h3>
-        <div id="buyStatus" class="muted">Connect your wallet to purchase.</div>
-        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-          <button id="connectWallet" class="btn ok">Connect Wallet</button>
-          <button id="buyNow" class="btn main" style="display:none">Pay Now</button>
+        <!-- Buy card (USDC on Base) -->
+        <div id="buyCard" class="card" style="display:none;margin-top:12px">
+          <h3 style="margin:0 0 8px">Buy with USDC (Base)</h3>
+          <p class="muted" style="margin:0 0 8px">Payments go directly to the seller’s wallet.</p>
+          <button id="buyBtn" class="btn ok" style="background:#2a6">Buy Now</button>
+          <div id="buyMsg" class="muted" style="margin-top:6px"></div>
         </div>
-      </div>
 
         <div class="muted" id="createdAt" style="margin-top:6px"></div>
       </div>
@@ -140,6 +141,7 @@ const itemTitle = document.getElementById('itemTitle');
 const metaLine  = document.getElementById('metaLine');
 const descEl    = document.getElementById('desc');
 const priceEl   = document.getElementById('price');
+const saleLine  = document.getElementById('saleLine');
 const createdAt = document.getElementById('createdAt');
 const ownerTools= document.getElementById('ownerTools');
 const editBtn   = document.getElementById('editBtn');
@@ -171,7 +173,7 @@ const loginLink = document.getElementById('loginLink');
 const qs = new URLSearchParams(location.search);
 const itemId = qs.get('id');
 
-let me=null, item=null;
+let me=null, item=null, owner=null;
 let basePrice=0, minBand=0, maxBand=0;
 let images=[], idx=0;
 
@@ -190,12 +192,38 @@ function setVoteMsg(t, ok=false){ voteMsg.textContent=t; voteMsg.style.color = o
   me = session?.user || null;
   loginLink.href = 'login.html?next=' + encodeURIComponent('item.html?id='+itemId);
 
-  const q = await sb.from('items')
-    .select('id,title,description,user_value,created_at,owner_id,profiles:owner_id(username)')
-    .eq('id', itemId).maybeSingle();
-  if (!q.data){ itemTitle.textContent='Item not found'; return; }
-  item = q.data;
+  // Attempt to fetch item with sale fields; fall back gracefully if any column is blocked by RLS
+  const coerceBool = v => (v===true || v===1 || v==='1' || v==='true' || v==='t');
 
+  let iq = await sb
+    .from('items')
+    .select('id,title,description,user_value,created_at,owner_id,for_sale,sold,sold_price,sold_at,profiles:owner_id(username)')
+    .eq('id', itemId)
+    .maybeSingle();
+
+  if (!iq.data) {
+    // Fallback (no joins) — minimum fields to render
+    iq = await sb
+      .from('items')
+      .select('id,title,description,user_value,created_at,owner_id,for_sale,sold,sold_price,sold_at')
+      .eq('id', itemId)
+      .maybeSingle();
+  }
+
+  if (!iq.data){ itemTitle.textContent='Item not found'; return; }
+  item = iq.data;
+  item.for_sale = coerceBool(item.for_sale);
+  item.sold     = coerceBool(item.sold);
+
+  // Load owner profile (username + wallet)
+  const pq = await sb
+    .from('profiles')
+    .select('username,usdc_base_address,role')
+    .eq('id', item.owner_id)
+    .maybeSingle();
+  owner = pq.data || null;
+
+  // images
   const im = await sb.from('items_images')
     .select('id,image_url,position,created_at')
     .eq('item_id', itemId)
@@ -205,14 +233,26 @@ function setVoteMsg(t, ok=false){ voteMsg.textContent=t; voteMsg.style.color = o
 
   // render basics
   itemTitle.textContent = item.title || 'Untitled';
-  metaLine.innerHTML = `Owner: ${item.profiles?.username
-    ? `<a href="user.html?u=${encodeURIComponent(item.profiles.username)}">@${item.profiles.username}</a>`
-    : 'unknown'
+  metaLine.innerHTML = `Owner: ${
+    (item.profiles?.username || owner?.username)
+      ? `<a href="user.html?u=${encodeURIComponent(item.profiles?.username || owner?.username)}">@${item.profiles?.username || owner?.username}</a>`
+      : 'unknown'
   }`;
   descEl.textContent = item.description || '—';
   basePrice = Number(item.user_value||0);
   priceEl.textContent = money(basePrice);
   createdAt.textContent = 'Added ' + new Date(item.created_at).toLocaleString();
+
+  // sale line priority: SOLD > for_sale true > not for sale > unknown
+  if (item.sold === true){
+    saleLine.textContent = `SOLD for ${money(item.sold_price||0)} on ${new Date(item.sold_at).toLocaleString()}`;
+  } else if (item.for_sale === true) {
+    saleLine.textContent = 'This item is listed for sale.';
+  } else if (item.for_sale === false) {
+    saleLine.textContent = 'Not for sale.';
+  } else {
+    saleLine.textContent = '—';
+  }
 
   // gallery render
   renderGallery();
@@ -245,6 +285,9 @@ function setVoteMsg(t, ok=false){ voteMsg.textContent=t; voteMsg.style.color = o
     guestMsg.style.display = 'block';
   }
   await refreshAggregates();
+
+  // buy feature
+  await setupBuyFeature();
 })();
 
 function renderGallery(){
@@ -293,6 +336,7 @@ document.addEventListener('keydown', (e)=>{
 
 // My vote
 async function refreshMyVote(){
+  if(!me) return;
   const { data: row } = await sb.from('item_votes')
     .select('agree, suggested_price').eq('item_id', itemId).eq('voter_id', me.id).maybeSingle();
   if(!row){ setActive(null); suggestPriceEl.value=''; setVoteMsg('You have not voted yet.'); return; }
@@ -335,106 +379,78 @@ saveSuggestionBtn.addEventListener('click', async ()=>{
   setVoteMsg('Saved your suggestion.', true); await refreshAggregates();
 });
 
-// === USDC Buy (Base) ===
-const buyBox     = document.getElementById('buyBox');
-const buyStatus  = document.getElementById('buyStatus');
-const connectBtn = document.getElementById('connectWallet');
-const buyBtn     = document.getElementById('buyNow');
+// --- USDC BUY FEATURE ---
+async function setupBuyFeature(){
+  const buyCard = document.getElementById('buyCard');
+  const buyBtn  = document.getElementById('buyBtn');
+  const buyMsg  = document.getElementById('buyMsg');
 
-const BASE_CHAIN_ID_HEX = '0x2105';
-const USDC_BASE = { chainId: BASE_CHAIN_ID_HEX, contract: '0x833589fCD6EDb6E08f4c7C32D4f71b54bdA02913', decimals: 6 };
-const ERC20_ABI = ["function balanceOf(address) view returns (uint256)","function transfer(address to, uint256 value) returns (bool)"];
-let _provider=null, _signer=null, _buyerAddr=null;
-
-(async function setup_buy_box(){
   try{
-    const qs = new URLSearchParams(location.search);
-    const itemId = qs.get('id');
-    if (!itemId) return;
+    // If sold, never show Buy
+    if (item.sold === true) { if (buyCard) buyCard.style.display='none'; return; }
 
-    // load item with seller wallet
-    const iq = await sb.from('items').select('id,owner_id,is_for_sale,price_usdc,sale_currency,profiles:owner_id(username,usdc_base_address)').eq('id', itemId).maybeSingle();
-    const it = iq.data;
-    const { data:{ session } } = await sb.auth.getSession();
-    const me = session?.user || null;
+    // If explicitly not for sale, stop.
+    if (item.for_sale === false) { return; }
 
-    const isForSale = !!it?.is_for_sale && it?.sale_currency==='USDC_BASE' && (it?.price_usdc > 0);
-    const viewerIsOwner = me && it && me.id === it.owner_id;
-    const sellerWallet = it?.profiles?.usdc_base_address || null;
-
-    if (isForSale && !viewerIsOwner && sellerWallet){
-      if (buyBox) buyBox.style.display='block';
-      if (buyStatus) buyStatus.textContent = `Price: ${(it.price_usdc/1_000_000).toFixed(2)} USDC — Network: Base`;
-      // expose for click handler
-      window.__itemForSale = it;
+    // If for_sale unknown (because of RLS), try a best-effort re-check.
+    if (item.for_sale !== true) {
+      try {
+        const sq = await sb.from('items').select('for_sale').eq('id', itemId).maybeSingle();
+        if (!sq.error && sq.data) {
+          const v = sq.data.for_sale;
+          item.for_sale = (v===true || v===1 || v==='1' || v==='true' || v==='t');
+        }
+      } catch (_) {}
     }
-  }catch(_e){}
-})();
 
-connectBtn?.addEventListener('click', async ()=>{
-  try{
-    if (!window.ethereum){ buyStatus.textContent='No wallet found. Install MetaMask or Coinbase Wallet.'; return; }
-    await window.ethereum.request({ method:'eth_requestAccounts' });
-    const current = await window.ethereum.request({ method:'eth_chainId' });
-    if (current !== BASE_CHAIN_ID_HEX){
+    if (item.for_sale !== true) return; // still not known as “for sale”
+
+    // Need a valid seller wallet
+    let sellerAddr;
+    try {
+      sellerAddr = ethers.utils.getAddress(String(owner?.usdc_base_address || '').trim());
+    } catch {
+      console.warn('Seller missing/invalid wallet');
+      return;
+    }
+
+    // Checksummed USDC contract on Base
+    const USDC_BASE = ethers.utils.getAddress('0x833589fcd6edb6e08f4c7c32d4f71b54bda02913');
+    const USDC_ABI = [
+      'function transfer(address to, uint256 amount) public returns (bool)',
+      'function decimals() public view returns (uint8)'
+    ];
+
+    buyCard.style.display='block';
+
+    buyBtn.addEventListener('click', async ()=>{
+      buyMsg.textContent='Connecting wallet...';
+      if (!window.ethereum) { buyMsg.textContent='No wallet found (MetaMask / Coinbase).'; return; }
+
       try{
-        await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{ chainId: BASE_CHAIN_ID_HEX }] });
-      }catch(e){
-        if (e.code===4902){
-          await window.ethereum.request({
-            method:'wallet_addEthereumChain',
-            params:[{ chainId: BASE_CHAIN_ID_HEX, chainName:'Base',
-              nativeCurrency:{ name:'ETH', symbol:'ETH', decimals:18 },
-              rpcUrls:['https://mainnet.base.org'], blockExplorerUrls:['https://basescan.org'] }]
-          });
-        } else { throw e; }
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send('eth_requestAccounts', []);
+        const signer = provider.getSigner();
+        const network = await provider.getNetwork();
+        if (network.chainId !== 8453){ buyMsg.textContent='Please switch to Base network.'; return; }
+
+        const usdc = new ethers.Contract(USDC_BASE, USDC_ABI, signer);
+        const price = ethers.utils.parseUnits(String(item.user_value || 0), 6); // USDC = 6 decimals
+
+        buyMsg.textContent='Sending payment...';
+        const tx = await usdc.transfer(sellerAddr, price);
+        buyMsg.textContent='Waiting for confirmation...';
+        await tx.wait();
+        buyMsg.textContent='✅ Payment complete! Tx hash: ' + tx.hash;
+      } catch(err){
+        console.error(err);
+        buyMsg.textContent='Payment failed: ' + (err.message || err);
       }
-    }
-    _provider = new ethers.providers.Web3Provider(window.ethereum);
-    _signer   = _provider.getSigner();
-    _buyerAddr= await _signer.getAddress();
-    buyStatus.textContent = `Wallet: ${_buyerAddr.slice(0,6)}…${_buyerAddr.slice(-4)} — ready`;
-    buyBtn.style.display='';
-  }catch(e){
-    buyStatus.textContent = 'Wallet error: ' + (e?.message || e);
-  }
-});
-
-buyBtn?.addEventListener('click', async ()=>{
-  try{
-    const it = window.__itemForSale;
-    if (!it){ buyStatus.textContent='Item not ready.'; return; }
-    if (!_signer){ buyStatus.textContent='Connect your wallet first.'; return; }
-    const seller = it.profiles?.usdc_base_address;
-    if (!seller){ buyStatus.textContent='Seller wallet missing.'; return; }
-
-    const amount = ethers.BigNumber.from(String(it.price_usdc));
-    const usdc = new ethers.Contract(USDC_BASE.contract, ERC20_ABI, _signer);
-
-    buyStatus.textContent='Sending USDC…';
-    const tx  = await usdc.transfer(seller, amount);
-    buyStatus.textContent='Waiting for confirmation…';
-    const rec = await tx.wait();
-
-    const { data:{ session } } = await sb.auth.getSession();
-    await sb.from('orders').insert({
-      item_id: it.id,
-      seller_id: it.owner_id,
-      buyer_id: session.user.id,
-      price_usdc: it.price_usdc,
-      currency: 'USDC',
-      method: 'USDC_BASE',
-      status: 'paid',
-      tx_hash: rec.transactionHash,
-      chain_id: BASE_CHAIN_ID_HEX
     });
-
-    buyStatus.textContent='Payment confirmed. View in Orders.';
   }catch(e){
-    buyStatus.textContent = 'Payment failed: ' + (e?.error?.message || e?.message || e);
+    console.error('setupBuyFeature error', e);
   }
-});
-
+}
 </script>
 </body>
 </html>
