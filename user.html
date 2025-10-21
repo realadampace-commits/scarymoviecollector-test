@@ -1,34 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>User — Scream Collector</title>
 <style>
-  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
-  .wrap{max-width:1000px;margin:0 auto;padding:24px}
+  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#dc143c;--ok:#2a6}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
   a{color:#9ecbff;text-decoration:none}
-  .muted{opacity:.75}
-
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:16px}
-  .card{background:#1c1c1c;border-radius:10px;overflow:hidden}
-  .thumb{height:160px;background:#222;display:flex;align-items:center;justify-content:center}
-  .thumb img{max-width:100%;max-height:100%}
-  .meta{padding:10px}
-
-  .userHead{display:flex;align-items:center;gap:12px}
-  .ava{position:relative;width:56px;height:56px;border-radius:50%;background:#333;overflow:hidden;flex:0 0 auto}
-  .ava img{width:100%;height:100%;object-fit:cover;display:block}
-  .frame{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;transform: translate(var(--frameX, 0px), var(--frameY, 0px)) scale(var(--frameScale, 1));}
-
-  .roleTag{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;font-size:12px;vertical-align:middle}
-  .role-free{background:#333;color:#ddd}
-  .role-subscriber{background:#2a6;color:#fff}
-  .role-moderator{background:#c33;color:#fff}
-  .role-owner{background:gold;color:#111;font-weight:700}
-
-  .sectionHead{display:flex;align-items:center;justify-content:space-between;margin-top:20px}
-  .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;text-decoration:none}
-  .panel{margin-top:12px;background:#1b1b1b;padding:12px;border-radius:10px}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px}
+  .card{background:var(--panel);border-radius:12px;padding:16px}
+  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
+  .row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+  .pill{display:inline-block;background:#232323;border:1px solid #333;border-radius:999px;padding:4px 10px;font-size:12px;color:#cfcfcf}
+  .avatarWrap{position:relative;width:92px;height:92px}
+  .avatar{width:92px;height:92px;border-radius:50%;background:#222;overflow:hidden;display:flex;align-items:center;justify-content:center}
+  .avatar img{max-width:100%;max-height:100%}
+  .frameOverlay{
+    position:absolute;inset:0;
+    background-size:contain;background-position:center;background-repeat:no-repeat;
+    pointer-events:none;transform-origin:center;
+    transform:translate(var(--frameX, 0px), var(--frameY, 0px)) scale(var(--frameScale, 1));
+  }
+  .itemCard{background:#181818;border:1px solid #2a2a2a;border-radius:12px;overflow:hidden}
+  .thumb{width:100%;aspect-ratio:4/3;background:#0f0f0f;display:flex;align-items:center;justify-content:center}
+  .thumb img{max-width:100%;max-height:100%;display:block}
+  .itemBody{padding:10px}
+  .itemTitle{margin:0 0 6px;font-size:15px;line-height:1.25}
+  .row2{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .price{font-weight:700}
+  .soldPill{background:#2a2a2a;color:#eee;border:1px solid #3a3a3a}
+  .sectionHead{display:flex;justify-content:space-between;align-items:center;margin-top:18px;margin-bottom:8px}
+  .hscroll{display:flex;gap:10px;overflow:auto;padding-bottom:4px}
+  .mini{min-width:160px;background:#181818;border:1px solid #2a2a2a;border-radius:10px;overflow:hidden}
+  .mini .thumb{aspect-ratio:1/1}
+  .mini .itemBody{padding:8px}
+  .empty{padding:14px;border:1px dashed #333;border-radius:10px;color:var(--muted);text-align:center}
 </style>
 </head>
 <body>
@@ -36,30 +43,46 @@
 <script type="module" src="/menu.js"></script>
 
 <div class="wrap">
-  <a href="users.html">← Back to Search</a>
+  <a href="index.html">← Home</a>
 
-  <div class="userHead" style="margin-top:10px">
-    <span class="ava" id="uAva">
-      <img id="uAvaImg" alt="">
-      <span id="uAvaFrame" class="frame" style="display:none"></span>
-    </span>
-    <div>
-      <h2 id="title" style="margin:0">Loading…</h2>
-      <div id="roleTagWrap" style="margin:4px 0 0"></div>
-      <p id="bio" class="muted" style="margin:4px 0 0"></p>
+  <!-- Profile header -->
+  <div class="card" style="margin-top:12px">
+    <div class="row">
+      <div class="avatarWrap">
+        <div id="avatarBox" class="avatar"><span class="muted">No image</span></div>
+        <div id="frameOverlay" class="frameOverlay"></div>
+      </div>
+      <div style="flex:1;min-width:220px">
+        <h1 id="uname" style="margin:0;font-size:22px">Loading…</h1>
+        <div id="roleBadge" class="pill" style="margin-top:6px;display:none"></div>
+      </div>
     </div>
+    <div id="bio" class="muted" style="margin-top:10px">—</div>
   </div>
 
-  <div id="rolePanel" class="panel" style="display:none"></div>
-
-  <div id="showcase"></div>
-
-  <div class="sectionHead">
-    <h3 style="margin:0" id="portfolioHeading">Recent Uploads</h3>
-    <a id="portfolioToggle" class="btn" href="#">View full portfolio</a>
+  <!-- Showcase (optional) -->
+  <div id="showcaseWrap" class="card" style="margin-top:12px;display:none">
+    <div class="sectionHead">
+      <h3 style="margin:0">Showcase</h3>
+    </div>
+    <div id="showcaseRow" class="hscroll"></div>
   </div>
-  <div id="items" class="grid"></div>
-  <div id="empty" class="muted" style="margin-top:12px; display:none">No items yet.</div>
+
+  <!-- Active Portfolio -->
+  <div class="sectionHead" style="margin-top:16px">
+    <h3 style="margin:0">Portfolio</h3>
+    <span id="portfolioCount" class="muted"></span>
+  </div>
+  <div id="portfolioGrid" class="grid"></div>
+  <div id="portfolioEmpty" class="empty" style="display:none">No items yet.</div>
+
+  <!-- SOLD ITEMS (new) -->
+  <div class="sectionHead" style="margin-top:20px">
+    <h3 style="margin:0">Sold Items</h3>
+    <span id="soldCount" class="muted"></span>
+  </div>
+  <div id="soldGrid" class="grid"></div>
+  <div id="soldEmpty" class="empty" style="display:none">No sold items.</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -69,148 +92,184 @@ const sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
 
-const qs = new URLSearchParams(location.search);
-const uname = qs.get('u');
-const showAll = qs.get('all') === '1';
-const itemsEl = document.getElementById('items');
-const emptyEl = document.getElementById('empty');
-const showcaseEl = document.getElementById('showcase');
-const titleEl = document.getElementById('title');
+// DOM
+const unameEl = document.getElementById('uname');
+const roleBadge = document.getElementById('roleBadge');
+const avatarBox = document.getElementById('avatarBox');
+const frameOverlay = document.getElementById('frameOverlay');
 const bioEl = document.getElementById('bio');
-const roleTagWrap = document.getElementById('roleTagWrap');
-const uAvaImg = document.getElementById('uAvaImg');
-const uAvaFrame = document.getElementById('uAvaFrame');
-const portfolioToggle = document.getElementById('portfolioToggle');
-const portfolioHeading = document.getElementById('portfolioHeading');
-const rolePanel = document.getElementById('rolePanel');
 
-let me=null, myRole='free', targetProfile=null;
+const portfolioGrid = document.getElementById('portfolioGrid');
+const portfolioCount = document.getElementById('portfolioCount');
+const portfolioEmpty = document.getElementById('portfolioEmpty');
+
+const soldGrid = document.getElementById('soldGrid');
+const soldCount = document.getElementById('soldCount');
+const soldEmpty = document.getElementById('soldEmpty');
+
+const showcaseWrap = document.getElementById('showcaseWrap');
+const showcaseRow = document.getElementById('showcaseRow');
+
+const qs = new URLSearchParams(location.search);
+const username = qs.get('u');
+
+let profile = null;
+let ownerId = null;
+
+function money(n){ return '$' + Number(n||0).toLocaleString(); }
+
+// Render helpers
+function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
+  const soldInfo = soldAt ? `
+    <span class="pill soldPill">Sold for ${money(soldPrice || 0)}</span>
+  ` : (forSale ? `<span class="pill" style="border-color:#2a6;color:#9f9">For sale</span>` : '');
+  return `
+    <a class="itemCard" href="item.html?id=${encodeURIComponent(id)}" title="${title||'Item'}">
+      <div class="thumb">${img ? `<img src="${img}" alt="">` : `<span class="muted">No image</span>`}</div>
+      <div class="itemBody">
+        <h4 class="itemTitle">${title || 'Untitled'}</h4>
+        <div class="row2">
+          <div class="price">${money(price || 0)}</div>
+          ${soldInfo}
+        </div>
+      </div>
+    </a>
+  `;
+}
 
 (async function init(){
-  if (!uname){ titleEl.textContent = 'User not found'; return; }
+  if (!username) { unameEl.textContent = 'User not found'; return; }
 
-  const { data:{ session } } = await sb.auth.getSession();
-  me = session?.user || null;
-  if (me){
-    const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
-    myRole = p?.role || 'free';
+  // Profile
+  const pq = await sb.from('profiles').select('id,username,role,bio,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y,showcase_ids')
+    .ilike('username', username).maybeSingle();
+  if (!pq.data) { unameEl.textContent = 'User not found'; return; }
+  profile = pq.data;
+  ownerId = profile.id;
+
+  unameEl.textContent = '@' + (profile.username || username);
+  if (profile.role && profile.role !== 'free') {
+    roleBadge.style.display = 'inline-block';
+    roleBadge.textContent = profile.role;
   }
+  bioEl.textContent = profile.bio || '—';
 
-  const { data: profile, error } = await sb
-    .from('profiles')
-    .select('id, username, avatar_url, bio, showcase_ids, role, frame_url, frame_scale, frame_offset_x, frame_offset_y')
-    .eq('username', uname)
-    .maybeSingle();
-  if (error || !profile){ titleEl.textContent = 'User not found'; return; }
-  targetProfile = profile;
-
-  titleEl.textContent = '@' + profile.username;
-  bioEl.textContent = profile.bio || '';
-  if (profile.avatar_url) uAvaImg.src = profile.avatar_url;
-
-  const role = profile.role || 'free';
-  const roleClass = {
-    free:'role-free', subscriber:'role-subscriber',
-    moderator:'role-moderator', owner:'role-owner'
-  }[role] || 'role-free';
-  roleTagWrap.innerHTML = `<span class="roleTag ${roleClass}">${role}</span>`;
-
+  if (profile.avatar_url) {
+    avatarBox.innerHTML = `<img src="${profile.avatar_url}" alt="avatar">`;
+  }
   if (profile.frame_url) {
-    uAvaFrame.style.backgroundImage = `url('${profile.frame_url}')`;
-    uAvaFrame.style.setProperty('--frameScale', profile.frame_scale ?? 1);
-    uAvaFrame.style.setProperty('--frameX', (profile.frame_offset_x ?? 0) + 'px');
-    uAvaFrame.style.setProperty('--frameY', (profile.frame_offset_y ?? 0) + 'px');
-    uAvaFrame.style.display = 'block';
-  } else {
-    uAvaFrame.style.display = 'none';
+    frameOverlay.style.backgroundImage = `url('${profile.frame_url}')`;
+    frameOverlay.style.setProperty('--frameScale', profile.frame_scale ?? 1);
+    frameOverlay.style.setProperty('--frameX', ((profile.frame_offset_x??0) + 'px'));
+    frameOverlay.style.setProperty('--frameY', ((profile.frame_offset_y??0) + 'px'));
   }
 
-  if (me && myRole !== 'free' && me.id !== profile.id){
-    await setupRolePanel(role);
-  }
+  // Portfolio (unsold)
+  await loadPortfolio();
 
-  portfolioHeading.textContent = showAll ? 'All Items' : 'Recent Uploads';
-  portfolioToggle.textContent = showAll ? 'Show last 5' : 'View full portfolio';
-  const newQs = new URLSearchParams(qs);
-  if (showAll) newQs.delete('all'); else newQs.set('all','1');
-  portfolioToggle.href = `portfolio.html?u=${encodeURIComponent(profile.username)}`;
+  // Sold items
+  await loadSold();
 
-  await loadPortfolioItems(profile.id, showAll);
+  // Showcase (optional)
+  const ids = Array.isArray(profile.showcase_ids) ? profile.showcase_ids.filter(Boolean) : [];
+  if (ids.length) await loadShowcase(ids);
 })();
 
-async function setupRolePanel(currentRole){
-  let html = '';
-  if (myRole === 'owner'){
-    html += `<strong>Owner Controls:</strong><br>
-    <label>Change Role:</label>
-    <select id="roleSelect">
-      <option value="free"${currentRole==='free'?' selected':''}>Free</option>
-      <option value="subscriber"${currentRole==='subscriber'?' selected':''}>Subscriber</option>
-      <option value="moderator"${currentRole==='moderator'?' selected':''}>Moderator</option>
-    </select>
-    <button id="saveRole" class="btn">Save</button>
-    <span id="roleMsg" class="muted"></span>`;
-  } else if (myRole === 'moderator'){
-    if (currentRole === 'moderator' || currentRole === 'owner'){
-      html = `<span class="muted">You cannot modify this user’s rank.</span>`;
-    } else {
-      html = `<strong>Moderator Controls:</strong><br>
-      <label>Change Role:</label>
-      <select id="roleSelect">
-        <option value="free"${currentRole==='free'?' selected':''}>Free</option>
-        <option value="subscriber"${currentRole==='subscriber'?' selected':''}>Subscriber</option>
-      </select>
-      <button id="saveRole" class="btn">Save</button>
-      <span id="roleMsg" class="muted"></span>`;
-    }
-  }
-  rolePanel.innerHTML = html;
-  rolePanel.style.display = html ? 'block' : 'none';
+async function loadPortfolio(){
+  // Items that are NOT sold (sold_at is null)
+  const iq = await sb.from('items')
+    .select('id,title,user_value,for_sale,sold_at')
+    .eq('owner_id', ownerId)
+    .is('sold_at', null)
+    .order('created_at', {ascending:false});
+  const rows = iq.data || [];
+  portfolioCount.textContent = rows.length ? `${rows.length} item${rows.length>1?'s':''}` : '';
 
-  const saveBtn = document.getElementById('saveRole');
-  if (saveBtn){
-    saveBtn.onclick = async ()=>{
-      const newRole = document.getElementById('roleSelect').value;
-      const msgEl = document.getElementById('roleMsg');
-      msgEl.textContent = 'Saving…';
-      const { error } = await sb.from('profiles').update({ role:newRole }).eq('id', targetProfile.id);
-      msgEl.textContent = error ? 'Error: '+error.message : 'Role updated.';
-      if (!error) location.reload();
-    };
-  }
+  if (!rows.length) { portfolioGrid.innerHTML=''; portfolioEmpty.style.display='block'; return; }
+
+  const imgs = await fetchThumbs(rows.map(r=>r.id));
+  portfolioGrid.innerHTML = rows.map(r=>{
+    const img = imgs.get(r.id) || null;
+    return itemCard({
+      id:r.id, title:r.title, price:r.user_value, img,
+      forSale: !!(r.for_sale===true||r.for_sale===1||r.for_sale==='t'||r.for_sale==='true'),
+      soldAt: null, soldPrice:null
+    });
+  }).join('');
+  portfolioEmpty.style.display='none';
 }
 
-async function attachPreviews(items){
-  if (!items?.length) return items;
-  const ids = items.map(i=>i.id);
-  const { data: imgs, error } = await sb
-    .from('items_images')
+async function loadSold(){
+  // Items that ARE sold (sold_at not null)
+  const sq = await sb.from('items')
+    .select('id,title,user_value,sold_at,sold_price')
+    .eq('owner_id', ownerId)
+    .not('sold_at','is', null)
+    .order('sold_at', {ascending:false});
+  const rows = sq.data || [];
+  soldCount.textContent = rows.length ? `${rows.length}` : '';
+
+  if (!rows.length) { soldGrid.innerHTML=''; soldEmpty.style.display='block'; return; }
+
+  const imgs = await fetchThumbs(rows.map(r=>r.id));
+  soldGrid.innerHTML = rows.map(r=>{
+    const img = imgs.get(r.id) || null;
+    return itemCard({
+      id:r.id, title:r.title, price:r.user_value, img,
+      forSale:false,
+      soldAt:r.sold_at,
+      soldPrice:r.sold_price
+    });
+  }).join('');
+  soldEmpty.style.display='none';
+}
+
+// Showcase (best-effort)
+async function loadShowcase(ids){
+  try{
+    const q = await sb.from('items')
+      .select('id,title,user_value,for_sale,sold_at,sold_price')
+      .in('id', ids.slice(0,12));
+    const rows = q.data || [];
+    if (!rows.length) return; // keep showcase hidden
+
+    const imgs = await fetchThumbs(rows.map(r=>r.id));
+    showcaseRow.innerHTML = rows.map(r=>{
+      const img = imgs.get(r.id) || null;
+      return `
+        <a class="mini" href="item.html?id=${encodeURIComponent(r.id)}">
+          <div class="thumb">${img ? `<img src="${img}" alt="">` : `<span class="muted">No image</span>`}</div>
+          <div class="itemBody">
+            <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
+              <div style="font-weight:700;font-size:14px">${money(r.user_value||0)}</div>
+              ${r.sold_at ? `<span class="pill soldPill" style="font-size:11px">Sold</span>` : ''}
+            </div>
+            <div class="muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.title||'Untitled'}</div>
+          </div>
+        </a>
+      `;
+    }).join('');
+    showcaseWrap.style.display = 'block';
+  }catch(_e){}
+}
+
+// Bulk fetch first image for a set of items
+async function fetchThumbs(itemIds){
+  const out = new Map();
+  if (!itemIds.length) return out;
+
+  // Pull all images, then pick the earliest position per item
+  const q = await sb.from('items_images')
     .select('item_id,image_url,position,created_at')
-    .in('item_id', ids)
+    .in('item_id', itemIds)
     .order('position',{ascending:true})
     .order('created_at',{ascending:true});
-  if (error) { console.warn('preview query error:', error); return items; }
-  const first = {};
-  (imgs||[]).forEach(im => { if (!first[im.item_id]) first[im.item_id] = im.image_url; });
-  return items.map(i => ({ ...i, preview_url: first[i.id] || null }));
-}
+  const rows = q.data || [];
 
-async function loadPortfolioItems(ownerId, all) {
-  const q = sb.from('items')
-    .select('id,title,user_value,created_at')
-    .eq('owner_id', ownerId)
-    .order('created_at', { ascending:false });
-  if (!all) q.limit(5);
-  const { data: items, error } = await q;
-    if (error) return console.error('Load error:', error);
-    if (!items || !items.length){ emptyEl.style.display='block'; itemsEl.innerHTML=''; return; }
-    const withPrev = await attachPreviews(items);
-    emptyEl.style.display='none';
-    itemsEl.innerHTML = withPrev.map(it=>`
-    <a class="card" href="item.html?id=${it.id}" style="color:inherit;text-decoration:none">
-    <div class="thumb">${it.preview_url ? `<img src="${it.preview_url}" alt="">` : 'No image'}</div>
-    <div class="meta"><strong>${it.title}</strong><br>$${(it.user_value||0).toLocaleString()}</div>
-    </a>`).join('');
+  for (const r of rows){
+    if (!out.has(r.item_id)) out.set(r.item_id, r.image_url);
+  }
+  return out;
 }
 </script>
 </body>
