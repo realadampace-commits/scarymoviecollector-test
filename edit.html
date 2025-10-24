@@ -208,7 +208,8 @@ undoSoldBtn.addEventListener('click', async ()=>{
     .select('sold,sold_price,sold_at').maybeSingle();
   soldMsg.textContent = error ? ('Error: ' + error.message) : 'Sale undone.';
   if (!error) renderSoldPanel(data);
-
+});
+  
 saveDetails.addEventListener('click', async ()=>{
   const title = titleEl.value.trim();
   const description = descEl.value.trim();
@@ -349,6 +350,7 @@ saveSellingBtn?.addEventListener('click', async ()=>{
 </script>
 </body>
 </html>
+
 
 
 
