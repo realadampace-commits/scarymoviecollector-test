@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Item — Scream Collector</title>
 <style>
   :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#dc143c;--ok:#2a6}
@@ -41,6 +42,7 @@
   .bar > span{display:block;height:100%;background:#2a6;width:0%}
   .ownerTools{display:flex;gap:8px;flex-wrap:wrap}
 </style>
+
 <!-- Ethers (for on-chain USDC transfers) -->
 <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 </head>
@@ -136,245 +138,149 @@ const sb = supabase.createClient(
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
 
-// DOM
-const itemTitle = document.getElementById('itemTitle');
-const metaLine  = document.getElementById('metaLine');
-const descEl    = document.getElementById('desc');
-const priceEl   = document.getElementById('price');
-const saleLine  = document.getElementById('saleLine');
-const createdAt = document.getElementById('createdAt');
-const ownerTools= document.getElementById('ownerTools');
-const editBtn   = document.getElementById('editBtn');
-const deleteBtn = document.getElementById('deleteBtn');
+// DOM refs
+const itemTitle=document.getElementById('itemTitle');
+const metaLine=document.getElementById('metaLine');
+const descEl=document.getElementById('desc');
+const priceEl=document.getElementById('price');
+const saleLine=document.getElementById('saleLine');
+const createdAt=document.getElementById('createdAt');
+const ownerTools=document.getElementById('ownerTools');
+const editBtn=document.getElementById('editBtn');
+const deleteBtn=document.getElementById('deleteBtn');
+const mainImg=document.getElementById('mainImg');
+const thumbsEl=document.getElementById('thumbs');
+const overlay=document.getElementById('overlay');
+const overlayImg=document.getElementById('overlayImg');
+const prevBtn=document.getElementById('prevBtn');
+const nextBtn=document.getElementById('nextBtn');
+const closeBtn=document.getElementById('closeBtn');
 
-const mainImg   = document.getElementById('mainImg');
-const thumbsEl  = document.getElementById('thumbs');
-const overlay   = document.getElementById('overlay');
-const overlayImg= document.getElementById('overlayImg');
-const prevBtn   = document.getElementById('prevBtn');
-const nextBtn   = document.getElementById('nextBtn');
-const closeBtn  = document.getElementById('closeBtn');
+// Voting refs
+const voteBox=document.getElementById('voteBox');
+const agreeBtn=document.getElementById('agreeBtn');
+const disagreeBtn=document.getElementById('disagreeBtn');
+const disagreeBlock=document.getElementById('disagreeBlock');
+const suggestPriceEl=document.getElementById('suggestPrice');
+const saveSuggestionBtn=document.getElementById('saveSuggestion');
+const voteMsg=document.getElementById('voteMsg');
+const aggText=document.getElementById('aggText');
+const agreeFill=document.getElementById('agreeFill');
+const avgLine=document.getElementById('avgLine');
+const bandHint=document.getElementById('bandHint');
+const guestMsg=document.getElementById('guestMsg');
+const loginLink=document.getElementById('loginLink');
 
-// voting
-const voteBox = document.getElementById('voteBox');
-const agreeBtn = document.getElementById('agreeBtn');
-const disagreeBtn = document.getElementById('disagreeBtn');
-const disagreeBlock = document.getElementById('disagreeBlock');
-const suggestPriceEl = document.getElementById('suggestPrice');
-const saveSuggestionBtn = document.getElementById('saveSuggestion');
-const voteMsg = document.getElementById('voteMsg');
-const aggText = document.getElementById('aggText');
-const agreeFill = document.getElementById('agreeFill');
-const avgLine = document.getElementById('avgLine');
-const bandHint = document.getElementById('bandHint');
-const guestMsg = document.getElementById('guestMsg');
-const loginLink = document.getElementById('loginLink');
+let me=null,item=null,owner=null;
+let basePrice=0,minBand=0,maxBand=0;
+let images=[],idx=0;
 
-const qs = new URLSearchParams(location.search);
-const itemId = qs.get('id');
-
-let me=null, item=null, owner=null;
-let basePrice=0, minBand=0, maxBand=0;
-let images=[], idx=0;
-
-function money(n){ return '$' + Number(n||0).toLocaleString(); }
+// Helpers
+function money(n){return '$'+Number(n||0).toLocaleString();}
 function setActive(which){
-  agreeBtn.classList.toggle('active', which==='agree');
-  disagreeBtn.classList.toggle('active', which==='disagree');
-  disagreeBlock.style.display = which==='disagree' ? 'flex' : 'none';
+  agreeBtn.classList.toggle('active',which==='agree');
+  disagreeBtn.classList.toggle('active',which==='disagree');
+  disagreeBlock.style.display=which==='disagree'?'flex':'none';
 }
-function setVoteMsg(t, ok=false){ voteMsg.textContent=t; voteMsg.style.color = ok ? '#9f9' : '#a9adb4'; }
+function setVoteMsg(t,ok=false){voteMsg.textContent=t;voteMsg.style.color=ok?'#9f9':'#a9adb4';}
 
-<script>
-// --- REPLACE your whole (async function init(){ ... })(); with this one ---
-
+// INIT
 (async function init(){
-  const dbg = (msg, obj) => {
-    let el = document.getElementById('debugLine');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'debugLine';
-      el.style.cssText = 'margin-top:8px;color:#9aa; font-size:12px;';
-      itemTitle.parentElement.appendChild(el);
-    }
-    el.textContent = '[debug] ' + msg + (obj !== undefined ? ' ' + JSON.stringify(obj) : '');
-    console.log('[item.html]', msg, obj ?? '');
-  };
+  const params=new URLSearchParams(location.search);
+  const rawId=decodeURIComponent(String(params.get('id')||params.get('itemId')||'')).trim();
+  if(!rawId){ itemTitle.textContent='Item not found'; return; }
 
-  // Read item id defensively (supports ?id= or ?itemId=)
-  const sp = new URLSearchParams(location.search);
-  let rawId = sp.get('id') || sp.get('itemId') || '';
-  rawId = decodeURIComponent(String(rawId)).trim();
-  if (!rawId) { itemTitle.textContent='Item not found'; dbg('Missing query param id'); return; }
+  const coerceBool=v=>v===true||v===1||v==='1'||v==='true'||v==='t';
+  let row=null,saleFlag=null;
 
-  dbg('Resolved item id', { rawId });
-
-  // Helpers already present elsewhere
-  const coerceBool = v => v === true || v === 1 || v === '1' || v === 'true' || v === 't';
-
-  // Try to fetch including for_sale first
-  let itemRow = null;
-  let saleFlag = null;
-
-  let q1 = await sb
-    .from('items')
+  // Try with for_sale
+  const q1=await sb.from('items')
     .select('id,title,description,user_value,created_at,owner_id,for_sale')
-    .eq('id', rawId)
-    .maybeSingle();
-
-  if (q1.error) dbg('items (with for_sale) error', { code:q1.error.code, message:q1.error.message });
-  if (q1.data) {
-    itemRow = q1.data;
-    saleFlag = q1.data.for_sale;
-  } else {
-    // Fallback: same without for_sale (in case RLS hides that column)
-    let q2 = await sb
-      .from('items')
+    .eq('id',rawId).maybeSingle();
+  if(q1.data){row=q1.data;saleFlag=q1.data.for_sale;}
+  else{
+    const q2=await sb.from('items')
       .select('id,title,description,user_value,created_at,owner_id')
-      .eq('id', rawId)
-      .maybeSingle();
-
-    if (q2.error) dbg('items (without for_sale) error', { code:q2.error.code, message:q2.error.message });
-
-    if (!q2.data) {
-      // If your IDs are integers, try again as number
-      const maybeInt = Number(rawId);
-      if (Number.isFinite(maybeInt)) {
-        dbg('Retrying with numeric id', { maybeInt });
-        let q3 = await sb
-          .from('items')
-          .select('id,title,description,user_value,created_at,owner_id,for_sale')
-          .eq('id', maybeInt)
-          .maybeSingle();
-
-        if (q3.error) dbg('items (numeric with for_sale) error', { code:q3.error.code, message:q3.error.message });
-        if (q3.data) { itemRow = q3.data; saleFlag = q3.data.for_sale; }
-        else {
-          let q4 = await sb
-            .from('items')
-            .select('id,title,description,user_value,created_at,owner_id')
-            .eq('id', maybeInt)
-            .maybeSingle();
-          if (q4.error) dbg('items (numeric without for_sale) error', { code:q4.error.code, message:q4.error.message });
-          if (q4.data) itemRow = q4.data;
-        }
-      }
-    } else {
-      itemRow = q2.data;
-
-      // Best-effort fetch of for_sale only (ignore if blocked)
-      try {
-        const sq = await sb.from('items').select('for_sale').eq('id', itemRow.id).maybeSingle();
-        if (!sq.error && sq.data) saleFlag = sq.data.for_sale;
-      } catch (e) {
-        dbg('for_sale fetch failed', { e: String(e) });
-      }
-    }
+      .eq('id',rawId).maybeSingle();
+    if(q2.data){row=q2.data;}
   }
+  if(!row){ itemTitle.textContent='Item not found'; return; }
 
-  if (!itemRow) {
-    itemTitle.textContent = 'Item not found';
-    dbg('No row found after all attempts');
-    return;
-  }
+  item=row; item.for_sale=coerceBool(saleFlag);
 
-  // Make the item globally available for rest of the page logic
-  item = itemRow;
-  item.for_sale = coerceBool(saleFlag);
+  const {data:{session}}=await sb.auth.getSession();
+  me=session?.user||null;
+  loginLink.href='login.html?next='+encodeURIComponent('item.html?id='+item.id);
 
-  // Get session + build login redirect
-  const { data:{ session } } = await sb.auth.getSession();
-  me = session?.user || null;
-  loginLink.href = 'login.html?next=' + encodeURIComponent('item.html?id=' + item.id);
+  const pq=await sb.from('profiles').select('username,usdc_base_address,role').eq('id',item.owner_id).maybeSingle();
+  owner=pq.data||null;
 
-  // Load owner profile (username + wallet)
-  const pq = await sb
-    .from('profiles')
-    .select('username,usdc_base_address,role')
-    .eq('id', item.owner_id)
-    .maybeSingle();
-  if (pq.error) dbg('profile query warning', { code:pq.error.code, message:pq.error.message });
-  owner = pq.data || null;
-
-  // Load images
-  const im = await sb.from('items_images')
+  const im=await sb.from('items_images')
     .select('id,image_url,position,created_at')
-    .eq('item_id', item.id)
-    .order('position', {ascending:true})
-    .order('created_at', {ascending:true});
-  images = im.data || [];
+    .eq('item_id',item.id)
+    .order('position',{ascending:true})
+    .order('created_at',{ascending:true});
+  images=im.data||[];
 
-  // Render basics
-  itemTitle.textContent = item.title || 'Untitled';
-  metaLine.innerHTML = `Owner: ${
-    owner?.username
-      ? `<a href="user.html?u=${encodeURIComponent(owner.username)}">@${owner.username}</a>`
-      : 'unknown'
-  }`;
-  descEl.textContent = item.description || '—';
-  basePrice = Number(item.user_value||0);
-  priceEl.textContent = '$' + Number(basePrice||0).toLocaleString();
-  createdAt.textContent = 'Added ' + new Date(item.created_at).toLocaleString();
+  // Render
+  itemTitle.textContent=item.title||'Untitled';
+  metaLine.innerHTML=`Owner: ${owner?.username?`<a href="user.html?u=${encodeURIComponent(owner.username)}">@${owner.username}</a>`:'unknown'}`;
+  descEl.textContent=item.description||'—';
+  basePrice=Number(item.user_value||0);
+  priceEl.textContent=money(basePrice);
+  createdAt.textContent='Added '+new Date(item.created_at).toLocaleString();
 
-  // Sale line (3-state)
-  if (item.for_sale === true)      saleLine.textContent = 'This item is listed for sale.';
-  else if (item.for_sale === false) saleLine.textContent = 'Not for sale.';
-  else                              saleLine.textContent = '—';
+  // 3-state sale line to avoid wrong “Not for sale” if column hidden by RLS
+  if(saleFlag===undefined||saleFlag===null){ saleLine.textContent='—'; }
+  else{ saleLine.textContent=item.for_sale?'This item is listed for sale.':'Not for sale.'; }
 
-  // Gallery
   renderGallery();
 
   // Owner/mod tools
-  if (me) {
-    const my = await sb.from('profiles').select('role').eq('id', me.id).maybeSingle();
-    const role = my.data?.role || 'free';
-    const isModOrOwner = (role==='moderator' || role==='owner');
-    if (me.id === item.owner_id || isModOrOwner) {
-      ownerTools.style.display = 'flex';
-      editBtn.href = 'edit.html?id=' + item.id;
-      deleteBtn.onclick = async ()=>{
-        if(!confirm('Delete this item?')) return;
-        const { error } = await sb.from('items').delete().eq('id', item.id);
-        if (error) return alert('Delete error: ' + error.message);
+  if(me){
+    const my=await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
+    const role=my.data?.role||'free';
+    const isModOrOwner=(me.id===item.owner_id)||(role==='moderator'||role==='owner');
+    if(isModOrOwner){
+      ownerTools.style.display='flex';
+      editBtn.href='edit.html?id='+item.id;
+      deleteBtn.onclick=async()=>{
+        if(!confirm('Delete this item?'))return;
+        const {error}=await sb.from('items').delete().eq('id',item.id);
+        if(error)return alert('Delete error: '+error.message);
         location.href='portfolio.html';
       };
     }
   }
 
-  // Voting UI
-  if (me) {
-    voteBox.style.display = 'block';
-    minBand = Math.round(basePrice*0.70);
-    maxBand = Math.round(basePrice*1.30);
-    bandHint.textContent = `If you disagree, suggest between $${minBand.toLocaleString()} and $${maxBand.toLocaleString()}.`;
+  // Voting
+  if(me){
+    voteBox.style.display='block';
+    minBand=Math.round(basePrice*0.70);
+    maxBand=Math.round(basePrice*1.30);
+    bandHint.textContent=`If you disagree, suggest between ${money(minBand)} and ${money(maxBand)}.`;
     await refreshMyVote();
   } else {
-    guestMsg.style.display = 'block';
+    guestMsg.style.display='block';
   }
   await refreshAggregates();
 
   // Buy feature
   await setupBuyFeature();
-
-  dbg('Ready', { id: item.id, for_sale: item.for_sale });
-
 })();
 
+// Gallery
 function renderGallery(){
-  if (!images.length) {
-    mainImg.textContent = 'No image';
-    thumbsEl.innerHTML = '';
-    return;
-  }
-  idx = 0;
-  mainImg.innerHTML = `<img src="${images[0].image_url}" alt="">`;
-  mainImg.onclick = openOverlay;
-  thumbsEl.innerHTML = images.map((im, i)=>`<img data-i="${i}" src="${im.image_url}" class="${i===0?'sel':''}" alt="">`).join('');
+  if(!images.length){ mainImg.textContent='No image'; thumbsEl.innerHTML=''; return; }
+  idx=0;
+  mainImg.innerHTML=`<img src="${images[0].image_url}" alt="">`;
+  mainImg.onclick=openOverlay;
+  thumbsEl.innerHTML=images.map((im,i)=>`<img data-i="${i}" src="${im.image_url}" class="${i===0?'sel':''}" alt="">`).join('');
   thumbsEl.querySelectorAll('img').forEach(t=>{
-    t.addEventListener('click', ()=>{
-      const i = Number(t.dataset.i);
-      idx = i;
-      mainImg.innerHTML = `<img src="${images[i].image_url}" alt="">`;
+    t.addEventListener('click',()=>{
+      const i=Number(t.dataset.i);
+      idx=i;
+      mainImg.innerHTML=`<img src="${images[i].image_url}" alt="">`;
       thumbsEl.querySelectorAll('img').forEach(x=>x.classList.remove('sel'));
       t.classList.add('sel');
     });
@@ -382,40 +288,41 @@ function renderGallery(){
 }
 
 // Lightbox
-function openOverlay(){
-  if (!images.length) return;
-  overlay.style.display='block';
-  overlayImg.src = images[idx].image_url;
-}
-function closeOverlay(){
-  overlay.style.display='none';
-}
-function prev(){ if (!images.length) return; idx=(idx-1+images.length)%images.length; overlayImg.src=images[idx].image_url; }
-function next(){ if (!images.length) return; idx=(idx+1)%images.length; overlayImg.src=images[idx].image_url; }
-overlay.addEventListener('click', (e)=>{ if(e.target===overlay) closeOverlay(); });
-closeBtn.addEventListener('click', closeOverlay);
-prevBtn.addEventListener('click', (e)=>{ e.stopPropagation(); prev(); });
-nextBtn.addEventListener('click', (e)=>{ e.stopPropagation(); next(); });
-document.addEventListener('keydown', (e)=>{
-  if (overlay.style.display==='block') {
-    if (e.key==='Escape') closeOverlay();
-    if (e.key==='ArrowLeft') prev();
-    if (e.key==='ArrowRight') next();
+function openOverlay(){ if(!images.length)return; overlay.style.display='block'; overlayImg.src=images[idx].image_url; }
+function closeOverlay(){ overlay.style.display='none'; }
+function prev(){ if(!images.length)return; idx=(idx-1+images.length)%images.length; overlayImg.src=images[idx].image_url; }
+function next(){ if(!images.length)return; idx=(idx+1)%images.length; overlayImg.src=images[idx].image_url; }
+overlay.addEventListener('click',e=>{ if(e.target===overlay) closeOverlay(); });
+closeBtn.addEventListener('click',closeOverlay);
+prevBtn.addEventListener('click',e=>{ e.stopPropagation(); prev(); });
+nextBtn.addEventListener('click',e=>{ e.stopPropagation(); next(); });
+document.addEventListener('keydown',e=>{
+  if(overlay.style.display==='block'){
+    if(e.key==='Escape') closeOverlay();
+    if(e.key==='ArrowLeft') prev();
+    if(e.key==='ArrowRight') next();
   }
 });
 
-// My vote
+// Voting
 async function refreshMyVote(){
-  if(!me) return;
-  const { data: row } = await sb.from('item_votes')
-    .select('agree, suggested_price').eq('item_id', itemId).eq('voter_id', me.id).maybeSingle();
+  if(!me)return;
+  const params=new URLSearchParams(location.search);
+  const currentId=params.get('id')||item?.id;
+  const {data:row}=await sb.from('item_votes')
+    .select('agree,suggested_price')
+    .eq('item_id',currentId)
+    .eq('voter_id',me.id)
+    .maybeSingle();
   if(!row){ setActive(null); suggestPriceEl.value=''; setVoteMsg('You have not voted yet.'); return; }
-  if(row.agree){ setActive('agree'); setVoteMsg('You agree with the price.', true); }
-  else{ setActive('disagree'); suggestPriceEl.value=row.suggested_price??''; setVoteMsg('You disagree. Adjust your suggestion and save.', true); }
+  if(row.agree){ setActive('agree'); setVoteMsg('You agree with the price.',true); }
+  else{ setActive('disagree'); suggestPriceEl.value=row.suggested_price??''; setVoteMsg('You disagree. Adjust your suggestion and save.',true); }
 }
 async function refreshAggregates(){
-  const { data: rows } = await sb.from('item_votes').select('agree, suggested_price').eq('item_id', itemId);
-  let agrees=0, disagrees=0, sum=0, n=0;
+  const params=new URLSearchParams(location.search);
+  const currentId=params.get('id')||item?.id;
+  const {data:rows}=await sb.from('item_votes').select('agree,suggested_price').eq('item_id',currentId);
+  let agrees=0,disagrees=0,sum=0,n=0;
   for(const r of rows||[]){ if(r.agree) agrees++; else {disagrees++; if(typeof r.suggested_price==='number'){sum+=r.suggested_price;n++;}}}
   const total=agrees+disagrees, pct= total? Math.round(agrees*100/total):0;
   agreeFill.style.width=pct+'%';
@@ -423,70 +330,53 @@ async function refreshAggregates(){
   avgLine.textContent= n? `Average suggested: ${money(Math.round(sum/n))}` : 'Average suggested: —';
 }
 agreeBtn.addEventListener('click', async ()=>{
-  if(!me) return;
+  if(!me)return;
+  const currentId=item?.id;
   setActive('agree'); setVoteMsg('Saving…');
-  const { error } = await sb.from('item_votes').upsert(
-    { item_id:itemId, voter_id:me.id, agree:true, suggested_price:null }, { onConflict:'item_id,voter_id' }
+  const {error}=await sb.from('item_votes').upsert(
+    { item_id:currentId, voter_id:me.id, agree:true, suggested_price:null },
+    { onConflict:'item_id,voter_id' }
   );
   if(error) return setVoteMsg('Error: '+error.message);
-  setVoteMsg('You agree with the price.', true); await refreshAggregates();
+  setVoteMsg('You agree with the price.',true); await refreshAggregates();
 });
 disagreeBtn.addEventListener('click', ()=>{
-  if(!me) return;
+  if(!me)return;
   setActive('disagree'); setVoteMsg(`Enter a suggestion within ${money(minBand)}–${money(maxBand)}.`);
-  if(!suggestPriceEl.value) suggestPriceEl.value = Math.round(basePrice);
+  if(!suggestPriceEl.value) suggestPriceEl.value=Math.round(basePrice);
 });
 saveSuggestionBtn.addEventListener('click', async ()=>{
-  if(!me) return;
-  const val = Math.round(Number(suggestPriceEl.value||0));
+  if(!me)return;
+  const currentId=item?.id;
+  const val=Math.round(Number(suggestPriceEl.value||0));
   if(!val) return setVoteMsg('Enter a number.');
   if(val<Math.round(basePrice*0.70)||val>Math.round(basePrice*1.30)) return setVoteMsg(`Must be between ${money(Math.round(basePrice*0.70))} and ${money(Math.round(basePrice*1.30))}.`);
   setVoteMsg('Saving…');
-  const { error } = await sb.from('item_votes').upsert(
-    { item_id:itemId, voter_id:me.id, agree:false, suggested_price:val }, { onConflict:'item_id,voter_id' }
+  const {error}=await sb.from('item_votes').upsert(
+    { item_id:currentId, voter_id:me.id, agree:false, suggested_price:val },
+    { onConflict:'item_id,voter_id' }
   );
   if(error) return setVoteMsg('Error: '+error.message);
-  setVoteMsg('Saved your suggestion.', true); await refreshAggregates();
+  setVoteMsg('Saved your suggestion.',true); await refreshAggregates();
 });
 
-// --- USDC BUY FEATURE ---
+// USDC BUY FEATURE
 async function setupBuyFeature(){
-  const buyCard = document.getElementById('buyCard');
-  const buyBtn  = document.getElementById('buyBtn');
-  const buyMsg  = document.getElementById('buyMsg');
+  const buyCard=document.getElementById('buyCard');
+  const buyBtn=document.getElementById('buyBtn');
+  const buyMsg=document.getElementById('buyMsg');
 
   try{
-    // If sold, never show Buy
-    if (item.sold === true) { if (buyCard) buyCard.style.display='none'; return; }
+    if(item?.sold===true){ if(buyCard) buyCard.style.display='none'; return; }
+    if(item?.for_sale!==true) return;
 
-    // If explicitly not for sale, stop.
-    if (item.for_sale === false) { return; }
-
-    // If for_sale unknown (because of RLS), try a best-effort re-check.
-    if (item.for_sale !== true) {
-      try {
-        const sq = await sb.from('items').select('for_sale').eq('id', itemId).maybeSingle();
-        if (!sq.error && sq.data) {
-          const v = sq.data.for_sale;
-          item.for_sale = (v===true || v===1 || v==='1' || v==='true' || v==='t');
-        }
-      } catch (_) {}
-    }
-
-    if (item.for_sale !== true) return; // still not known as “for sale”
-
-    // Need a valid seller wallet
     let sellerAddr;
-    try {
-      sellerAddr = ethers.utils.getAddress(String(owner?.usdc_base_address || '').trim());
-    } catch {
-      console.warn('Seller missing/invalid wallet');
-      return;
-    }
+    try{
+      sellerAddr=ethers.utils.getAddress(String((await sb.from('profiles').select('usdc_base_address').eq('id',item.owner_id).maybeSingle()).data?.usdc_base_address||'').trim());
+    }catch{ console.warn('Seller wallet missing/invalid'); return; }
 
-    // Checksummed USDC contract on Base
-    const USDC_BASE = ethers.utils.getAddress('0x833589fcd6edb6e08f4c7c32d4f71b54bda02913');
-    const USDC_ABI = [
+    const USDC_BASE=ethers.utils.getAddress('0x833589fcd6edb6e08f4c7c32d4f71b54bda02913');
+    const USDC_ABI=[
       'function transfer(address to, uint256 amount) public returns (bool)',
       'function decimals() public view returns (uint8)'
     ];
@@ -495,33 +385,30 @@ async function setupBuyFeature(){
 
     buyBtn.addEventListener('click', async ()=>{
       buyMsg.textContent='Connecting wallet...';
-      if (!window.ethereum) { buyMsg.textContent='No wallet found (MetaMask / Coinbase).'; return; }
+      if(!window.ethereum){ buyMsg.textContent='No wallet found (MetaMask / Coinbase).'; return; }
 
       try{
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        await provider.send('eth_requestAccounts', []);
-        const signer = provider.getSigner();
-        const network = await provider.getNetwork();
-        if (network.chainId !== 8453){ buyMsg.textContent='Please switch to Base network.'; return; }
+        const provider=new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send('eth_requestAccounts',[]);
+        const signer=provider.getSigner();
+        const network=await provider.getNetwork();
+        if(network.chainId!==8453){ buyMsg.textContent='Please switch to Base network.'; return; }
 
-        const usdc = new ethers.Contract(USDC_BASE, USDC_ABI, signer);
-        const price = ethers.utils.parseUnits(String(item.user_value || 0), 6); // USDC = 6 decimals
+        const usdc=new ethers.Contract(USDC_BASE,USDC_ABI,signer);
+        const price=ethers.utils.parseUnits(String(item.user_value||0),6);
 
         buyMsg.textContent='Sending payment...';
-        const tx = await usdc.transfer(sellerAddr, price);
+        const tx=await usdc.transfer(sellerAddr,price);
         buyMsg.textContent='Waiting for confirmation...';
         await tx.wait();
-        buyMsg.textContent='✅ Payment complete! Tx hash: ' + tx.hash;
-      } catch(err){
+        buyMsg.textContent='✅ Payment complete! Tx hash: '+tx.hash;
+      }catch(err){
         console.error(err);
-        buyMsg.textContent='Payment failed: ' + (err.message || err);
+        buyMsg.textContent='Payment failed: '+(err.message||err);
       }
     });
-  }catch(e){
-    console.error('setupBuyFeature error', e);
-  }
+  }catch(e){ console.error('setupBuyFeature error',e); }
 }
 </script>
 </body>
 </html>
-
