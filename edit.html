@@ -155,9 +155,16 @@ function dmsg(t, cls='muted'){ detailsMsg.className=cls; detailsMsg.textContent=
 
   ownerId = it.data?.owner_id || null;
   // const isModOrOwner = (myRole==='moderator' || myRole==='owner');
-  if (!(ownerId && (ownerId===me.id || myRole==='owner'))) {
+  const canEdit = ownerId && (
+    ownerId === me.id ||
+    myRole === 'owner' ||
+    myRole === 'moderator'
+    // add "|| myRole === 'subscriber'" if you want subscribers to edit too
+  );
+  
+  if (!canEdit) {
     alert('You do not have permission to edit this item.');
-    location.href='item.html?id='+itemId;
+    location.href = 'item.html?id=' + itemId;
     return;
   }
 
@@ -350,6 +357,7 @@ saveSellingBtn?.addEventListener('click', async ()=>{
 </script>
 </body>
 </html>
+
 
 
 
