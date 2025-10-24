@@ -151,22 +151,38 @@ function dmsg(t, cls='muted'){ detailsMsg.className=cls; detailsMsg.textContent=
   // fetch item to validate permission and load fields
   const it = await sb.from('items')
     .select('id,owner_id,title,description,user_value,for_sale,sold,sold_price,sold_at')
-    .eq('id', itemId).maybeSingle();  // load sale fields too
-
-  ownerId = it.data?.owner_id || null;
-  // const isModOrOwner = (myRole==='moderator' || myRole==='owner');
-  const canEdit = ownerId && (
-    ownerId === me.id ||
-    myRole === 'owner' ||
-    myRole === 'moderator'
-    // add "|| myRole === 'subscriber'" if you want subscribers to edit too
-  );
+    .eq('id', itemId)
+    .maybeSingle();
   
-  if (!canEdit) {
-    alert('You do not have permission to edit this item.');
+  if (it.error || !it.data) {
+    alert('Item not found or not accessible.');
     location.href = 'item.html?id=' + itemId;
     return;
   }
+  
+  ownerId = it.data.owner_id ?? null;
+  
+  // Elevated roles can always edit
+  const isElevated = (myRole === 'owner' || myRole === 'moderator');
+  
+  // If owner_id is readable, require match. If it’s hidden by RLS (null/undefined),
+  // assume the current user is the owner because the row was returned to them.
+  // (Server-side RLS still enforces updates, so this only affects the client UI.)
+  let canEdit = isElevated;
+  if (!canEdit) {
+    if (typeof ownerId === 'string') {
+      canEdit = ownerId === me.id;
+    } else {
+      // owner_id not visible -> treat as owner (optimistic UI)
+      canEdit = true;
+    }
+  }
+
+if (!canEdit) {
+  alert('You do not have permission to edit this item.');
+  location.href = 'item.html?id=' + itemId;
+  return;
+}
 
   // Fill fields
   titleEl.value = it.data?.title || '';
@@ -357,6 +373,7 @@ saveSellingBtn?.addEventListener('click', async ()=>{
 </script>
 </body>
 </html>
+
 
 
 
