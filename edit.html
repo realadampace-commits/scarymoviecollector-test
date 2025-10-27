@@ -211,7 +211,7 @@ function setEditable(enabled){
 
   // ------- STEP 2: fetch the rest of the editable/display fields -------
   const full = await sb.from('items')
-    .select('title,description,user_value,for_sale,sold,sold_price,sold_at')
+    .select('title,description,user_value,sold,sold_price,sold_at')
     .eq('id', resolvedId)
     .maybeSingle();
 
@@ -253,7 +253,7 @@ markSoldBtn.addEventListener('click', async ()=>{
   if (!(price > 0)) { soldMsg.textContent = 'Enter a positive sold price.'; return; }
   soldMsg.textContent = 'Saving…';
   const { error, data } = await sb.from('items')
-    .update({ sold:true, sold_price:price, sold_at:new Date().toISOString(), for_sale:false })
+    .update({ sold:true, sold_price:price, sold_at:new Date().toISOString(), is_for_sale:false })
     .eq('id', itemId)
     .select('sold,sold_price,sold_at').maybeSingle();
   soldMsg.textContent = error ? ('Error: ' + error.message) : 'Marked as sold.';
@@ -403,4 +403,5 @@ saveSellingBtn?.addEventListener('click', async ()=>{
 </script>
 </body>
 </html>
+
 
