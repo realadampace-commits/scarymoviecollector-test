@@ -197,96 +197,77 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
     frameOverlay.style.setProperty('--frameY', ((profile.frame_offset_y??0) + 'px'));
   }
 
-  await loadPortfolio();
-  await loadSold();
-
+  await loadAllItemsForUser();
+  
   const ids = Array.isArray(profile.showcase_ids) ? profile.showcase_ids.filter(Boolean) : [];
   if (ids.length) await loadShowcase(ids);
 })();
 
-async function loadPortfolio(){
-  // Use sold_at IS NULL to mean “unsold”
-  let q = await sb.from('items')
-    .select('id,title,user_value,created_at,owner_id,profiles:owner_id(username,avatar_url),for_sale,sold_at')
+async function loadAllItemsForUser(){
+  // 1) Pull ALL items for this owner in one query
+  const q = await sb.from('items')
+    .select('id,title,user_value,created_at,owner_id,for_sale,sold_at,sold_price')
     .eq('owner_id', ownerId)
-    .is('sold_at', null)
-    .order('created_at',{ascending:false});
+    .order('created_at', { ascending:false });
 
   let rows = q.data || [];
-  console.log('[user.html] portfolio rows by owner_id', rows.length);
+  console.log('[user.html] items by owner_id:', rows.length);
 
-  // Fallback: inner join by username (in case owner_id visibility/RLS acts up)
-  if (!rows.length && profile?.username) {
+  // 2) Fallback by username (in case RLS or a view hides owner_id)
+  if (!rows.length && profile?.username){
     const q2 = await sb.from('items')
-      .select('id,title,user_value,created_at,owner_id,profiles!inner(username,avatar_url),for_sale,sold_at')
+      .select('id,title,user_value,created_at,owner_id,for_sale,sold_at,sold_price,profiles!inner(username)')
       .eq('profiles.username', profile.username)
-      .is('sold_at', null)
-      .order('created_at',{ascending:false});
+      .order('created_at', { ascending:false });
     rows = q2.data || [];
-    console.log('[user.html] portfolio rows by username join', rows.length);
+    console.log('[user.html] items by username join:', rows.length);
   }
 
-  portfolioCount.textContent = rows.length ? `${rows.length} item${rows.length>1?'s':''}` : '';
+  // 3) Split client-side
+  const unsold = rows.filter(r => !r.sold_at);
+  const sold   = rows.filter(r => !!r.sold_at);
 
-  if (!rows.length) {
+  // 4) Fetch previews once for all
+  const withPrev = await attachPreviews(rows);
+  const thumbById = new Map(withPrev.map(r => [r.id, r.preview_url || null]));
+
+  // 5) Render UNSOLD (Portfolio)
+  portfolioCount.textContent = unsold.length ? `${unsold.length} item${unsold.length>1?'s':''}` : '';
+  if (!unsold.length){
     portfolioGrid.innerHTML = '';
     portfolioEmpty.style.display = 'block';
-    return;
-  }
-
-  const withPrev = await attachPreviews(rows);
-  portfolioGrid.innerHTML = withPrev.map(r=>{
-    return itemCard({
+  } else {
+    portfolioGrid.innerHTML = unsold.map(r => itemCard({
       id: r.id,
       title: r.title,
       price: r.user_value,
-      img: r.preview_url || null,
+      img: thumbById.get(r.id),
       forSale: !!(r.for_sale===true||r.for_sale===1||r.for_sale==='t'||r.for_sale==='true'),
       soldAt: null,
       soldPrice: null
-    });
-  }).join('');
-  portfolioEmpty.style.display='none';
-}
-
-async function loadSold(){
-  const sq = await sb.from('items')
-    .select('id,title,user_value,sold_at,sold_price')
-    .eq('owner_id', ownerId)
-    .not('sold_at','is', null)
-    .order('sold_at', {ascending:false});
-  let rows = sq.data || [];
-  dbg('sold rows', {count: rows.length});
-
-  // Fallback: inner join by username if needed
-  if (!rows.length && profile?.username) {
-    const sq2 = await sb.from('items')
-      .select('id,title,user_value,sold_at,sold_price,profiles!inner(username)')
-      .eq('profiles.username', profile.username)
-      .not('sold_at','is', null)
-      .order('sold_at', {ascending:false});
-    rows = sq2.data || [];
-    dbg('sold rows (fallback by username join)', {count: rows.length});
+    })).join('');
+    portfolioEmpty.style.display = 'none';
   }
 
-  soldCount.textContent = rows.length ? `${rows.length}` : '';
-
-  if (!rows.length) { soldGrid.innerHTML=''; soldEmpty.style.display='block'; return; }
-
-  const withPrev = await attachPreviews(rows);
-  soldGrid.innerHTML = withPrev.map(r=>{
-    return itemCard({
-      id:r.id,
-      title:r.title,
-      price:r.user_value,
-      img:r.preview_url || null,
-      forSale:false,
-      soldAt:r.sold_at,
-      soldPrice:r.sold_price
-    });
-  }).join('');
-  soldEmpty.style.display='none';
+  // 6) Render SOLD
+  soldCount.textContent = sold.length ? `${sold.length}` : '';
+  if (!sold.length){
+    soldGrid.innerHTML = '';
+    soldEmpty.style.display = 'block';
+  } else {
+    soldGrid.innerHTML = sold.map(r => itemCard({
+      id: r.id,
+      title: r.title,
+      price: r.user_value,
+      img: thumbById.get(r.id),
+      forSale: false,
+      soldAt: r.sold_at,
+      soldPrice: r.sold_price
+    })).join('');
+    soldEmpty.style.display = 'none';
+  }
 }
+
 
 // Showcase
 async function loadShowcase(ids){
