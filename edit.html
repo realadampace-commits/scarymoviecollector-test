@@ -13,6 +13,7 @@
   input,textarea,button{padding:10px;border-radius:8px;border:1px solid #333;background:#222;color:#eee}
   input,textarea{width:100%}
   button{border:none;background:var(--accent);cursor:pointer}
+  button[disabled]{opacity:.5;cursor:not-allowed}
   .row{display:grid;grid-template-columns:180px 1fr;gap:14px;align-items:center}
   .small{font-size:12px;opacity:.8}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
@@ -33,7 +34,10 @@
 
 <div class="wrap">
   <a href="#" id="backLink">← Back to item</a>
-  <h2>Edit Item</h2>
+  <h2 style="display:flex;align-items:center;gap:10px">
+    Edit Item
+    <span id="permNote" class="small muted"></span>
+  </h2>
 
   <!-- Details -->
   <div class="card">
@@ -64,7 +68,8 @@
       <span id="msg" class="muted"></span>
     </div>
     <div class="small" style="margin-top:6px">Up to 5 images total. First image is treated as the main image.</div>
-  
+  </div> <!-- 🧱 close Photos card -->
+
   <!-- Buy -->
   <div class="card">
     <h3 style="margin:0 0 8px">Selling (USDC on Base)</h3>
@@ -79,7 +84,7 @@
   </div>
 
   <!-- Sold -->
-  <div class="panel" id="soldPanel" style="margin-top:16px">
+  <div class="card" id="soldPanel" style="margin-top:16px">
     <h3 style="margin:0 0 8px">Sale Status</h3>
     <div id="soldState" class="muted" style="margin:0 0 8px">Loading…</div>
     <div id="soldControls">
@@ -91,7 +96,6 @@
     </div>
   </div>
 
-</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -107,6 +111,8 @@ const itemId=qs.get('id');
 
 const backLink=document.getElementById('backLink');
 backLink.href='item.html?id='+itemId;
+
+const permNote=document.getElementById('permNote');
 
 const titleEl=document.getElementById('title');
 const priceEl=document.getElementById('price');
@@ -128,18 +134,32 @@ const markSoldBtn = document.getElementById('markSold');
 const undoSoldBtn = document.getElementById('undoSold');
 const soldMsg = document.getElementById('soldMsg');
 
-let isSold = false;
+const sellToggle     = document.getElementById('sellToggle');
+const sellPriceUsdc  = document.getElementById('sellPriceUsdc');
+const saveSellingBtn = document.getElementById('saveSelling');
+const sellNote       = document.getElementById('sellNote');
 
-let me=null, ownerId=null, myRole='free';
+let me=null, myRole='free', ownerId=null;
 let images=[];
 
 function msg(t, cls='muted'){ msgEl.className=cls; msgEl.textContent=t; }
 function dmsg(t, cls='muted'){ detailsMsg.className=cls; detailsMsg.textContent=t; }
 
+function setEditable(enabled){
+  [titleEl, priceEl, descEl, newFiles, addBtn, delBtn, saveDetails,
+   sellToggle, sellPriceUsdc, saveSellingBtn,
+   soldPriceEl, markSoldBtn, undoSoldBtn
+  ].forEach(el=>{ if(el){ el.disabled = !enabled; }});
+  if (!enabled){
+    dmsg('You can view this item, but you do not have permission to edit it.', 'err');
+  } else {
+    dmsg('', 'muted');
+  }
+}
+
 (async function init(){
   if(!itemId){ alert('Missing item id'); location.href='index.html'; return; }
 
-  // auth
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ alert('Please sign in.'); location.href='login.html?next='+encodeURIComponent('edit.html?id='+itemId); return; }
   me = session.user;
@@ -148,56 +168,48 @@ function dmsg(t, cls='muted'){ detailsMsg.className=cls; detailsMsg.textContent=
   const vp = await sb.from('profiles').select('role').eq('id', me.id).maybeSingle();
   myRole = vp.data?.role || 'free';
 
-  // fetch item to validate permission and load fields
+  // fetch item (may hide owner_id due to RLS)
   const it = await sb.from('items')
     .select('id,owner_id,title,description,user_value,for_sale,sold,sold_price,sold_at')
     .eq('id', itemId)
     .maybeSingle();
-  
+
   if (it.error || !it.data) {
     alert('Item not found or not accessible.');
     location.href = 'item.html?id=' + itemId;
     return;
   }
-  
-  ownerId = it.data.owner_id ?? null;
-  
-  // Elevated roles can always edit
-  const isElevated = (myRole === 'owner' || myRole === 'moderator');
-  
-  // If owner_id is readable, require match. If it’s hidden by RLS (null/undefined),
-  // assume the current user is the owner because the row was returned to them.
-  // (Server-side RLS still enforces updates, so this only affects the client UI.)
-  let canEdit = isElevated;
-  if (!canEdit) {
-    if (typeof ownerId === 'string') {
-      canEdit = ownerId === me.id;
-    } else {
-      // owner_id not visible -> treat as owner (optimistic UI)
-      canEdit = true;
-    }
-  }
 
-if (!canEdit) {
-  alert('You do not have permission to edit this item.');
-  location.href = 'item.html?id=' + itemId;
-  return;
-}
+  ownerId = it.data.owner_id ?? null;
+  const ownerMatch = (ownerId != null) ? (String(ownerId) === String(me.id)) : true; // optimistic if hidden
+  const isElevated = (myRole === 'owner' || myRole === 'moderator');
+  const canEdit = isElevated || ownerMatch;
+
+  // Note and toggle editability (no redirect)
+  permNote.textContent = canEdit
+    ? `(role: ${myRole} — editing enabled)`
+    : `(role: ${myRole} — view only)`;
+  setEditable(canEdit);
+
+  console.log('[edit.html] perms', { meId: me.id, myRole, ownerId, ownerMatch, isElevated, canEdit });
 
   // Fill fields
-  titleEl.value = it.data?.title || '';
-  descEl.value  = it.data?.description || '';
-  priceEl.value = it.data?.user_value ?? '';
+  titleEl.value = it.data.title || '';
+  descEl.value  = it.data.description || '';
+  priceEl.value = it.data.user_value ?? '';
 
   await refreshImages();
 
-  isSold = !!it.data?.sold;
+  // Sold panel
   renderSoldPanel(it.data);
+
+  // Init selling block after we know perms; it has its own checks
+  initSellingBlock();
 })();
 
 function renderSoldPanel(row){
   if (!row) { soldPanel.style.display='none'; return; }
-  isSold = !!row.sold;
+  const isSold = !!row.sold;
   if (isSold){
     soldState.textContent = `Sold for $${Number(row.sold_price||0).toLocaleString()} on ${new Date(row.sold_at).toLocaleString()}`;
     soldPriceEl.value = row.sold_price ?? '';
@@ -232,7 +244,7 @@ undoSoldBtn.addEventListener('click', async ()=>{
   soldMsg.textContent = error ? ('Error: ' + error.message) : 'Sale undone.';
   if (!error) renderSoldPanel(data);
 });
-  
+
 saveDetails.addEventListener('click', async ()=>{
   const title = titleEl.value.trim();
   const description = descEl.value.trim();
@@ -312,22 +324,16 @@ delBtn.addEventListener('click', async ()=>{
 });
 
 // === Selling (USDC on Base) ===
-const sellToggle     = document.getElementById('sellToggle');
-const sellPriceUsdc  = document.getElementById('sellPriceUsdc');
-const saveSellingBtn = document.getElementById('saveSelling');
-const sellNote       = document.getElementById('sellNote');
-
 let _sellerRole = 'free', _sellerWallet = null, _editItemId = null;
-
-// fetch role + wallet + item selling fields
-(async function init_selling_block(){
+async function initSellingBlock(){
   try{
-    const qs = new URLSearchParams(location.search);
-    _editItemId = qs.get('id');
+    _editItemId = itemId;
     const { data:{ session } } = await sb.auth.getSession();
     if (!session || !_editItemId) return;
-    const { data: mep } = await sb.from('profiles').select('role,usdc_base_address').eq('id', session.user.id).maybeSingle();
-    _sellerRole   = mep?.role || 'free';
+
+    // reuse role we already fetched
+    _sellerRole = myRole;
+    const { data: mep } = await sb.from('profiles').select('usdc_base_address').eq('id', session.user.id).maybeSingle();
     _sellerWallet = mep?.usdc_base_address || null;
 
     const { data: it } = await sb.from('items').select('is_for_sale,price_usdc,sale_currency,owner_id').eq('id', _editItemId).maybeSingle();
@@ -336,14 +342,13 @@ let _sellerRole = 'free', _sellerWallet = null, _editItemId = null;
       if (sellPriceUsdc && it.price_usdc) sellPriceUsdc.value = (Number(it.price_usdc)/1_000_000).toFixed(2);
     }
 
-    // show gating hints (no hiding existing UI)
     if ((_sellerRole==='subscriber' || _sellerRole==='moderator' || _sellerRole==='owner')){
       if (!_sellerWallet) { sellNote.className='err'; sellNote.textContent='Add your USDC (Base) wallet in Settings first.'; }
     } else {
       sellNote.className='err'; sellNote.textContent='Selling requires a subscriber (or higher) role.';
     }
   }catch(_e){}
-})();
+}
 
 saveSellingBtn?.addEventListener('click', async ()=>{
   try{
@@ -369,13 +374,6 @@ saveSellingBtn?.addEventListener('click', async ()=>{
     sellNote.className='err'; sellNote.textContent = 'Error: ' + (e?.message || e);
   }
 });
-
 </script>
 </body>
 </html>
-
-
-
-
-
-
