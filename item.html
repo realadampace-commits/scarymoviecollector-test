@@ -193,20 +193,23 @@ function setVoteMsg(t,ok=false){voteMsg.textContent=t;voteMsg.style.color=ok?'#9
   const coerceBool=v=>v===true||v===1||v==='1'||v==='true'||v==='t';
   let row=null,saleFlag=null;
 
-  // Try with for_sale
+  // Try with for_sale + sold fields
   const q1=await sb.from('items')
-    .select('id,title,description,user_value,created_at,owner_id,for_sale')
+    .select('id,title,description,user_value,created_at,owner_id,for_sale,sold,sold_price,sold_at')
     .eq('id',rawId).maybeSingle();
-  if(q1.data){row=q1.data;saleFlag=q1.data.for_sale;}
+
+  if(q1.data){ row=q1.data; saleFlag=q1.data.for_sale; }
   else{
+    // Fallback without for_sale in case of RLS
     const q2=await sb.from('items')
-      .select('id,title,description,user_value,created_at,owner_id')
+      .select('id,title,description,user_value,created_at,owner_id,sold,sold_price,sold_at')
       .eq('id',rawId).maybeSingle();
-    if(q2.data){row=q2.data;}
+    if(q2.data){ row=q2.data; }
   }
   if(!row){ itemTitle.textContent='Item not found'; return; }
 
-  item=row; item.for_sale=coerceBool(saleFlag);
+  item=row;
+  item.for_sale=coerceBool(saleFlag);
 
   const {data:{session}}=await sb.auth.getSession();
   me=session?.user||null;
@@ -222,17 +225,29 @@ function setVoteMsg(t,ok=false){voteMsg.textContent=t;voteMsg.style.color=ok?'#9
     .order('created_at',{ascending:true});
   images=im.data||[];
 
-  // Render
+  // Render basics
   itemTitle.textContent=item.title||'Untitled';
   metaLine.innerHTML=`Owner: ${owner?.username?`<a href="user.html?u=${encodeURIComponent(owner.username)}">@${owner.username}</a>`:'unknown'}`;
   descEl.textContent=item.description||'—';
   basePrice=Number(item.user_value||0);
-  priceEl.textContent=money(basePrice);
   createdAt.textContent='Added '+new Date(item.created_at).toLocaleString();
 
-  // 3-state sale line to avoid wrong “Not for sale” if column hidden by RLS
-  if(saleFlag===undefined||saleFlag===null){ saleLine.textContent='—'; }
-  else{ saleLine.textContent=item.for_sale?'This item is listed for sale.':'Not for sale.'; }
+  // SOLD UI
+  if (item.sold === true) {
+    // Big price shows sold price
+    priceEl.textContent = money(item.sold_price || 0);
+    // Sale line explains it was sold
+    const soldDate = item.sold_at ? new Date(item.sold_at).toLocaleString() : '';
+    saleLine.textContent = `Sold for ${money(item.sold_price || 0)}${soldDate ? ' on ' + soldDate : ''}.`;
+  } else {
+    // Not sold → show current sale state
+    priceEl.textContent = money(basePrice);
+    if(saleFlag===undefined||saleFlag===null){ 
+      saleLine.textContent='—'; 
+    } else { 
+      saleLine.textContent=item.for_sale?'This item is listed for sale.':'Not for sale.'; 
+    }
+  }
 
   renderGallery();
 
@@ -265,7 +280,7 @@ function setVoteMsg(t,ok=false){voteMsg.textContent=t;voteMsg.style.color=ok?'#9
   }
   await refreshAggregates();
 
-  // Buy feature
+  // Buy feature (already hides if sold)
   await setupBuyFeature();
 })();
 
@@ -307,8 +322,7 @@ document.addEventListener('keydown',e=>{
 // Voting
 async function refreshMyVote(){
   if(!me)return;
-  const params=new URLSearchParams(location.search);
-  const currentId=params.get('id')||item?.id;
+  const currentId=item?.id;
   const {data:row}=await sb.from('item_votes')
     .select('agree,suggested_price')
     .eq('item_id',currentId)
@@ -319,8 +333,7 @@ async function refreshMyVote(){
   else{ setActive('disagree'); suggestPriceEl.value=row.suggested_price??''; setVoteMsg('You disagree. Adjust your suggestion and save.',true); }
 }
 async function refreshAggregates(){
-  const params=new URLSearchParams(location.search);
-  const currentId=params.get('id')||item?.id;
+  const currentId=item?.id;
   const {data:rows}=await sb.from('item_votes').select('agree,suggested_price').eq('item_id',currentId);
   let agrees=0,disagrees=0,sum=0,n=0;
   for(const r of rows||[]){ if(r.agree) agrees++; else {disagrees++; if(typeof r.suggested_price==='number'){sum+=r.suggested_price;n++;}}}
@@ -412,3 +425,4 @@ async function setupBuyFeature(){
 </script>
 </body>
 </html>
+
