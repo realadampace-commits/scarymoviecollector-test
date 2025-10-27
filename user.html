@@ -111,14 +111,30 @@ const showcaseWrap = document.getElementById('showcaseWrap');
 const showcaseRow = document.getElementById('showcaseRow');
 
 const qs = new URLSearchParams(location.search);
-const username = qs.get('u');
+const usernameRaw = qs.get('u') || '';
+const username = usernameRaw.replace(/^@/, ''); // normalize ?u=@name → name
 
 let profile = null;
 let ownerId = null;
 
 function money(n){ return '$' + Number(n||0).toLocaleString(); }
 
-// Render helpers
+// preview helper (same logic as portfolio.html)
+async function attachPreviews(items){
+  if (!items?.length) return items;
+  const ids = items.map(i=>i.id);
+  const { data: imgs } = await sb
+    .from('items_images')
+    .select('item_id,image_url,position,created_at')
+    .in('item_id', ids)
+    .order('position',{ascending:true})
+    .order('created_at',{ascending:true});
+  const first = {};
+  (imgs||[]).forEach(im => { if (!first[im.item_id]) first[im.item_id] = im.image_url; });
+  return items.map(i => ({ ...i, preview_url: first[i.id] || null }));
+}
+
+// Card renderer
 function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
   const soldInfo = soldAt ? `
     <span class="pill soldPill">Sold for ${money(soldPrice || 0)}</span>
@@ -141,8 +157,10 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
   if (!username) { unameEl.textContent = 'User not found'; return; }
 
   // Profile
-  const pq = await sb.from('profiles').select('id,username,role,bio,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y,showcase_ids')
-    .ilike('username', username).maybeSingle();
+  const pq = await sb.from('profiles')
+    .select('id,username,role,bio,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y,showcase_ids')
+    .ilike('username', username)
+    .maybeSingle();
   if (!pq.data) { unameEl.textContent = 'User not found'; return; }
   profile = pq.data;
   ownerId = profile.id;
@@ -164,43 +182,45 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
     frameOverlay.style.setProperty('--frameY', ((profile.frame_offset_y??0) + 'px'));
   }
 
-  // Portfolio (unsold)
+  // Portfolio (unsold) — mirror portfolio.html
   await loadPortfolio();
 
   // Sold items
   await loadSold();
 
-  // Showcase (optional)
+  // Showcase
   const ids = Array.isArray(profile.showcase_ids) ? profile.showcase_ids.filter(Boolean) : [];
   if (ids.length) await loadShowcase(ids);
 })();
 
 async function loadPortfolio(){
-  // Items that are NOT sold (sold_at is null)
-  const iq = await sb.from('items')
-    .select('id,title,user_value,for_sale,sold_at')
+  const { data, error } = await sb.from('items')
+    .select('id,title,user_value,created_at,owner_id,profiles:owner_id(username,avatar_url),sold,for_sale,sold_at')
     .eq('owner_id', ownerId)
-    .is('sold_at', null)
-    .order('created_at', {ascending:false});
-  const rows = iq.data || [];
-  portfolioCount.textContent = rows.length ? `${rows.length} item${rows.length>1?'s':''}` : '';
+    .or('sold.is.null,sold.eq.false')   // same filter as portfolio.html (unsold only)
+    .order('created_at',{ascending:false});
 
+  const rows = data || [];
+  portfolioCount.textContent = rows.length ? `${rows.length} item${rows.length>1?'s':''}` : '';
+  if (error) { console.warn('portfolio load error:', error); }
   if (!rows.length) { portfolioGrid.innerHTML=''; portfolioEmpty.style.display='block'; return; }
 
-  const imgs = await fetchThumbs(rows.map(r=>r.id));
-  portfolioGrid.innerHTML = rows.map(r=>{
-    const img = imgs.get(r.id) || null;
+  const withPrev = await attachPreviews(rows);
+  portfolioGrid.innerHTML = withPrev.map(r=>{
     return itemCard({
-      id:r.id, title:r.title, price:r.user_value, img,
+      id:r.id,
+      title:r.title,
+      price:r.user_value,
+      img:r.preview_url || null,
       forSale: !!(r.for_sale===true||r.for_sale===1||r.for_sale==='t'||r.for_sale==='true'),
-      soldAt: null, soldPrice:null
+      soldAt: null,
+      soldPrice: null
     });
   }).join('');
   portfolioEmpty.style.display='none';
 }
 
 async function loadSold(){
-  // Items that ARE sold (sold_at not null)
   const sq = await sb.from('items')
     .select('id,title,user_value,sold_at,sold_price')
     .eq('owner_id', ownerId)
@@ -211,11 +231,13 @@ async function loadSold(){
 
   if (!rows.length) { soldGrid.innerHTML=''; soldEmpty.style.display='block'; return; }
 
-  const imgs = await fetchThumbs(rows.map(r=>r.id));
-  soldGrid.innerHTML = rows.map(r=>{
-    const img = imgs.get(r.id) || null;
+  const withPrev = await attachPreviews(rows);
+  soldGrid.innerHTML = withPrev.map(r=>{
     return itemCard({
-      id:r.id, title:r.title, price:r.user_value, img,
+      id:r.id,
+      title:r.title,
+      price:r.user_value,
+      img:r.preview_url || null,
       forSale:false,
       soldAt:r.sold_at,
       soldPrice:r.sold_price
@@ -224,21 +246,19 @@ async function loadSold(){
   soldEmpty.style.display='none';
 }
 
-// Showcase (best-effort)
 async function loadShowcase(ids){
   try{
     const q = await sb.from('items')
       .select('id,title,user_value,for_sale,sold_at,sold_price')
       .in('id', ids.slice(0,12));
     const rows = q.data || [];
-    if (!rows.length) return; // keep showcase hidden
+    if (!rows.length) return;
 
-    const imgs = await fetchThumbs(rows.map(r=>r.id));
-    showcaseRow.innerHTML = rows.map(r=>{
-      const img = imgs.get(r.id) || null;
+    const withPrev = await attachPreviews(rows);
+    showcaseRow.innerHTML = withPrev.map(r=>{
       return `
         <a class="mini" href="item.html?id=${encodeURIComponent(r.id)}">
-          <div class="thumb">${img ? `<img src="${img}" alt="">` : `<span class="muted">No image</span>`}</div>
+          <div class="thumb">${r.preview_url ? `<img src="${r.preview_url}" alt="">` : `<span class="muted">No image</span>`}</div>
           <div class="itemBody">
             <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
               <div style="font-weight:700;font-size:14px">${money(r.user_value||0)}</div>
@@ -251,25 +271,6 @@ async function loadShowcase(ids){
     }).join('');
     showcaseWrap.style.display = 'block';
   }catch(_e){}
-}
-
-// Bulk fetch first image for a set of items
-async function fetchThumbs(itemIds){
-  const out = new Map();
-  if (!itemIds.length) return out;
-
-  // Pull all images, then pick the earliest position per item
-  const q = await sb.from('items_images')
-    .select('item_id,image_url,position,created_at')
-    .in('item_id', itemIds)
-    .order('position',{ascending:true})
-    .order('created_at',{ascending:true});
-  const rows = q.data || [];
-
-  for (const r of rows){
-    if (!out.has(r.item_id)) out.set(r.item_id, r.image_url);
-  }
-  return out;
 }
 </script>
 </body>
