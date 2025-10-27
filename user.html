@@ -205,38 +205,42 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
 })();
 
 async function loadPortfolio(){
-  // primary query — exactly like portfolio.html (unsold only)
+  // Use sold_at IS NULL to mean “unsold”
   let q = await sb.from('items')
-    .select('id,title,user_value,created_at,owner_id,profiles:owner_id(username,avatar_url),sold,for_sale,sold_at')
+    .select('id,title,user_value,created_at,owner_id,profiles:owner_id(username,avatar_url),for_sale,sold_at')
     .eq('owner_id', ownerId)
-    .or('sold.is.null,sold.eq.false')
+    .is('sold_at', null)
     .order('created_at',{ascending:false});
 
   let rows = q.data || [];
-  dbg('portfolio rows (by owner_id)', {count: rows.length});
+  console.log('[user.html] portfolio rows by owner_id', rows.length);
 
-  // Fallback: inner join by username (in case owner_id is hidden by RLS or ownerId mismatch)
+  // Fallback: inner join by username (in case owner_id visibility/RLS acts up)
   if (!rows.length && profile?.username) {
     const q2 = await sb.from('items')
-      .select('id,title,user_value,created_at,owner_id,profiles!inner(username,avatar_url),sold,for_sale,sold_at')
+      .select('id,title,user_value,created_at,owner_id,profiles!inner(username,avatar_url),for_sale,sold_at')
       .eq('profiles.username', profile.username)
-      .or('sold.is.null,sold.eq.false')
+      .is('sold_at', null)
       .order('created_at',{ascending:false});
     rows = q2.data || [];
-    dbg('portfolio rows (fallback by username join)', {count: rows.length});
+    console.log('[user.html] portfolio rows by username join', rows.length);
   }
 
   portfolioCount.textContent = rows.length ? `${rows.length} item${rows.length>1?'s':''}` : '';
 
-  if (!rows.length) { portfolioGrid.innerHTML=''; portfolioEmpty.style.display='block'; return; }
+  if (!rows.length) {
+    portfolioGrid.innerHTML = '';
+    portfolioEmpty.style.display = 'block';
+    return;
+  }
 
   const withPrev = await attachPreviews(rows);
   portfolioGrid.innerHTML = withPrev.map(r=>{
     return itemCard({
-      id:r.id,
-      title:r.title,
-      price:r.user_value,
-      img:r.preview_url || null,
+      id: r.id,
+      title: r.title,
+      price: r.user_value,
+      img: r.preview_url || null,
       forSale: !!(r.for_sale===true||r.for_sale===1||r.for_sale==='t'||r.for_sale==='true'),
       soldAt: null,
       soldPrice: null
