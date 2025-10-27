@@ -110,9 +110,17 @@ const soldEmpty = document.getElementById('soldEmpty');
 const showcaseWrap = document.getElementById('showcaseWrap');
 const showcaseRow = document.getElementById('showcaseRow');
 
+// tiny debug line (optional)
+const dbg = (m,o)=>{ 
+  let el = document.getElementById('dbg'); 
+  if(!el){ el=document.createElement('div'); el.id='dbg'; el.style.cssText='margin:6px 0;color:#9aa;font-size:12px'; unameEl.parentElement.appendChild(el); }
+  el.textContent = '[debug] ' + m + (o?(' '+JSON.stringify(o)): '');
+  console.log('[user.html]', m, o||'');
+};
+
 const qs = new URLSearchParams(location.search);
-const usernameRaw = qs.get('u') || '';
-const username = usernameRaw.replace(/^@/, ''); // normalize ?u=@name → name
+const rawU = decodeURIComponent((qs.get('u')||'').trim());
+const username = rawU.replace(/^@/, '');
 
 let profile = null;
 let ownerId = null;
@@ -134,7 +142,6 @@ async function attachPreviews(items){
   return items.map(i => ({ ...i, preview_url: first[i.id] || null }));
 }
 
-// Card renderer
 function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
   const soldInfo = soldAt ? `
     <span class="pill soldPill">Sold for ${money(soldPrice || 0)}</span>
@@ -154,18 +161,26 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
 }
 
 (async function init(){
-  if (!username) { unameEl.textContent = 'User not found'; return; }
+  // If ?u is missing, show MY page (like portfolio.html)
+  if (!username) {
+    const { data:{ session } } = await sb.auth.getSession();
+    if (!session){ unameEl.textContent='User not found'; dbg('no ?u and no session'); return; }
+    ownerId = session.user.id;
+    const mep = await sb.from('profiles').select('id,username,role,bio,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y,showcase_ids').eq('id', ownerId).maybeSingle();
+    if (!mep.data){ unameEl.textContent='User not found'; dbg('self profile not found'); return; }
+    profile = mep.data;
+  } else {
+    // Public profile by username
+    const pq = await sb.from('profiles')
+      .select('id,username,role,bio,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y,showcase_ids')
+      .ilike('username', username)
+      .maybeSingle();
+    if (!pq.data) { unameEl.textContent = 'User not found'; dbg('profile not found',{username}); return; }
+    profile = pq.data;
+  }
 
-  // Profile
-  const pq = await sb.from('profiles')
-    .select('id,username,role,bio,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y,showcase_ids')
-    .ilike('username', username)
-    .maybeSingle();
-  if (!pq.data) { unameEl.textContent = 'User not found'; return; }
-  profile = pq.data;
   ownerId = profile.id;
-
-  unameEl.textContent = '@' + (profile.username || username);
+  unameEl.textContent = '@' + (profile.username || username || 'me');
   if (profile.role && profile.role !== 'free') {
     roleBadge.style.display = 'inline-block';
     roleBadge.textContent = profile.role;
@@ -182,27 +197,37 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
     frameOverlay.style.setProperty('--frameY', ((profile.frame_offset_y??0) + 'px'));
   }
 
-  // Portfolio (unsold) — mirror portfolio.html
   await loadPortfolio();
-
-  // Sold items
   await loadSold();
 
-  // Showcase
   const ids = Array.isArray(profile.showcase_ids) ? profile.showcase_ids.filter(Boolean) : [];
   if (ids.length) await loadShowcase(ids);
 })();
 
 async function loadPortfolio(){
-  const { data, error } = await sb.from('items')
+  // primary query — exactly like portfolio.html (unsold only)
+  let q = await sb.from('items')
     .select('id,title,user_value,created_at,owner_id,profiles:owner_id(username,avatar_url),sold,for_sale,sold_at')
     .eq('owner_id', ownerId)
-    .or('sold.is.null,sold.eq.false')   // same filter as portfolio.html (unsold only)
+    .or('sold.is.null,sold.eq.false')
     .order('created_at',{ascending:false});
 
-  const rows = data || [];
+  let rows = q.data || [];
+  dbg('portfolio rows (by owner_id)', {count: rows.length});
+
+  // Fallback: inner join by username (in case owner_id is hidden by RLS or ownerId mismatch)
+  if (!rows.length && profile?.username) {
+    const q2 = await sb.from('items')
+      .select('id,title,user_value,created_at,owner_id,profiles!inner(username,avatar_url),sold,for_sale,sold_at')
+      .eq('profiles.username', profile.username)
+      .or('sold.is.null,sold.eq.false')
+      .order('created_at',{ascending:false});
+    rows = q2.data || [];
+    dbg('portfolio rows (fallback by username join)', {count: rows.length});
+  }
+
   portfolioCount.textContent = rows.length ? `${rows.length} item${rows.length>1?'s':''}` : '';
-  if (error) { console.warn('portfolio load error:', error); }
+
   if (!rows.length) { portfolioGrid.innerHTML=''; portfolioEmpty.style.display='block'; return; }
 
   const withPrev = await attachPreviews(rows);
@@ -226,7 +251,20 @@ async function loadSold(){
     .eq('owner_id', ownerId)
     .not('sold_at','is', null)
     .order('sold_at', {ascending:false});
-  const rows = sq.data || [];
+  let rows = sq.data || [];
+  dbg('sold rows', {count: rows.length});
+
+  // Fallback: inner join by username if needed
+  if (!rows.length && profile?.username) {
+    const sq2 = await sb.from('items')
+      .select('id,title,user_value,sold_at,sold_price,profiles!inner(username)')
+      .eq('profiles.username', profile.username)
+      .not('sold_at','is', null)
+      .order('sold_at', {ascending:false});
+    rows = sq2.data || [];
+    dbg('sold rows (fallback by username join)', {count: rows.length});
+  }
+
   soldCount.textContent = rows.length ? `${rows.length}` : '';
 
   if (!rows.length) { soldGrid.innerHTML=''; soldEmpty.style.display='block'; return; }
@@ -246,6 +284,7 @@ async function loadSold(){
   soldEmpty.style.display='none';
 }
 
+// Showcase
 async function loadShowcase(ids){
   try{
     const q = await sb.from('items')
