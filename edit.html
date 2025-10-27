@@ -168,45 +168,71 @@ function setEditable(enabled){
   const vp = await sb.from('profiles').select('role').eq('id', me.id).maybeSingle();
   myRole = vp.data?.role || 'free';
 
-  // fetch item (may hide owner_id due to RLS)
-  const it = await sb.from('items')
-    .select('id,owner_id,title,description,user_value,for_sale,sold,sold_price,sold_at')
+  // ------- STEP 1: minimal fetch so RLS/column perms don't block -------
+  let core = await sb.from('items')
+    .select('id,owner_id')
     .eq('id', itemId)
     .maybeSingle();
 
-  if (it.error || !it.data) {
-    alert('Item not found or not accessible.');
-    location.href = 'item.html?id=' + itemId;
+  // If not found, retry with numeric id (helps when ?id="123" but id is integer)
+  if (!core.data) {
+    const maybeInt = Number(itemId);
+    if (Number.isFinite(maybeInt)) {
+      core = await sb.from('items')
+        .select('id,owner_id')
+        .eq('id', maybeInt)
+        .maybeSingle();
+    }
+  }
+
+  if (core.error) {
+    console.warn('[edit] core fetch error:', core.error);
+  }
+  if (!core.data) {
+    // Show message inline instead of redirecting — easier to debug
+    detailsMsg.className = 'err';
+    detailsMsg.textContent = 'Item not found or not accessible. (Core fetch)';
     return;
   }
 
-  ownerId = it.data.owner_id ?? null;
+  // normalize the resolved id (in case numeric retry worked)
+  const resolvedId = core.data.id;
+  ownerId = core.data.owner_id ?? null;
+
+  // ------- Permission: elevated roles OR owner match (if owner_id visible) -------
   const ownerMatch = (ownerId != null) ? (String(ownerId) === String(me.id)) : true; // optimistic if hidden
   const isElevated = (myRole === 'owner' || myRole === 'moderator');
   const canEdit = isElevated || ownerMatch;
 
-  // Note and toggle editability (no redirect)
   permNote.textContent = canEdit
     ? `(role: ${myRole} — editing enabled)`
     : `(role: ${myRole} — view only)`;
   setEditable(canEdit);
 
-  console.log('[edit.html] perms', { meId: me.id, myRole, ownerId, ownerMatch, isElevated, canEdit });
+  // ------- STEP 2: fetch the rest of the editable/display fields -------
+  const full = await sb.from('items')
+    .select('title,description,user_value,for_sale,sold,sold_price,sold_at')
+    .eq('id', resolvedId)
+    .maybeSingle();
 
-  // Fill fields
-  titleEl.value = it.data.title || '';
-  descEl.value  = it.data.description || '';
-  priceEl.value = it.data.user_value ?? '';
+  if (full.error) console.warn('[edit] full fetch error:', full.error);
+
+  // Even if some fields are hidden by column privileges, use what we can safely
+  const row = full.data || {};
+  titleEl.value = row.title || '';
+  descEl.value  = row.description || '';
+  priceEl.value = (row.user_value ?? '') === null ? '' : row.user_value;
 
   await refreshImages();
 
-  // Sold panel
-  renderSoldPanel(it.data);
-
-  // Init selling block after we know perms; it has its own checks
-  initSellingBlock();
+  // Sold panel: render with partial data if necessary
+  renderSoldPanel({
+    sold: row.sold ?? false,
+    sold_price: row.sold_price ?? null,
+    sold_at: row.sold_at ?? null
+  });
 })();
-
+  
 function renderSoldPanel(row){
   if (!row) { soldPanel.style.display='none'; return; }
   const isSold = !!row.sold;
@@ -377,3 +403,4 @@ saveSellingBtn?.addEventListener('click', async ()=>{
 </script>
 </body>
 </html>
+
