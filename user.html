@@ -204,34 +204,72 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
 })();
 
 async function loadAllItemsForUser(){
-  // 1) Pull ALL items for this owner in one query
-  const q = await sb.from('items')
+  const debug = (msg, obj) => {
+    let el = document.getElementById('dbg');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'dbg';
+      el.style.cssText = 'margin:6px 0;color:#9aa;font-size:12px';
+      unameEl.parentElement.appendChild(el);
+    }
+    el.textContent = '[debug] ' + msg + (obj ? ' ' + JSON.stringify(obj) : '');
+    console.log('[user.html]', msg, obj || '');
+  };
+
+  let rows = [];
+
+  // A) Primary: by owner_id (fastest if visible)
+  const qA = await sb.from('items')
     .select('id,title,user_value,created_at,owner_id,for_sale,sold_at,sold_price')
     .eq('owner_id', ownerId)
     .order('created_at', { ascending:false });
+  if (qA.error) debug('A error', qA.error);
+  rows = qA.data || [];
+  debug('A owner_id count', { count: rows.length });
 
-  let rows = q.data || [];
-  console.log('[user.html] items by owner_id:', rows.length);
-
-  // 2) Fallback by username (in case RLS or a view hides owner_id)
-  if (!rows.length && profile?.username){
-    const q2 = await sb.from('items')
+  // B) Fallback: inner join by exact username (ensures join happens)
+  if (!rows.length && profile?.username) {
+    const qB = await sb.from('items')
       .select('id,title,user_value,created_at,owner_id,for_sale,sold_at,sold_price,profiles!inner(username)')
       .eq('profiles.username', profile.username)
       .order('created_at', { ascending:false });
-    rows = q2.data || [];
-    console.log('[user.html] items by username join:', rows.length);
+    if (qB.error) debug('B error', qB.error);
+    rows = qB.data || [];
+    debug('B username inner join count', { count: rows.length, username: profile.username });
   }
 
-  // 3) Split client-side
+  // C) Fallback: case-insensitive username (ilike)
+  if (!rows.length && profile?.username) {
+    const qC = await sb.from('items')
+      .select('id,title,user_value,created_at,owner_id,for_sale,sold_at,sold_price,profiles!inner(username)')
+      .ilike('profiles.username', profile.username)
+      .order('created_at', { ascending:false });
+    if (qC.error) debug('C error', qC.error);
+    rows = qC.data || [];
+    debug('C username ilike join count', { count: rows.length, username: profile.username });
+  }
+
+  // D) Final fallback: if still nothing, render empties & stop
+  if (!rows.length) {
+    portfolioGrid.innerHTML = '';
+    portfolioEmpty.style.display = 'block';
+    soldGrid.innerHTML = '';
+    soldEmpty.style.display = 'block';
+    portfolioCount.textContent = '';
+    soldCount.textContent = '';
+    debug('No rows after all fallbacks');
+    return;
+  }
+
+  // Split by sold status
   const unsold = rows.filter(r => !r.sold_at);
   const sold   = rows.filter(r => !!r.sold_at);
 
-  // 4) Fetch previews once for all
+  // Previews (single pass)
   const withPrev = await attachPreviews(rows);
   const thumbById = new Map(withPrev.map(r => [r.id, r.preview_url || null]));
 
-  // 5) Render UNSOLD (Portfolio)
+  // UNSOLD
   portfolioCount.textContent = unsold.length ? `${unsold.length} item${unsold.length>1?'s':''}` : '';
   if (!unsold.length){
     portfolioGrid.innerHTML = '';
@@ -249,7 +287,7 @@ async function loadAllItemsForUser(){
     portfolioEmpty.style.display = 'none';
   }
 
-  // 6) Render SOLD
+  // SOLD
   soldCount.textContent = sold.length ? `${sold.length}` : '';
   if (!sold.length){
     soldGrid.innerHTML = '';
@@ -266,6 +304,8 @@ async function loadAllItemsForUser(){
     })).join('');
     soldEmpty.style.display = 'none';
   }
+
+  debug('Rendered', { unsold: unsold.length, sold: sold.length });
 }
 
 
