@@ -220,7 +220,7 @@ async function loadAllItemsForUser(){
 
   // A) Primary: by owner_id (fastest if visible)
   const qA = await sb.from('items')
-    .select('id,title,user_value,created_at,owner_id,for_sale,sold_at,sold_price')
+    .select('id,title,user_value,created_at,owner_id,is_for_sale,sold_at,sold_price')
     .eq('owner_id', ownerId)
     .order('created_at', { ascending:false });
   if (qA.error) debug('A error', qA.error);
@@ -230,7 +230,7 @@ async function loadAllItemsForUser(){
   // B) Fallback: inner join by exact username (ensures join happens)
   if (!rows.length && profile?.username) {
     const qB = await sb.from('items')
-      .select('id,title,user_value,created_at,owner_id,for_sale,sold_at,sold_price,profiles!inner(username)')
+      .select('id,title,user_value,created_at,owner_id,is_for_sale,sold_at,sold_price,profiles!inner(username)')
       .eq('profiles.username', profile.username)
       .order('created_at', { ascending:false });
     if (qB.error) debug('B error', qB.error);
@@ -241,7 +241,7 @@ async function loadAllItemsForUser(){
   // C) Fallback: case-insensitive username (ilike)
   if (!rows.length && profile?.username) {
     const qC = await sb.from('items')
-      .select('id,title,user_value,created_at,owner_id,for_sale,sold_at,sold_price,profiles!inner(username)')
+      .select('id,title,user_value,created_at,owner_id,is_for_sale,sold_at,sold_price,profiles!inner(username)')
       .ilike('profiles.username', profile.username)
       .order('created_at', { ascending:false });
     if (qC.error) debug('C error', qC.error);
@@ -280,7 +280,7 @@ async function loadAllItemsForUser(){
       title: r.title,
       price: r.user_value,
       img: thumbById.get(r.id),
-      forSale: !!(r.for_sale===true||r.for_sale===1||r.for_sale==='t'||r.for_sale==='true'),
+      forSale: !!(r.is_for_sale===true||r.is_for_sale===1||r.is_for_sale==='t'||r.is_for_sale==='true'),
       soldAt: null,
       soldPrice: null
     })).join('');
@@ -313,7 +313,7 @@ async function loadAllItemsForUser(){
 async function loadShowcase(ids){
   try{
     const q = await sb.from('items')
-      .select('id,title,user_value,for_sale,sold_at,sold_price')
+      .select('id,title,user_value,is_for_sale,sold_at,sold_price')
       .in('id', ids.slice(0,12));
     const rows = q.data || [];
     if (!rows.length) return;
