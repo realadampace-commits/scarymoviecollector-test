@@ -259,12 +259,13 @@ function setVoteMsg(t,ok=false){voteMsg.textContent=t;voteMsg.style.color=ok?'#9
     if(isModOrOwner){
       ownerTools.style.display='flex';
       editBtn.href='edit.html?id='+item.id;
-      deleteBtn.onclick=async()=>{
-        if(!confirm('Delete this item?'))return;
-        const {error}=await sb.from('items').delete().eq('id',item.id);
-        if(error)return alert('Delete error: '+error.message);
-        location.href='portfolio.html';
-      };
+      deleteBtn.onclick = async () => {
+        if (!confirm('Delete this item?')) return;
+          const { error } = await sb.from('items').delete().eq('id', item.id);
+          if (error) return alert('Delete error: ' + error.message);
+          alert('Item deleted.');
+          location.href = 'index.html';
+      }
     }
   }
 
@@ -425,4 +426,5 @@ async function setupBuyFeature(){
 </script>
 </body>
 </html>
+
 
