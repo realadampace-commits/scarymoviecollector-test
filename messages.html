@@ -57,33 +57,38 @@ const sb = supabase.createClient(
   'https://wktxpukjmvmhzpctttjx.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
 );
+
 let me = null;
+let realtimeChannel = null;   // keep the active channel so we can unsubscribe/re-subscribe
 
 (async function init(){
   const { data:{ session } } = await sb.auth.getSession();
   if (!session){ location.href='login.html?next=messages.html'; return; }
   me = session.user;
-  await loadInbox();
-  subscribeInbox();
+
+  const threadIds = await loadInbox();        // initial render
+  await subscribeInbox(threadIds);            // start realtime
 })();
 
+/** Renders the inbox and returns the array of my thread ids in newest->oldest order */
 async function loadInbox(){
   const status = document.getElementById('status');
-  const list = document.getElementById('list');
+  const list   = document.getElementById('list');
   status.textContent = 'Loading…';
 
-  // fetch my threads, order by thread.created_at
+  // my participation rows, newest threads first
   const { data: parts, error } = await sb
     .from('dm_participants')
     .select('thread_id,last_read_at, dm_threads!inner(created_at), profiles:user_id(username,avatar_url)')
     .eq('user_id', me.id)
     .order('created_at', { ascending:false, foreignTable: 'dm_threads' });
-  if (error){ status.textContent='Error: '+error.message; return; }
-  if (!parts?.length){ status.textContent='No conversations yet.'; list.innerHTML=''; return; }
+
+  if (error){ status.textContent='Error: '+error.message; return []; }
+  if (!parts?.length){ status.textContent='No conversations yet.'; list.innerHTML=''; return []; }
 
   const threadIds = [...new Set(parts.map(p=>p.thread_id))];
 
-  // fetch the other participant's profile for each thread
+  // other participant per thread
   const { data: others } = await sb
     .from('dm_participants')
     .select('thread_id, profiles:user_id(username,avatar_url)')
@@ -91,16 +96,23 @@ async function loadInbox(){
     .neq('user_id', me.id);
   const otherByThread = Object.fromEntries((others || []).map(o => [o.thread_id, o.profiles]));
 
-  // latest message per thread
+  // latest message per thread (a small view that has thread_id, body, created_at)
   const { data: latest } = await sb.from('dm_latest')
-    .select('*').in('thread_id', threadIds);
+    .select('*')
+    .in('thread_id', threadIds);
   const latestByThread = Object.fromEntries((latest||[]).map(m=>[m.thread_id, m]));
 
+  // map of my last_read_at for quick lookup
+  const lastReadByThread = Object.fromEntries(parts.map(p => [p.thread_id, p.last_read_at]));
+
+  // render
   list.innerHTML = parts.map(p=>{
     const m = latestByThread[p.thread_id];
     const other = otherByThread[p.thread_id];
     const preview = m?.body ? m.body : '(no messages yet)';
-    const unread = m && (!p.last_read_at || new Date(m.created_at) > new Date(p.last_read_at));
+    const lastRead = lastReadByThread[p.thread_id] ? new Date(lastReadByThread[p.thread_id]) : null;
+    const unread = m && (!lastRead || new Date(m.created_at) > lastRead);
+
     return `
       <div class="thread" data-id="${p.thread_id}">
         <span class="ava">${other?.avatar_url ? `<img src="${other.avatar_url}" alt="">` : ''}</span>
@@ -121,68 +133,66 @@ async function loadInbox(){
   });
 
   status.textContent = '';
+  return threadIds;
 }
 
-function subscribeInbox(){
-  sb.channel('dm_inbox')
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_messages' }, async () => {
-      await loadInbox();
-    })
+/** Cleanly (re)subscribe to realtime events relevant to this user’s inbox */
+async function subscribeInbox(threadIds){
+  // close old channel if present
+  if (realtimeChannel) {
+    try { await sb.removeChannel(realtimeChannel); } catch(_) {}
+    realtimeChannel = null;
+  }
+
+  // Build a filter for messages in *my* threads
+  // Supabase realtime supports eq filters. For multiple threads, open one channel and filter client-side,
+  // or build multiple .on registrations. Here we filter client-side for simplicity + reliability.
+  const myThreadSet = new Set(threadIds);
+
+  realtimeChannel = sb.channel(`dm_inbox_${me.id}_${Date.now()}`)
+    // 1) New messages anywhere -> if message thread is mine, refresh inbox
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'dm_messages' },
+      async (payload) => {
+        const tid = payload.new?.thread_id;
+        if (!tid) return;
+
+        // Fast path: if this thread is already in my list, just refresh list UI
+        if (myThreadSet.has(tid)) {
+          await loadInbox();
+          return;
+        }
+
+        // Slow path: maybe a brand-new conversation was started with me;
+        // check if I'm a participant on this thread, then reload + resubscribe.
+        const { data: mine } = await sb
+          .from('dm_participants')
+          .select('thread_id')
+          .eq('thread_id', tid)
+          .eq('user_id', me.id)
+          .maybeSingle();
+        if (mine) {
+          const ids = await loadInbox();
+          await subscribeInbox(ids); // re-subscribe so future messages in new thread stream in
+        }
+      })
+    // 2) My read-state changed (last_read_at) -> update unread badge
+    .on('postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'dm_participants', filter: `user_id=eq.${me.id}` },
+      async () => { await loadInbox(); })
+    // 3) Someone added me to a new thread (new conversation) -> reload + re-subscribe with new IDs
+    .on('postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'dm_participants', filter: `user_id=eq.${me.id}` },
+      async () => {
+        const ids = await loadInbox();
+        await subscribeInbox(ids);
+      })
     .subscribe();
 }
 
-// Start new chat
-document.getElementById('startBtn').addEventListener('click', startChat);
-document.getElementById('userSearch').addEventListener('keydown', e=>{
-  if(e.key==='Enter'){ e.preventDefault(); startChat(); }
-});
-async function startChat(){
-  const msgEl = document.getElementById('startMsg');
-  const raw = (document.getElementById('userSearch').value||'').trim().replace(/^@/,'');
-  if (!raw){ msgEl.textContent='Enter a username.'; return; }
-  msgEl.textContent='Starting…';
-
-  // partial match on username
-  const { data: them } = await sb.from('profiles')
-    .select('id,username').ilike('username', `%${raw}%`).maybeSingle();
-  if (!them){ msgEl.textContent='User not found.'; return; }
-  if (them.id === me.id){ msgEl.textContent='That’s you 🙂'; return; }
-
-  // reuse existing thread if present
-  const existing = await findExistingThread(me.id, them.id);
-  if (existing){ location.href = 'dm.html?id=' + existing; return; }
-
-  // create thread and insert participants sequentially (to satisfy RLS)
-  const tId = crypto.randomUUID();
-
-  const { error: te } = await sb.from('dm_threads').insert({ id: tId });
-  if (te){ msgEl.textContent='Error: ' + te.message; return; }
-
-  const { error: p1e } = await sb.from('dm_participants').insert({
-    thread_id: tId, user_id: me.id, last_read_at: null
-  });
-  if (p1e){ msgEl.textContent='Error (me): ' + p1e.message; return; }
-
-  const { error: p2e } = await sb.from('dm_participants').insert({
-    thread_id: tId, user_id: them.id, last_read_at: null
-  });
-  if (p2e){ msgEl.textContent='Error (them): ' + p2e.message; return; }
-
-  msgEl.textContent = 'Done.';
-  location.href = 'dm.html?id=' + tId;
-}
-
-async function findExistingThread(a, b){
-  const { data: mine } = await sb.from('dm_participants').select('thread_id').eq('user_id', a);
-  const tIds = (mine||[]).map(r=>r.thread_id);
-  if (!tIds.length) return null;
-  const { data: both } = await sb.from('dm_participants')
-    .select('thread_id').in('thread_id', tIds).eq('user_id', b).limit(1);
-  return both?.[0]?.thread_id || null;
-}
-
-function escapeHtml(s){ 
-  return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); 
+// ---- helpers you already have ----
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 </script>
 </body>
