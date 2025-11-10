@@ -41,6 +41,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const sb = supabase.createClient(
   'https://wktxpukjmvmhzpctttjx.supabase.co',
@@ -51,9 +52,6 @@ const qs = new URLSearchParams(location.search);
 const threadId = qs.get('id');
 
 let me = null, other = null, channel = null;
-
-// optimistic message map: tempId -> element
-const optimistic = new Map();
 
 document.getElementById('send').addEventListener('click', sendMsg);
 document.getElementById('text').addEventListener('keydown', e=>{
@@ -69,7 +67,6 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
   if (!session){ location.href='login.html?next=' + encodeURIComponent('dm.html?id='+threadId); return; }
   me = session.user;
 
-  // validate access & get other participant
   const { data: parts, error } = await sb
     .from('dm_participants')
     .select('user_id, profiles:user_id(username,avatar_url)')
@@ -105,19 +102,8 @@ function subscribeThread(){
       { event:'INSERT', schema:'public', table:'dm_messages', filter:'thread_id=eq.'+threadId },
       (payload)=> {
         const m = payload.new;
-        // if we already optimistically rendered an identical message by me, replace it
-        if (m.author_id === me.id) {
-          const key = findOptimisticKey(m.body);
-          if (key && optimistic.has(key)) {
-            const el = optimistic.get(key);
-            // replace optimistic bubble with the server one (update timestamp)
-            el.querySelector('.meta').textContent = new Date(m.created_at).toLocaleTimeString();
-            el.dataset.mid = m.id;
-            optimistic.delete(key);
-            ensureScroll();
-            return;
-          }
-        }
+        // if we already have this exact message id in the DOM, skip (prevents duplicates)
+        if (document.querySelector(`.row[data-mid="${m.id}"]`)) return;
         appendMessage(m);
         if (m.author_id !== me.id) markRead();
       }
@@ -154,10 +140,10 @@ async function sendMsg(){
   const text = (box.value||'').trim();
   if (!text) return;
 
-  // optimistic render
-  const tempId = 'tmp_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+  // optimistic render with a temp id
   const list = document.getElementById('list');
   const nearBottom = isNearBottom(list);
+  const tempId = 'tmp_'+Date.now()+'_'+Math.random().toString(36).slice(2);
   const el = document.createElement('div');
   el.className = 'row mine';
   el.dataset.mid = tempId;
@@ -167,25 +153,27 @@ async function sendMsg(){
   `;
   list.appendChild(el);
   if (nearBottom) list.scrollTop = list.scrollHeight;
-  optimistic.set(tempId, el);
 
-  // persist
+  // persist and immediately reconcile the optimistic bubble
   document.getElementById('status').textContent = 'Sending…';
-  const { error } = await sb.from('dm_messages').insert({
-    thread_id: threadId,
-    author_id: me.id,
-    body: text
-  });
+  const { data, error } = await sb
+    .from('dm_messages')
+    .insert({ thread_id: threadId, author_id: me.id, body: text })
+    .select('id,author_id,body,created_at')
+    .single();
+
   if (error){
     document.getElementById('status').textContent = 'Error: ' + error.message;
-    // mark optimistic bubble as failed
     el.querySelector('.meta').textContent = 'Failed';
     el.querySelector('.bubble').style.opacity = 0.6;
     return;
   }
-  // clear composer; realtime INSERT will reconcile timestamp + remove optimistic
-  box.value = '';
+
+  // Update the existing optimistic element with the real id & timestamp
+  el.dataset.mid = data.id;
+  el.querySelector('.meta').textContent = new Date(data.created_at).toLocaleTimeString();
   document.getElementById('status').textContent = '';
+  box.value = '';
 }
 
 async function markRead(){
@@ -196,22 +184,8 @@ async function markRead(){
 }
 
 function isNearBottom(scroller){
-  const pad = 60; // px
+  const pad = 60;
   return (scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight) < pad;
-}
-function ensureScroll(){
-  const list = document.getElementById('list');
-  if (isNearBottom(list)) list.scrollTop = list.scrollHeight;
-}
-
-function findOptimisticKey(text){
-  // We key by the exact body we sent; if you want stronger matching,
-  // include a client-generated nonce in the message body/metadata.
-  for (const [k, el] of optimistic.entries()){
-    const body = el.querySelector('.bubble')?.textContent || '';
-    if (body === text) return k;
-  }
-  return null;
 }
 
 function escapeHtml(s){
