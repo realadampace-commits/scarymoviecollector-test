@@ -56,13 +56,9 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-const sb = supabase.createClient(
-  window.SUPABASE_URL || '',
-  window.SUPABASE_ANON_KEY || ''
-);
-
+<script type="module" src="/src/pages/orders.js"></script>
+<!-- Legacy settlement controls removed: order history is read-only until server verification exists. -->
+<!--
 const tabBuy  = document.getElementById('tabBuy');
 const tabSell = document.getElementById('tabSell');
 const buyPane = document.getElementById('buyPane');
@@ -198,6 +194,6 @@ function renderSell(rows){
     });
   });
 }
-</script>
+-->
 </body>
 </html>
