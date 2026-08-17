@@ -2,8 +2,12 @@ import { getSupabaseClient } from '../supabase-client.js';
 import { requireSession, signOut } from '../auth.js';
 import { getProfile, updateOwnProfile } from '../data/profiles.js';
 
+const loginUrl = `login.html?next=${encodeURIComponent(`${location.pathname.split('/').pop() || 'settings.html'}${location.search}`)}`;
+
+try {
 const client = getSupabaseClient();
 const session = await requireSession(client);
+document.body.classList.remove('auth-pending');
 const profile = await getProfile(client, session.user.id);
 const username = document.getElementById('username');
 const bio = document.getElementById('bioInput');
@@ -21,3 +25,7 @@ document.getElementById('saveBio')?.addEventListener('click', () => save({ bio: 
 document.getElementById('saveShowcase')?.addEventListener('click', () => save({ showcase_ids: showcase.value.split(',').map((id) => id.trim()).filter(Boolean) }, 'showcaseMsg'));
 document.getElementById('logoutLocal')?.addEventListener('click', async () => { await signOut(client); location.href = 'login.html'; });
 document.getElementById('logoutGlobal')?.addEventListener('click', async () => { await signOut(client); location.href = 'login.html'; });
+} catch (error) {
+  console.warn('Settings requires an authenticated configured session.', error);
+  location.replace(loginUrl);
+}

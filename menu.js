@@ -1,4 +1,5 @@
-// /menu.js
+import { getSupabaseClient } from './src/supabase-client.js';
+
 class AppMenu extends HTMLElement {
   static cache = null;
 
@@ -12,8 +13,8 @@ class AppMenu extends HTMLElement {
     const root = this.attachShadow({ mode: 'open' });
     root.innerHTML = `
       <style>
-        :host { position: fixed; inset: 0 auto 0 0; width: 72px; z-index: 999; }
-        .menu { position: relative; height:100%; display:flex; align-items:flex-start; justify-content:center; padding-top:18px; }
+        :host { position: fixed; top: 12px; right: 12px; z-index: 999; }
+        .menu { position: relative; display:flex; align-items:flex-start; justify-content:center; }
         .hamburger {
           font-size: 20px; background:#222; color:#eee; border:1px solid #333;
           border-radius:10px; padding:8px 12px; cursor:pointer;
@@ -33,20 +34,22 @@ class AppMenu extends HTMLElement {
         .overlay{position:fixed;inset:0;background:transparent;display:none;}
         .overlay.show{display:block;}
         @media (max-width:700px) {
-          :host { inset:auto 0 0; width:100%; height:68px; }
-          .menu { height:68px; padding:10px 12px; align-items:center; justify-content:flex-end; background:rgba(18,23,34,.96); border-top:1px solid #2b3548; }
+          :host { top:12px; right:12px; }
+          .menu { height:auto; padding:0; }
           .hamburger { width:48px; height:48px; }
-          .drawer { top:auto; bottom:62px; left:auto; right:10px; }
+          .drawer { top:56px; bottom:auto; left:auto; right:0; }
         }
       </style>
       <div class="overlay"></div>
       ${AppMenu.cache}
     `;
 
-    this.sb = supabase.createClient(
-      window.SUPABASE_URL || '',
-      window.SUPABASE_ANON_KEY || ''
-    );
+    try {
+      this.sb = getSupabaseClient();
+    } catch (error) {
+      console.warn('Menu auth state unavailable.', error);
+      this.sb = null;
+    }
 
     this._drawer = root.querySelector('#drawer');
     this._hamburger = root.querySelector('.hamburger');
@@ -83,10 +86,15 @@ class AppMenu extends HTMLElement {
   }
 
   async checkAuth() {
+    const onlyAuth = this.shadowRoot.querySelectorAll('.only-auth');
+    const onlyGuest = this.shadowRoot.querySelectorAll('.only-guest');
+    if (!this.sb) {
+      onlyAuth.forEach(el=>el.style.display='none');
+      onlyGuest.forEach(el=>el.style.display='flex');
+      return;
+    }
     try {
       const { data:{ session } } = await this.sb.auth.getSession();
-      const onlyAuth = this.shadowRoot.querySelectorAll('.only-auth');
-      const onlyGuest = this.shadowRoot.querySelectorAll('.only-guest');
       if (session) {
         onlyAuth.forEach(el=>el.style.display='flex');
         onlyGuest.forEach(el=>el.style.display='none');

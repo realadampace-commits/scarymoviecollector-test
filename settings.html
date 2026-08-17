@@ -33,12 +33,13 @@
   .sel{outline:2px solid #4ade80}
   .dim{opacity:.35;filter:grayscale(.9)}
   .lock{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;border-radius:12px;font-weight:600}
+  body.auth-pending .wrap { visibility:hidden; }
 </style>
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="auth-pending">
 <app-menu></app-menu>
-<script type="module" src="/menu.js"></script>
+<script type="module" src="/src/menu-bootstrap.js"></script>
 
 <div class="wrap">
   <div style="display:flex;justify-content:space-between;align-items:center">
