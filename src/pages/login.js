@@ -1,5 +1,5 @@
-import { getSupabaseClient } from './supabase-client.js';
-import { getSession, signInWithPassword, signUpWithPassword } from './auth.js';
+import { getSupabaseClient } from '../supabase-client.js';
+import { getSession, signInWithPassword, signUpWithPassword } from '../auth.js';
 
 const client = getSupabaseClient();
 const email = document.getElementById('email');
