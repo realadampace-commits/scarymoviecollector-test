@@ -6,6 +6,15 @@
   "scripts": {
     "check": "node --test",
     "check:pages": "node scripts/check-legacy-pages.mjs",
-    "security:scan": "node scripts/scan-secrets.mjs"
+    "security:scan": "node scripts/scan-secrets.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4"
+  },
+  "devDependencies": {
+    "vite": "^7.1.3"
   }
 }
