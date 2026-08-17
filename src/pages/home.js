@@ -15,6 +15,9 @@ try {
     </a>
   `).join('');
 } catch (error) {
-  console.error(error);
-  msgEl.textContent = 'Unable to load items right now.';
+  console.error('Home item load failed:', error);
+  const detail = String(error?.message || '').trim();
+  msgEl.textContent = detail
+    ? `Unable to load items: ${detail}`
+    : 'Unable to load items right now.';
 }
