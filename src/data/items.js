@@ -20,6 +20,18 @@ export async function getItem(client, id) {
   return data;
 }
 
+export async function deleteOwnItem(client, itemId, ownerId) {
+  if (!itemId || !ownerId || typeof itemId !== 'string' || typeof ownerId !== 'string') {
+    throw new TypeError('item and owner ids are required');
+  }
+  const { error } = await client
+    .from('items')
+    .delete()
+    .eq('id', itemId)
+    .eq('owner_id', ownerId);
+  if (error) throw error;
+}
+
 export async function listPortfolioItems(client, ownerId) {
   if (!ownerId || typeof ownerId !== 'string') throw new TypeError('owner id is required');
   const { data, error } = await client
