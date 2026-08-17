@@ -1,3 +1,13 @@
+export async function listForumCategories(client) {
+  const { data, error } = await client
+    .from('forum_categories')
+    .select('id,title,created_at,parent_id')
+    .is('parent_id', null)
+    .order('title', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function listForumPosts(client, { categoryId, limit = 25 } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 100);
   let query = client
