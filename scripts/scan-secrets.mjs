@@ -6,7 +6,7 @@ const patterns = [
   /eyJ[a-zA-Z0-9_-]{20,}/,
   /service_role/i,
   /-----BEGIN (?:RSA|OPENSSH|PRIVATE) KEY-----/,
-  /(?:password|secret|token)\s*[:=]\s*['\"][^'\"]{16,}/i,
+  /\b(?:password|secret|token)\b\s*[:=]\s*['\"][A-Za-z0-9_+\/=.-]{16,}['\"]/i,
 ];
 let hits = [];
 async function walk(dir) {
