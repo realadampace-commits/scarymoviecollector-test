@@ -21,7 +21,7 @@ function render(rows, userId, target, empty) {
     <div class="row"><strong>${row.buyer_id === userId ? 'Purchase' : 'Sale'}</strong><span class="pill ${escapeHtml(row.status || 'pending')}">${escapeHtml(row.status || 'pending')}</span></div>
     <div><a href="item.html?id=${encodeURIComponent(row.item_id)}">View item</a></div>
     <div class="row"><span>${formatUsd(Number(row.price_usdc || 0) / 1_000_000)} ${escapeHtml(row.currency || 'USDC')}</span><span class="small">${escapeHtml(new Date(row.created_at).toLocaleString())}</span></div>
-    <div class="small muted">${row.status === 'pending' ? 'Payment verification is pending. No settlement is performed in the browser.' : row.tx_hash ? 'Transaction recorded by the authorized payment flow.' : 'No transaction reference.'}</div>
+    <div class="small muted">${row.status === 'pending' ? 'Payment verification is pending. No settlement is performed in the browser.' : row.status === 'paid' ? 'Payment verified by the authorized payment flow; shipping updates are server-controlled.' : row.status === 'shipped' ? 'Seller marked this order shipped. Delivery confirmation is server-controlled.' : row.status === 'completed' ? 'Order completed by the authorized marketplace flow.' : row.tx_hash ? 'Transaction recorded by the authorized payment flow.' : 'No transaction reference. This history is read-only.'}</div>
     ${row.tracking_number ? `<div class="small">Tracking: ${escapeHtml(row.tracking_number)}</div>` : ''}
   </div>`).join('');
 }

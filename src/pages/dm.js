@@ -6,7 +6,7 @@ import { escapeHtml } from '../ui.js';
 const threadId = new URLSearchParams(location.search).get('id');
 const client = getSupabaseClient();
 const session = await getSession(client);
-if (!threadId) { location.href = 'messages.html'; throw new Error('missing thread id'); }
+if (!threadId || !/^[0-9a-f-]{8,}$/i.test(threadId)) { location.href = 'messages.html'; throw new Error('invalid thread id'); }
 if (!session) { location.href = `login.html?next=${encodeURIComponent(`dm.html?id=${threadId}`)}`; throw new Error('authentication required'); }
 const head = document.getElementById('head');
 const list = document.getElementById('list');
@@ -36,4 +36,11 @@ const channel = client.channel(`dm-thread-${threadId}`)
     try { await render(); } catch (error) { console.error(error); }
   })
   .subscribe();
-window.addEventListener('beforeunload', () => { client.removeChannel(channel); });
+let cleanedUp = false;
+async function cleanup() {
+  if (cleanedUp) return;
+  cleanedUp = true;
+  await client.removeChannel(channel);
+}
+window.addEventListener('pagehide', cleanup, { once: true });
+window.addEventListener('beforeunload', cleanup, { once: true });
