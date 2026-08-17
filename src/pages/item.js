@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '../supabase-client.js';
 import { getSession } from '../auth.js';
 import { getItemDetail } from '../data/item-detail.js';
+import { deleteOwnItem } from '../data/items.js';
 import { saveItemVote } from '../data/item-votes.js';
 import { escapeHtml, formatUsd } from '../ui.js';
 
@@ -54,6 +55,24 @@ avg.textContent = `Average suggested: ${votes.averageSuggested == null ? '—' :
 const session = await getSession(client);
 if (session) voteBox.style.display = '';
 else guest.style.display = '';
+
+if (session?.user?.id === item.owner_id) {
+  const ownerTools = document.getElementById('ownerTools');
+  const deleteButton = document.getElementById('deleteBtn');
+  ownerTools.style.display = 'flex';
+  document.getElementById('editBtn').href = `edit.html?id=${encodeURIComponent(item.id)}`;
+  deleteButton.addEventListener('click', async () => {
+    if (!confirm('Delete this item?')) return;
+    deleteButton.disabled = true;
+    try {
+      await deleteOwnItem(client, item.id, session.user.id);
+      location.href = 'portfolio.html';
+    } catch (error) {
+      deleteButton.disabled = false;
+      alert(error.message || 'Unable to delete item.');
+    }
+  });
+}
 
 let choice = null;
 document.getElementById('agreeBtn').addEventListener('click', () => { choice = true; document.getElementById('agreeBtn').classList.add('active'); document.getElementById('disagreeBtn').classList.remove('active'); document.getElementById('disagreeBlock').style.display = 'none'; });
