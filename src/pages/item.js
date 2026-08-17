@@ -2,6 +2,7 @@ import { getSupabaseClient } from '../supabase-client.js';
 import { getSession } from '../auth.js';
 import { getItemDetail } from '../data/item-detail.js';
 import { deleteOwnItem } from '../data/items.js';
+import { createOrderIntent } from '../data/order-intent.js';
 import { saveItemVote } from '../data/item-votes.js';
 import { escapeHtml, formatUsd } from '../ui.js';
 
@@ -55,6 +56,29 @@ avg.textContent = `Average suggested: ${votes.averageSuggested == null ? '—' :
 const session = await getSession(client);
 if (session) voteBox.style.display = '';
 else guest.style.display = '';
+
+if (session && session.user.id !== item.owner_id && !item.sold && item.is_for_sale) {
+  const buyCard = document.getElementById('buyCard');
+  const buyButton = document.getElementById('buyBtn');
+  const buyMsg = document.getElementById('buyMsg');
+  buyCard.style.display = '';
+  buyButton.addEventListener('click', async () => {
+    buyButton.disabled = true;
+    buyMsg.textContent = 'Preparing order…';
+    try {
+      const order = await createOrderIntent(client, {
+        itemId: item.id,
+        buyerId: session.user.id,
+        sellerId: item.owner_id,
+        priceUsdc: item.price_usdc ?? item.user_value
+      });
+      buyMsg.textContent = `Order ${order.id} is pending payment verification.`;
+    } catch (error) {
+      buyButton.disabled = false;
+      buyMsg.textContent = error.message || 'Unable to prepare order.';
+    }
+  });
+}
 
 if (session?.user?.id === item.owner_id) {
   const ownerTools = document.getElementById('ownerTools');
