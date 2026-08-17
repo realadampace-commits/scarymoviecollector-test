@@ -42,47 +42,6 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-const sb = supabase.createClient(
-  window.SUPABASE_URL || '',
-  window.SUPABASE_ANON_KEY || ''
-);
-
-// helper: attach first photo as preview_url
-async function attachPreviews(items) {
-  if (!items?.length) return items;
-  const ids = items.map(i => i.id);
-  const { data: imgs } = await sb
-    .from('items_images')
-    .select('item_id,image_url,position,created_at')
-    .in('item_id', ids)
-    .order('position', {ascending:true})
-    .order('created_at', {ascending:true});
-  const first = {};
-  (imgs||[]).forEach(im => { if (!first[im.item_id]) first[im.item_id] = im.image_url; });
-  return items.map(i => ({...i, preview_url:first[i.id]||null}));
-}
-
-const listEl = document.getElementById('list');
-const msgEl  = document.getElementById('msg');
-
-(async function load(){
-  const { data: items, error } = await sb
-    .from('items')
-    .select('id,title,user_value,created_at')
-    .order('created_at',{ascending:false})
-    .limit(24);
-  if (error){ msgEl.textContent = 'Error: '+error.message; return; }
-  const withPrev = await attachPreviews(items);
-  msgEl.textContent = withPrev?.length ? '' : 'No items yet.';
-  listEl.innerHTML = (withPrev||[]).map(it=>`
-    <a class="tile" href="item.html?id=${it.id}">
-      <div class="thumb">${it.preview_url ? `<img src="${it.preview_url}" alt="">` : '<span class="muted">No image</span>'}</div>
-      <div class="meta"><strong>${it.title}</strong><br class="muted">$${(it.user_value||0).toLocaleString()}</div>
-    </a>
-  `).join('');
-})();
-</script>
+<script type="module" src="/src/pages/home.js"></script>
 </body>
 </html>
