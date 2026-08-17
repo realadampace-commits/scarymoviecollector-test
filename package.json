@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "check": "node --test",
+    "check:pages": "node scripts/check-legacy-pages.mjs",
     "security:scan": "node scripts/scan-secrets.mjs"
   }
 }
