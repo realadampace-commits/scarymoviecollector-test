@@ -1,3 +1,10 @@
+export async function createThread(client, otherUserId) {
+  if (!otherUserId || typeof otherUserId !== 'string') throw new TypeError('other user id is required');
+  const { data, error } = await client.rpc('create_dm_thread', { other_user: otherUserId });
+  if (error) throw error;
+  return data;
+}
+
 export async function listMyThreads(client) {
   const { data, error } = await client
     .from('dm_threads')
