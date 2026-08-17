@@ -38,8 +38,8 @@ class AppMenu extends HTMLElement {
     `;
 
     this.sb = supabase.createClient(
-      'https://wktxpukjmvmhzpctttjx.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+      window.SUPABASE_URL || '',
+      window.SUPABASE_ANON_KEY || ''
     );
 
     this._drawer = root.querySelector('#drawer');
