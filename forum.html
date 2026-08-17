@@ -17,6 +17,7 @@
   input{padding:8px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
   .topbar{display:flex;align-items:center;justify-content:space-between}
 </style>
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <app-menu></app-menu>
@@ -45,95 +46,6 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-(function(){
-  const sb = supabase.createClient(
-    'https://wktxpukjmvmhzpctttjx.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
-  );
-
-  const listEl   = document.getElementById('list');
-  const statusEl = document.getElementById('status');
-  const modTop   = document.getElementById('modTop');
-  const catTitle = document.getElementById('catTitle');
-  const addCat   = document.getElementById('addCat');
-  const modMsg   = document.getElementById('modMsg');
-
-  let myRole='free';
-
-  const setStatus=(t,cls='muted')=>{statusEl.className=cls;statusEl.textContent=t;};
-  const setModMsg=(t,cls='muted')=>{modMsg.className=cls;modMsg.textContent=t;};
-
-  (async function init(){
-    const { data:{ session } } = await sb.auth.getSession();
-    if (session){
-      const { data:p } = await sb.from('profiles').select('role').eq('id',session.user.id).maybeSingle();
-      myRole = p?.role || 'free';
-    }
-    const isModOrOwner = (myRole==='moderator' || myRole==='owner'); // CHANGED
-    if (isModOrOwner) modTop.style.display='block'; // CHANGED
-    await loadTopLevel(isModOrOwner);
-  })();
-
-  async function loadTopLevel(isModOrOwner){
-    setStatus('Loading categories…');
-    const { data: cats, error } = await sb
-      .from('forum_categories')
-      .select('id,title,created_at')
-      .is('parent_id', null)
-      .order('title',{ascending:true});
-    if (error){ setStatus('Error: '+error.message,'err'); listEl.innerHTML=''; return; }
-    setStatus(cats?.length ? '' : 'No categories yet.');
-    listEl.innerHTML = (cats||[]).map(c=>`
-      <li class="node">
-        <div class="row">
-          <strong>${escapeHtml(c.title)}</strong>
-          <div class="row">
-            <a class="btn" href="forum_category.html?id=${c.id}">Open</a>
-            ${isModOrOwner
-              ? `<button class="btn" data-act="addSub" data-id="${c.id}">Add Sub</button>
-                 <button class="btn" style="background:#933" data-act="delCat" data-id="${c.id}">Delete</button>`
-              : ''
-            }
-          </div>
-        </div>
-      </li>
-    `).join('');
-  }
-
-  function escapeHtml(s){return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
-
-  addCat?.addEventListener('click', async ()=>{
-    const title=(catTitle.value||'').trim();
-    if(!title) return setModMsg('Title required.','err');
-    setModMsg('Creating…');
-    const { error } = await sb.from('forum_categories').insert({ title, parent_id: null });
-    if (error) return setModMsg('Error: '+error.message,'err');
-    setModMsg('Created!','ok'); catTitle.value='';
-    const isModOrOwner = (myRole==='moderator' || myRole==='owner');
-    await loadTopLevel(isModOrOwner);
-  });
-
-  listEl.addEventListener('click', async (e)=>{
-    const btn = e.target.closest('button[data-act]');
-    if(!btn) return;
-    const act = btn.dataset.act, id = btn.dataset.id;
-    if (act==='addSub'){
-      const title = prompt('Subcategory title?'); if(!title) return;
-      const { error } = await sb.from('forum_categories').insert({ title, parent_id:id });
-      if (error) return alert('Error: '+error.message);
-      const isModOrOwner = (myRole==='moderator' || myRole==='owner');
-      await loadTopLevel(isModOrOwner);
-    } else if (act==='delCat'){
-      if(!confirm('Delete this category (and any subcategories)?')) return;
-      const { error } = await sb.from('forum_categories').delete().eq('id', id);
-      if (error) return alert('Error: '+error.message);
-      const isModOrOwner = (myRole==='moderator' || myRole==='owner');
-      await loadTopLevel(isModOrOwner);
-    }
-  });
-})();
-</script>
+<script type="module" src="/src/pages/forum.js"></script>
 </body>
 </html>

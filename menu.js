@@ -12,8 +12,8 @@ class AppMenu extends HTMLElement {
     const root = this.attachShadow({ mode: 'open' });
     root.innerHTML = `
       <style>
-        :host { position: fixed; top: 16px; left: 16px; z-index: 999; }
-        .menu { position: relative; }
+        :host { position: fixed; inset: 0 auto 0 0; width: 72px; z-index: 999; }
+        .menu { position: relative; height:100%; display:flex; align-items:flex-start; justify-content:center; padding-top:18px; }
         .hamburger {
           font-size: 20px; background:#222; color:#eee; border:1px solid #333;
           border-radius:10px; padding:8px 12px; cursor:pointer;
@@ -32,14 +32,20 @@ class AppMenu extends HTMLElement {
         .active>a{font-weight:600;color:#fff;}
         .overlay{position:fixed;inset:0;background:transparent;display:none;}
         .overlay.show{display:block;}
+        @media (max-width:700px) {
+          :host { inset:auto 0 0; width:100%; height:68px; }
+          .menu { height:68px; padding:10px 12px; align-items:center; justify-content:flex-end; background:rgba(18,23,34,.96); border-top:1px solid #2b3548; }
+          .hamburger { width:48px; height:48px; }
+          .drawer { top:auto; bottom:62px; left:auto; right:10px; }
+        }
       </style>
       <div class="overlay"></div>
       ${AppMenu.cache}
     `;
 
     this.sb = supabase.createClient(
-      'https://wktxpukjmvmhzpctttjx.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndrdHhwdWtqbXZtaHpwY3R0dGp4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxMjg2MjAsImV4cCI6MjA3MTcwNDYyMH0.07xzRjb_iQlkaObfslKiL9VZIHT8P3vnK-ZkIVm2qVY'
+      window.SUPABASE_URL || '',
+      window.SUPABASE_ANON_KEY || ''
     );
 
     this._drawer = root.querySelector('#drawer');
