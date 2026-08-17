@@ -30,3 +30,10 @@ async function submit() {
 send.addEventListener('click', submit);
 text.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(); } });
 try { await render(); } catch (error) { status.textContent = 'Unable to load messages.'; console.error(error); }
+
+const channel = client.channel(`dm-thread-${threadId}`)
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_messages', filter: `thread_id=eq.${threadId}` }, async () => {
+    try { await render(); } catch (error) { console.error(error); }
+  })
+  .subscribe();
+window.addEventListener('beforeunload', () => { client.removeChannel(channel); });
