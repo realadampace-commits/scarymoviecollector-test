@@ -1,11 +1,11 @@
 import { getSupabaseClient } from '../supabase-client.js';
-import { getSession, signInWithPassword, signUpWithPassword } from '../auth.js';
+import { getSession, requestPasswordReset, signInWithPassword, signUpWithPassword } from '../auth.js';
 
 const client = getSupabaseClient();
 const email = document.getElementById('email');
 const password = document.getElementById('password');
 const msg = document.getElementById('msg');
-const buttons = [document.getElementById('signup'), document.getElementById('signin')];
+const buttons = [document.getElementById('signup'), document.getElementById('signin'), document.getElementById('forgot')];
 const nextUrl = new URLSearchParams(location.search).get('next') || 'portfolio.html';
 const setMsg = (text, kind = '') => { msg.className = `msg ${kind}`; msg.textContent = text; };
 const setBusy = (busy) => { buttons.forEach((button) => { button.disabled = busy; }); email.disabled = busy; password.disabled = busy; };
@@ -26,5 +26,14 @@ document.getElementById('signin').addEventListener('click', async () => {
   setBusy(true); setMsg('Signing in…');
   try { await signInWithPassword(client, email.value, password.value); setMsg('Signed in. Redirecting…', 'ok'); setTimeout(() => { location.href = nextUrl; }, 300); }
   catch (error) { setMsg(error.message || 'Sign-in failed.', 'err'); }
+  finally { setBusy(false); }
+});
+
+document.getElementById('forgot').addEventListener('click', async () => {
+  setBusy(true); setMsg('Sending reset link…');
+  try {
+    await requestPasswordReset(client, email.value, new URL('reset.html', location.href).href);
+    setMsg('If an account exists for that email, a reset link has been sent.', 'ok');
+  } catch (error) { setMsg(error.message || 'Unable to send reset email.', 'err'); }
   finally { setBusy(false); }
 });

@@ -2,54 +2,25 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Reset Password</title>
+<title>Reset Password — Scream Collector</title>
 <style>
   body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif;display:grid;place-items:center;height:100vh}
   .box{background:#1c1c1c;border-radius:10px;padding:24px;width:340px}
   input,button{width:100%;padding:10px;margin-top:8px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
-  button{border:none;background:crimson;cursor:pointer}
-  .msg{margin-top:8px;font-size:14px}
-  a{color:#9ecbff;text-decoration:none}
+  button{border:none;background:crimson;cursor:pointer}.msg{margin-top:8px;font-size:14px;white-space:pre-wrap}a{color:#9ecbff;text-decoration:none}
 </style>
-  <link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <div class="box">
   <h2>Choose a new password</h2>
-  <input id="pwd1" type="password" placeholder="New password (min 6)"/>
-  <input id="pwd2" type="password" placeholder="Repeat new password"/>
-  <button id="save">Save new password</button>
-  <div id="msg" class="msg"></div>
+  <p class="msg">Open this page using the password-reset link from your email.</p>
+  <input id="pwd1" type="password" autocomplete="new-password" placeholder="New password (min 6)"/>
+  <input id="pwd2" type="password" autocomplete="new-password" placeholder="Repeat new password"/>
+  <button id="save" type="button">Save new password</button>
+  <div id="msg" class="msg" aria-live="polite"></div>
   <div class="msg" style="opacity:.8;margin-top:10px"><a href="login.html">Back to login</a></div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-const sb = supabase.createClient(
-  window.SUPABASE_URL || '',
-  window.SUPABASE_ANON_KEY || ''
-);
-const msg = (t, ok=false)=>{ const m=document.getElementById('msg'); m.style.color = ok ? '#9f9' : '#f88'; m.textContent = t; };
-
-(async function ensureRecovery(){
-  // When arriving from email, Supabase hands you a session via the URL hash.
-  const { data:{ session }, error } = await sb.auth.getSession();
-  if (error) msg('Auth error: ' + error.message);
-  // If no session, user likely opened this page directly — they should click the email link again.
-})();
-
-document.getElementById('save').onclick = async ()=>{
-  const a = document.getElementById('pwd1').value.trim();
-  const b = document.getElementById('pwd2').value.trim();
-  if (!a || a.length < 6) return msg('Password must be at least 6 characters.');
-  if (a !== b) return msg('Passwords do not match.');
-
-  const { data, error } = await sb.auth.updateUser({ password: a });
-  if (error) return msg('Failed to set password: ' + error.message);
-
-  msg('Password updated. Redirecting to login…', true);
-  setTimeout(()=> location.href = 'login.html', 1000);
-};
-</script>
+<script type="module" src="/src/pages/reset.js"></script>
 </body>
 </html>
