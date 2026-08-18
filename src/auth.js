@@ -14,7 +14,7 @@ export async function signInWithPassword(client, email, password) {
 
 export async function requestPasswordReset(client, email, recoveryUrl) {
   const normalizedEmail = String(email ?? '').trim();
-  if (!normalizedEmail) throw new TypeError('valid email is required');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new TypeError('valid email is required');
   if (!String(recoveryUrl ?? '').trim()) throw new TypeError('recovery URL is required');
   const { data, error } = await client.auth.resetPasswordForEmail(normalizedEmail, { redirectTo: recoveryUrl });
   if (error) throw error;
@@ -27,6 +27,10 @@ export async function resetPassword(client, password, confirmation) {
   const { data, error } = await client.auth.updateUser({ password });
   if (error) throw error;
   return data;
+}
+
+export function isPasswordRecoveryEvent(event) {
+  return event === 'PASSWORD_RECOVERY';
 }
 
 export async function getSession(client) {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getSession, requireSession, requestPasswordReset, resetPassword, signOut } from '../src/auth.js';
+import { getSession, isPasswordRecoveryEvent, requireSession, requestPasswordReset, resetPassword, signOut } from '../src/auth.js';
 
 function clientWith(session, error = null) {
   const calls = [];
@@ -37,6 +37,7 @@ test('requestPasswordReset trims the email and uses the supplied recovery URL', 
 test('requestPasswordReset rejects invalid email or missing recovery URL', async () => {
   const client = { auth: { async resetPasswordForEmail() { throw new Error('must not be called'); } } };
   await assert.rejects(() => requestPasswordReset(client, '', 'https://example.test/reset.html'), /valid email/);
+  await assert.rejects(() => requestPasswordReset(client, 'not-an-email', 'https://example.test/reset.html'), /valid email/);
   await assert.rejects(() => requestPasswordReset(client, 'fan@example.com', ''), /recovery URL/);
 });
 
@@ -47,4 +48,10 @@ test('resetPassword validates confirmation and delegates the new password', asyn
   assert.deepEqual(calls, [{ password: 'new-secret' }]);
   await assert.rejects(() => resetPassword(client, 'short', 'short'), /at least 6/);
   await assert.rejects(() => resetPassword(client, 'new-secret', 'different'), /do not match/);
+});
+
+test('isPasswordRecoveryEvent only accepts Supabase recovery events', () => {
+  assert.equal(isPasswordRecoveryEvent('PASSWORD_RECOVERY'), true);
+  assert.equal(isPasswordRecoveryEvent('SIGNED_IN'), false);
+  assert.equal(isPasswordRecoveryEvent(undefined), false);
 });
