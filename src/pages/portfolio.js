@@ -53,7 +53,7 @@ const chartSvg = (points) => {
   }));
   const polyline = coordinates.map(({ x, y }) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
   const last = coordinates.at(-1);
-  return `<svg class="portfolio-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Collection value history"><line class="chart-grid" x1="0" y1="36" x2="${width}" y2="36"></line><line class="chart-grid" x1="0" y1="130" x2="${width}" y2="130"></line><line class="chart-grid" x1="0" y1="224" x2="${width}" y2="224"></line><polyline class="chart-line" points="${polyline}"></polyline><circle class="chart-dot" cx="${last.x.toFixed(1)}" cy="${last.y.toFixed(1)}" r="7"></circle></svg>`;
+  return `<svg class="portfolio-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Current stated collection value grouped by item-added date"><line class="chart-grid" x1="0" y1="36" x2="${width}" y2="36"></line><line class="chart-grid" x1="0" y1="130" x2="${width}" y2="130"></line><line class="chart-grid" x1="0" y1="224" x2="${width}" y2="224"></line><polyline class="chart-line" points="${polyline}"></polyline><circle class="chart-dot" cx="${last.x.toFixed(1)}" cy="${last.y.toFixed(1)}" r="7"></circle></svg>`;
 };
 
 const renderRange = (range) => {
@@ -65,8 +65,8 @@ const renderRange = (range) => {
   chartEl.innerHTML = chartSvg(points);
   highEl.textContent = formatUsd(values.length ? Math.max(...values) : 0);
   lowEl.textContent = formatUsd(values.length ? Math.min(...values) : 0);
-  if (!points.length) changeEl.textContent = 'No collection history in this range.';
-  else changeEl.innerHTML = `<span class="${change >= 0 ? 'positive' : 'negative'}">${change >= 0 ? '+' : ''}${formatUsd(change)}</span><span>Collection growth over ${range === 'ALL' ? 'all time' : range}</span>`;
+  if (!points.length) changeEl.textContent = 'No dated collection items in this range.';
+  else changeEl.innerHTML = `<span class="${change >= 0 ? 'positive' : 'negative'}">${change >= 0 ? '+' : ''}${formatUsd(change)}</span><span>Current stated value added by items dated ${range === 'ALL' ? 'all time' : range}</span>`;
   document.querySelectorAll('.range').forEach((button) => { button.setAttribute('aria-pressed', String(button.dataset.range === range)); });
 };
 
