@@ -192,7 +192,10 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
   bioEl.textContent = profile.bio || '—';
 
   if (profile.avatar_url) {
-    avatarBox.innerHTML = `<img src="${profile.avatar_url}" alt="avatar">`;
+    const image = document.createElement('img');
+    image.src = profile.avatar_url;
+    image.alt = 'avatar';
+    avatarBox.replaceChildren(image);
   }
   if (profile.frame_url) {
     frameOverlay.style.backgroundImage = `url('${profile.frame_url}')`;

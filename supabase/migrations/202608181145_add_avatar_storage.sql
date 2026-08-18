@@ -1,0 +1,43 @@
+-- Profile pictures: authenticated users can only manage files in their own folder.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', true, 5242880, array['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+create policy "avatar images are publicly readable"
+on storage.objects for select
+using (bucket_id = 'avatars');
+
+create policy "users upload own avatar images"
+on storage.objects for insert to authenticated
+with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid()::text));
+
+create policy "users update own avatar images"
+on storage.objects for update to authenticated
+using (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid()::text))
+with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid()::text));
+
+create policy "users delete own avatar images"
+on storage.objects for delete to authenticated
+using (bucket_id = 'avatars' and (storage.foldername(name))[1] = (select auth.uid()::text));
+
+-- Users may only store an avatar URL generated for their own storage folder.
+-- This protects public profile renderers even if someone bypasses the browser UI.
+create or replace function public.enforce_own_avatar_url() returns trigger
+language plpgsql
+as $$
+begin
+  if new.avatar_url is distinct from old.avatar_url and new.avatar_url is not null
+     and new.avatar_url !~ ('^https://wktxpukjmvmhzpctttjx\.supabase\.co/storage/v1/object/public/avatars/' || new.id::text || '/') then
+    raise exception 'avatar URL must reference the owner''s avatars storage folder';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_own_avatar_url on public.profiles;
+create trigger enforce_own_avatar_url
+before update of avatar_url on public.profiles
+for each row execute function public.enforce_own_avatar_url();

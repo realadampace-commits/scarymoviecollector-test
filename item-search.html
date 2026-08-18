@@ -132,7 +132,7 @@ async function runSearch(){
   statusEl.textContent = `Found ${withPrev.length} item${withPrev.length===1?'':'s'}.`;
   resultsEl.innerHTML = withPrev.map(it=>{
     const ava = it.profiles?.avatar_url
-      ? `<span class="ava"><img src="${it.profiles.avatar_url}" alt=""></span>`
+      ? `<span class="ava"><img src="${escapeHtml(it.profiles.avatar_url)}" alt=""></span>`
       : `<span class="ava"></span>`;
     const uname = it.profiles?.username ? '@'+it.profiles.username : 'user';
     return `
