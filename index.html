@@ -17,10 +17,11 @@
   .thumb img{max-width:100%;max-height:100%}
   .meta{padding:10px}
   .muted{color:var(--muted)}
+  body.auth-pending .auth-action{visibility:hidden}
 </style>
   <link rel="stylesheet" href="/styles.css">
 </head>
-<body>
+<body class="auth-pending">
 <app-menu></app-menu>
 <script type="module" src="/src/menu-bootstrap.js"></script>
 
@@ -32,9 +33,9 @@
 <div class="wrap">
   <div class="top">
     <h2 style="margin:0">Recent Items</h2>
-    <a class="btn" href="login.html?next=create.html">Log in to add an item</a>
+    <a id="addItemAction" class="btn auth-action" href="login.html?next=create.html">Log in to add an item</a>
     <a class="btn" href="users.html">Users</a>
-    <a class="btn" href="login.html?next=settings.html">Log in for settings</a>
+    <a id="settingsAction" class="btn auth-action" href="login.html?next=settings.html">Log in for settings</a>
   </div>
 
   <div class="card">

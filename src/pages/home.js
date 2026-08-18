@@ -1,12 +1,31 @@
 import { getSupabaseClient } from '../supabase-client.js';
+import { getSession } from '../auth.js';
+import { homeActionsForSession } from '../data/home-actions.js';
 import { listRecentItems } from '../data/items.js';
 import { escapeHtml, formatUsd } from '../ui.js';
 
 const listEl = document.getElementById('list');
 const msgEl = document.getElementById('msg');
+const addItemAction = document.getElementById('addItemAction');
+const settingsAction = document.getElementById('settingsAction');
+
+function renderActions(session) {
+  const actions = homeActionsForSession(session);
+  addItemAction.href = actions.addItem.href;
+  addItemAction.textContent = actions.addItem.label;
+  settingsAction.href = actions.settings.href;
+  settingsAction.textContent = actions.settings.label;
+  document.body.classList.remove('auth-pending');
+}
 
 try {
-  const items = await listRecentItems(getSupabaseClient());
+  const client = getSupabaseClient();
+  const session = await getSession(client).catch((error) => {
+    console.warn('Home auth-state load failed:', error);
+    return null;
+  });
+  renderActions(session);
+  const items = await listRecentItems(client);
   msgEl.textContent = items.length ? '' : 'No items yet.';
   listEl.innerHTML = items.map((item) => `
     <a class="tile" href="item.html?id=${encodeURIComponent(item.id)}">
@@ -16,6 +35,7 @@ try {
   `).join('');
 } catch (error) {
   console.error('Home item load failed:', error);
+  renderActions(null);
   const detail = String(error?.message || '').trim();
   msgEl.textContent = detail
     ? `Unable to load items: ${detail}`
