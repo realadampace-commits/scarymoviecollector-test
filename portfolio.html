@@ -4,44 +4,20 @@
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>My Portfolio</title>
 <style>
-  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}
-  .wrap{max-width:1000px;margin:0 auto;padding:24px}
-  .head{display:flex;justify-content:space-between;align-items:center}
-  a.btn{background:crimson;color:#fff;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;text-decoration:none}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:16px}
-  .card{background:#1c1c1c;border-radius:10px;overflow:hidden}
-  .thumb{height:160px;background:#222;display:flex;align-items:center;justify-content:center}
-  .thumb img{max-width:100%;max-height:100%}
-  .meta{padding:10px}
-  .owner{display:flex;align-items:center;gap:8px;opacity:.8;font-size:12px;margin-top:4px}
-  .ava{width:20px;height:20px;border-radius:50%;background:#333;display:inline-block;overflow:hidden}
-  .ava img{width:100%;height:100%;object-fit:cover;display:block}
-  .muted{opacity:.7}
+  body{margin:0;background:#111;color:#eee;font-family:Arial,Helvetica,sans-serif}.wrap{max-width:1000px;margin:0 auto;padding:24px}.head{display:flex;justify-content:space-between;align-items:center;gap:12px}a.btn{background:crimson;color:#fff;border:none;border-radius:6px;padding:10px 16px;cursor:pointer;text-decoration:none;display:inline-block}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-top:16px}.card{background:#1c1c1c;border-radius:10px;overflow:hidden}.thumb{height:160px;background:#222;display:flex;align-items:center;justify-content:center}.thumb img{max-width:100%;max-height:100%}.meta{padding:10px}.owner{display:flex;align-items:center;gap:8px;opacity:.8;font-size:12px;margin-top:4px}.muted{opacity:.7}
+  .value-panel{margin:24px 0 20px;padding:24px;background:#080808;border:1px solid #292929;border-radius:14px}.value-total{font-size:clamp(2.4rem,8vw,4.6rem);font-weight:700;letter-spacing:-.05em}.value-summary{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 22px;font-size:1.1rem;color:#aaa}.positive{color:#27cf75}.negative{color:#ff4c68}.chart-wrap{height:280px;border-bottom:1px solid #333}.portfolio-chart{width:100%;height:100%;display:block}.chart-grid{stroke:#343434;stroke-dasharray:2 6}.chart-line{fill:none;stroke:#f5f5f5;stroke-width:3;stroke-linejoin:round;stroke-linecap:round}.chart-dot{fill:#ece9ff;stroke:#565169;stroke-width:4}.stats{display:flex;justify-content:space-between;gap:20px;padding:16px 0}.stat-label{font-size:.95rem}.stat-value{font-size:1.25rem;font-weight:700;margin-top:5px}.ranges{display:flex;justify-content:space-between;gap:4px;overflow-x:auto;border-top:1px solid #333;padding-top:8px}.range{appearance:none;border:0;background:transparent;color:#aaa;font-weight:700;font-size:1rem;padding:10px 12px;cursor:pointer}.range[aria-pressed="true"]{color:#fff;border-bottom:3px solid #fff}.chart-empty{display:grid;place-items:center;height:100%;color:#aaa}
+  @media(max-width:620px){.wrap{padding:16px}.head{align-items:flex-start;flex-direction:column}.value-panel{padding:18px}.chart-wrap{height:220px}.range{padding:10px 8px}.head .btn{padding:9px 11px}}
 </style>
-  <link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-<app-menu></app-menu>
-<script type="module" src="/src/menu-bootstrap.js"></script>
-
+<app-menu></app-menu><script type="module" src="/src/menu-bootstrap.js"></script>
 <div class="wrap">
-  <div class="head">
-    <a href="index.html">← Home</a>
-    <div>
-      <a class="btn" href="create.html">Add Item</a>
-      <a class="btn" href="settings.html" style="background:#444">Settings</a>
-    </div>
-  </div>
-
+  <div class="head"><a href="index.html">← Home</a><div><a class="btn" href="create.html">Add Item</a><a class="btn" href="settings.html" style="background:#444">Settings</a></div></div>
   <h2 id="title">My Portfolio</h2>
-  <div id="total" class="muted">Total: $0</div>
-
-  <div id="items" class="grid" style="margin-top:10px"></div>
-  <div id="msg" class="muted" style="margin-top:10px"></div>
+  <section class="value-panel" aria-labelledby="value-title"><div id="value-title" class="muted">Collection value</div><div id="total" class="value-total">$0.00</div><div id="change" class="value-summary"></div><div id="chart" class="chart-wrap" aria-live="polite"></div><div class="stats"><div><div class="stat-label positive">↑ High</div><div id="high" class="stat-value">$0.00</div></div><div style="text-align:right"><div class="stat-label negative">↓ Low</div><div id="low" class="stat-value">$0.00</div></div></div><div class="ranges" role="group" aria-label="Portfolio history range"><button class="range" data-range="1W" type="button" aria-pressed="false">1W</button><button class="range" data-range="1M" type="button" aria-pressed="false">1M</button><button class="range" data-range="3M" type="button" aria-pressed="true">3M</button><button class="range" data-range="6M" type="button" aria-pressed="false">6M</button><button class="range" data-range="1Y" type="button" aria-pressed="false">1Y</button><button class="range" data-range="ALL" type="button" aria-pressed="false">ALL</button></div></section>
+  <div id="items" class="grid"></div><div id="msg" class="muted" style="margin-top:10px"></div>
 </div>
-
 <script type="module" src="/src/pages/portfolio.js"></script>
 </body>
 </html>
-
-
