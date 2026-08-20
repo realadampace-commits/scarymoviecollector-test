@@ -54,9 +54,10 @@
     <h3>USDC (Base) Wallet</h3>
     <p class="muted">Enter your Base address (starts with 0x…) to receive USDC for sales. Required to sell. Only <strong>subscribers</strong> (and moderators/owner) can enable selling.</p>
     <div class="tools">
-      <input id="usdcAddr" placeholder="0x..." style="min-width:320px">
+      <label class="muted" for="usdcAddr">Base wallet address</label>
+      <input id="usdcAddr" name="usdcAddr" autocomplete="off" inputmode="text" placeholder="0x..." style="min-width:320px">
       <button id="saveUsdc" style="background:#2a6">Save</button>
-      <span id="usdcMsg" class="muted"></span>
+      <span id="usdcMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
     </div>
   </div>
 
@@ -69,9 +70,10 @@
         <div id="frameOverlay" class="frameOverlay"></div>
       </div>
       <div class="tools">
+        <label class="muted" for="avatarFile">Choose a profile picture</label>
         <input type="file" id="avatarFile" accept="image/*" />
-        <button id="uploadAvatar">Upload</button>
-        <span id="avatarMsg" class="muted"></span>
+        <button id="uploadAvatar" type="button">Upload</button>
+        <span id="avatarMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
       </div>
     </div>
   </div>
@@ -80,11 +82,11 @@
   <div class="card">
     <h3>Change Username</h3>
     <div class="row">
-      <label class="muted">New username</label>
+      <label class="muted" for="username">New username</label>
       <div class="tools">
-        <input id="username" placeholder="e.g., nate008"/>
+        <input id="username" name="username" autocomplete="username" placeholder="e.g., nate008"/>
         <button id="saveUsername">Save</button>
-        <span id="userMsg" class="muted"></span>
+        <span id="userMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
       </div>
     </div>
   </div>
@@ -92,10 +94,11 @@
   <!-- Bio -->
   <div class="card">
     <h3>Bio</h3>
-    <textarea id="bioInput" placeholder="Tell people about yourself…" style="width:100%;height:80px;"></textarea>
+    <label class="muted" for="bioInput">About you</label>
+    <textarea id="bioInput" name="bio" autocomplete="off" placeholder="Tell people about yourself…" style="width:100%;height:80px;"></textarea>
     <div class="tools" style="margin-top:8px">
       <button id="saveBio">Save Bio</button>
-      <span id="bioMsg" class="muted"></span>
+      <span id="bioMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
     </div>
   </div>
 
@@ -104,9 +107,10 @@
     <h3>Showcase Favorites</h3>
     <p class="muted" style="margin-top:6px">Paste up to 5 item IDs (from item URLs) separated by commas.</p>
     <div class="tools">
-      <input id="showcaseInput" placeholder="65a7f..., b91c4..., ..." style="flex:1"/>
+      <label class="muted" for="showcaseInput">Item IDs</label>
+      <input id="showcaseInput" name="showcase" autocomplete="off" placeholder="65a7f..., b91c4..., ..." style="flex:1"/>
       <button id="saveShowcase">Save Showcase</button>
-      <span id="showcaseMsg" class="muted"></span>
+      <span id="showcaseMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
     </div>
   </div>
 
@@ -121,18 +125,21 @@
     <div class="tools" id="subsTools" style="display:none;margin-top:8px">
       <button id="saveFrame" style="background:#2a6">Use Selected Frame</button>
       <button id="clearFrame" style="background:#555">Remove Frame</button>
-      <span id="frameMsg" class="muted"></span>
+      <span id="frameMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
     </div>
 
     <!-- Owner upload tools -->
     <div id="modTools" style="display:none;margin-top:14px;border-top:1px dashed #333;padding-top:12px">
       <h4 style="margin:0 0 6px">Owner: Upload new frame</h4>
       <div class="tools">
-        <input id="frameTitle" placeholder="Frame title (optional)"/>
-        <input id="frameScale" type="number" step="0.01" min="0.5" max="2" value="1.08" style="width:110px" title="Scale"/>
-        <input id="frameFile" type="file" accept="image/*" />
+        <label class="muted" for="frameTitle">Frame title (optional)</label>
+        <input id="frameTitle" name="frameTitle" autocomplete="off" placeholder="e.g., Neon VHS"/>
+        <label class="muted" for="frameScale">Frame scale</label>
+        <input id="frameScale" name="frameScale" type="number" step="0.01" min="0.5" max="2" value="1.08" style="width:110px" />
+        <label class="muted" for="frameFile">Frame image</label>
+        <input id="frameFile" name="frameFile" type="file" accept="image/*" />
         <button id="uploadFrame">Upload Frame</button>
-        <span id="uploadMsg" class="muted"></span>
+        <span id="uploadMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
       </div>
       <div class="muted" style="font-size:12px">Recommended: square PNG with transparency (e.g., 1024×1024).</div>
     </div>
@@ -144,7 +151,7 @@
     <p class="muted">We’ll send a secure reset link to your email.</p>
     <div class="tools">
       <button id="sendReset">Send Password Reset Email</button>
-      <span id="pwdMsg" class="muted"></span>
+      <span id="pwdMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
     </div>
   </div>
 
@@ -154,19 +161,19 @@
     <div class="tools">
       <button id="logoutLocal"  style="background:#666">Sign out (this device)</button>
       <button id="logoutGlobal" style="background:#c33">Sign out (all devices)</button>
-      <span id="logoutMsg" class="muted"></span>
+      <span id="logoutMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
     </div>
   </div>
 </div>
 
 <!-- Frame Editor Modal -->
-<div id="frameEditor" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+<div id="frameEditor" role="dialog" aria-modal="true" aria-labelledby="frameEditorTitle" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
      z-index:9999;align-items:center;justify-content:center">
   <div style="background:#1c1c1c;color:#eee;border-radius:12px;max-width:520px;width:90%;
               padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.5)">
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <h3 style="margin:0">Edit Frame</h3>
-      <button id="feClose" style="background:#333;border:none;border-radius:6px;padding:6px 10px;cursor:pointer">Close</button>
+      <h3 id="frameEditorTitle" style="margin:0">Edit Frame</h3>
+      <button id="feClose" type="button" style="background:#333;border:none;border-radius:6px;padding:6px 10px;cursor:pointer">Close</button>
     </div>
 
     <div style="display:flex;gap:16px;align-items:center;margin:12px 0">
@@ -176,16 +183,16 @@
       </div>
       <div style="flex:1">
         <div style="display:grid;grid-template-columns:80px 1fr auto;align-items:center;gap:8px">
-          <label>X:</label>
-          <input id="feX" type="range" min="-80" max="80" step="1">
+          <label for="feX">X:</label>
+          <input id="feX" type="range" min="-80" max="80" step="1" aria-describedby="feXv">
           <span id="feXv" class="muted"></span>
 
-          <label>Y:</label>
-          <input id="feY" type="range" min="-80" max="80" step="1">
+          <label for="feY">Y:</label>
+          <input id="feY" type="range" min="-80" max="80" step="1" aria-describedby="feYv">
           <span id="feYv" class="muted"></span>
 
-          <label>Scale:</label>
-          <input id="feS" type="range" min="0.5" max="2" step="0.01">
+          <label for="feS">Scale:</label>
+          <input id="feS" type="range" min="0.5" max="2" step="0.01" aria-describedby="feSv">
           <span id="feSv" class="muted"></span>
         </div>
       </div>

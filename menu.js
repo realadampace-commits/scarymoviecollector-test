@@ -60,7 +60,7 @@ class AppMenu extends HTMLElement {
     this.addEventListener('keydown', (e) => e.key === 'Escape' && this.close());
 
     this.highlightActive();
-    this.close();
+    this.close({ restoreFocus: false });
     this.checkAuth(); // show/hide proper items
   }
 
@@ -68,11 +68,15 @@ class AppMenu extends HTMLElement {
     this._drawer.hidden = false;
     this._overlay.classList.add('show');
     this._hamburger.setAttribute('aria-expanded', 'true');
+    this._hamburger.setAttribute('aria-label', 'Close menu');
+    this._drawer.querySelector('a:not([hidden])')?.focus();
   }
-  close() {
+  close({ restoreFocus = true } = {}) {
     this._drawer.hidden = true;
     this._overlay.classList.remove('show');
     this._hamburger.setAttribute('aria-expanded', 'false');
+    this._hamburger.setAttribute('aria-label', 'Open menu');
+    if (restoreFocus) this._hamburger.focus();
   }
   toggle() { this._drawer.hidden ? this.open() : this.close(); }
 

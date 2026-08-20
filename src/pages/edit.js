@@ -42,18 +42,22 @@ if (!owner) {
   addBtn.addEventListener('click', async () => {
     const files = Array.from(newFiles.files || []);
     if (!files.length) { imageMsg.textContent = 'Choose at least one image.'; return; }
-    addBtn.disabled = true; imageMsg.textContent = 'Uploading…';
+    addBtn.disabled = true; addBtn.setAttribute('aria-busy', 'true'); imageMsg.textContent = 'Uploading…';
     try {
       await uploadOwnItemImages(client, id, session.user.id, files);
       images = await listItemImages(client, id); renderImages(); newFiles.value = ''; imageMsg.textContent = 'Uploaded.';
     } catch (error) { imageMsg.textContent = error.message || 'Unable to upload images.'; }
-    finally { addBtn.disabled = false; }
+    finally { addBtn.disabled = false; addBtn.removeAttribute('aria-busy'); }
   });
 }
 document.getElementById('permNote').textContent = owner ? 'Metadata and image editing enabled; sale controls are temporarily unavailable.' : 'View-only access.';
 if (!owner) document.getElementById('saveDetails').disabled = true;
 document.getElementById('saveDetails').addEventListener('click', async () => {
   const message = document.getElementById('detailsMsg');
+  const saveButton = document.getElementById('saveDetails');
+  if (saveButton.disabled) return;
+  saveButton.disabled = true; saveButton.setAttribute('aria-busy', 'true'); message.textContent = 'Saving…';
   try { await updateOwnItem(client, id, session.user.id, { title: title.value.trim(), description: desc.value, price: Number(price.value) }); message.textContent = 'Saved.'; }
-  catch (error) { message.textContent = error.message || 'Unable to save changes.'; }
+  catch (error) { message.textContent = error.message || 'Unable to save changes. Try again.'; }
+  finally { saveButton.disabled = false; saveButton.removeAttribute('aria-busy'); }
 });

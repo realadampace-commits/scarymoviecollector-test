@@ -5,6 +5,7 @@ const client = getSupabaseClient();
 const firstPassword = document.getElementById('pwd1');
 const secondPassword = document.getElementById('pwd2');
 const saveButton = document.getElementById('save');
+const resetForm = document.getElementById('resetForm');
 const message = document.getElementById('msg');
 let recoveryVerified = false;
 
@@ -32,7 +33,8 @@ setTimeout(() => {
   if (!recoveryVerified) setMessage('This password-reset link is invalid or expired. Request a new one from sign in.', 'err');
 }, 1000);
 
-saveButton.addEventListener('click', async () => {
+resetForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
   if (!recoveryVerified) return;
   setFormEnabled(false);
   setMessage('Saving new password…');

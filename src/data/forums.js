@@ -26,9 +26,10 @@ export async function listForumChildren(client, categoryId) {
   return data ?? [];
 }
 
-export async function listCategoryPosts(client, categoryId) {
+export async function listCategoryPosts(client, categoryId, { limit = 100 } = {}) {
   if (!categoryId || typeof categoryId !== 'string') throw new TypeError('category id is required');
-  const { data, error } = await client.from('forum_posts').select('id,title,body,created_at,author_id,category_id').eq('category_id', categoryId).order('created_at', { ascending: false });
+  const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 100);
+  const { data, error } = await client.from('forum_posts').select('id,title,body,created_at,author_id,category_id').eq('category_id', categoryId).order('created_at', { ascending: false }).limit(safeLimit);
   if (error) throw error;
   return data ?? [];
 }
@@ -44,6 +45,7 @@ export async function listForumCategories(client) {
 }
 
 export async function listForumPosts(client, { categoryId, limit = 25 } = {}) {
+  if (categoryId != null && typeof categoryId !== 'string') throw new TypeError('category id must be a string');
   const safeLimit = Math.min(Math.max(Number(limit) || 25, 1), 100);
   let query = client
     .from('forum_posts')

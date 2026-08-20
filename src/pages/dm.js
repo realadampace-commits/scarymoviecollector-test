@@ -14,22 +14,36 @@ const text = document.getElementById('text');
 const send = document.getElementById('send');
 const status = document.getElementById('status');
 async function render() {
-  const messages = await listThreadMessages(client, threadId);
-  list.innerHTML = messages.map((message) => `<div class="row ${message.author_id === session.user.id ? 'mine' : ''}"><div class="bubble">${escapeHtml(message.body)}</div><div class="meta">${message.author_id === session.user.id ? 'You' : 'Participant'}</div></div>`).join('');
-  list.scrollTop = list.scrollHeight;
+  list.setAttribute('aria-busy', 'true');
+  try {
+    const messages = await listThreadMessages(client, threadId);
+    list.innerHTML = messages.length
+      ? messages.map((message) => `<div class="row ${message.author_id === session.user.id ? 'mine' : ''}"><div class="bubble">${escapeHtml(message.body)}</div><div class="meta">${message.author_id === session.user.id ? 'You' : 'Participant'}</div></div>`).join('')
+      : '<p class="muted empty-state">No messages yet. Send a message to start the conversation.</p>';
+    list.scrollTop = list.scrollHeight;
+  } catch (error) {
+    console.error(error);
+    list.innerHTML = '<p class="muted">Unable to load messages right now. <button class="retry-messages" type="button">Retry loading messages</button></p>';
+  } finally {
+    list.setAttribute('aria-busy', 'false');
+  }
 }
 head.textContent = `Conversation ${threadId}`;
 async function submit() {
   const body = text.value.trim();
   if (!body) return;
   send.disabled = true;
+  status.textContent = 'Sending…';
   try { await sendMessage(client, { threadId, authorId: session.user.id, body }); text.value = ''; status.textContent = 'Sent.'; await render(); }
   catch (error) { status.textContent = error.message || 'Unable to send message.'; }
   finally { send.disabled = false; }
 }
 send.addEventListener('click', submit);
+list.addEventListener('click', (event) => {
+  if (event.target.closest('.retry-messages')) render();
+});
 text.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(); } });
-try { await render(); } catch (error) { status.textContent = 'Unable to load messages.'; console.error(error); }
+await render();
 
 const channel = client.channel(`dm-thread-${threadId}`)
   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dm_messages', filter: `thread_id=eq.${threadId}` }, async () => {

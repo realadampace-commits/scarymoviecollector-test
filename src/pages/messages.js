@@ -63,10 +63,17 @@ function renderThreadList() {
 
 async function renderInbox(selectId = null) {
   status.textContent = 'Loading conversations…';
-  const threads = await listMyThreads(client);
-  threadCards = await Promise.all(threads.map(enrichThread));
-  renderThreadList();
-  if (selectId && threadCards.some((thread) => thread.id === selectId)) await selectThread(selectId, { refreshInbox: false });
+  list.innerHTML = '';
+  try {
+    const threads = await listMyThreads(client);
+    threadCards = await Promise.all(threads.map(enrichThread));
+    renderThreadList();
+    if (selectId && threadCards.some((thread) => thread.id === selectId)) await selectThread(selectId, { refreshInbox: false });
+  } catch (error) {
+    threadCards = [];
+    status.innerHTML = 'Unable to load conversations right now. <button class="retry-inbox" type="button">Retry loading conversations</button>';
+    console.error(error);
+  }
 }
 
 async function selectThread(id, { refreshInbox = true } = {}) {
@@ -80,6 +87,7 @@ async function selectThread(id, { refreshInbox = true } = {}) {
   headAvatar.textContent = initials(thread.profile?.username);
   text.disabled = false;
   send.disabled = false;
+  text.focus();
   composeStatus.textContent = '';
   renderThreadList();
   preview.innerHTML = '<div class="welcome"><p>Loading messages…</p></div>';
@@ -94,7 +102,7 @@ async function selectThread(id, { refreshInbox = true } = {}) {
     preview.scrollTop = preview.scrollHeight;
   } catch (error) {
     if (!selectionRequests.isCurrent(request) || activeThread?.id !== id) return;
-    preview.innerHTML = '<div class="welcome"><h2>Unable to load messages</h2><p>Please try again.</p></div>';
+    preview.innerHTML = '<div class="welcome"><h2>Unable to load messages</h2><p>Check your connection, then retry.</p><button class="retry-messages" type="button">Retry loading messages</button></div>';
     console.error(error);
   }
   if (refreshInbox) renderThreadList();
@@ -105,6 +113,8 @@ async function startChat() {
   if (!term) { startMsg.textContent = 'Enter a username to start a chat.'; return; }
   startMsg.textContent = 'Searching…';
   startBtn.disabled = true;
+  startBtn.setAttribute('aria-busy', 'true');
+  startBtn.textContent = 'Searching…';
   try {
     const matches = await searchProfiles(client, term, { limit: 8 });
     const target = matches.find((profile) => profile.id !== session.user.id);
@@ -117,6 +127,8 @@ async function startChat() {
     startMsg.textContent = error.message || 'Unable to start chat.';
   } finally {
     startBtn.disabled = false;
+    startBtn.removeAttribute('aria-busy');
+    startBtn.textContent = 'Send';
   }
 }
 
@@ -147,7 +159,24 @@ async function submitMessage() {
 document.getElementById('startForm').addEventListener('submit', (event) => { event.preventDefault(); startChat(); });
 document.getElementById('composer').addEventListener('submit', (event) => { event.preventDefault(); submitMessage(); });
 document.getElementById('focusStart').addEventListener('click', () => userSearch.focus());
-document.getElementById('backToInbox').addEventListener('click', () => shell.classList.remove('show-thread'));
+function returnToInbox() {
+  shell.classList.remove('show-thread');
+  list.querySelector(`[data-id="${CSS.escape(activeThread?.id || '')}"]`)?.focus();
+}
+
+document.getElementById('backToInbox').addEventListener('click', returnToInbox);
+status.addEventListener('click', (event) => {
+  if (event.target.closest('.retry-inbox')) renderInbox();
+});
+preview.addEventListener('click', (event) => {
+  if (event.target.closest('.retry-messages') && activeThread) selectThread(activeThread.id, { refreshInbox: false });
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && shell.classList.contains('show-thread')) {
+    event.preventDefault();
+    returnToInbox();
+  }
+});
 text.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submitMessage(); } });
 
-try { await renderInbox(); } catch (error) { status.textContent = 'Unable to load conversations right now.'; console.error(error); }
+await renderInbox();

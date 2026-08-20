@@ -25,13 +25,14 @@
   <h2>New Post</h2>
 
   <div class="card">
-    <label>Title</label>
-    <input id="title" placeholder="Thread title"/>
-    <label style="margin-top:10px">Body</label>
-    <textarea id="body" rows="8" placeholder="Write your post…"></textarea>
+    <label for="title">Title</label>
+    <input id="title" name="title" required autocomplete="off" aria-describedby="postHelp" placeholder="Thread title"/>
+    <label for="body" style="margin-top:10px">Body</label>
+    <textarea id="body" name="body" rows="8" required aria-describedby="postHelp" placeholder="Write your post…"></textarea>
+    <p id="postHelp" class="muted">Both fields are required. Your post will be visible to the community.</p>
     <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
-      <button id="save">Create</button>
-      <span id="msg" class="muted"></span>
+      <button id="save" type="button" disabled aria-disabled="true">Create</button>
+      <span id="msg" class="muted" role="status" aria-live="polite"></span>
     </div>
   </div>
 </div>
@@ -56,11 +57,20 @@ let me=null, myRole='free';
 
 (async function init(){
   const { data:{ session } } = await sb.auth.getSession();
-  if(!session){ alert('Please sign in.'); location.href='login.html?next='+encodeURIComponent(location.pathname+location.search); return; }
+  if(!session){
+    msg('Please sign in to create a post. Redirecting to sign in…','err');
+    location.href='login.html?next='+encodeURIComponent(location.pathname+location.search);
+    return;
+  }
   me = session.user;
   const { data:p } = await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();
   myRole = p?.role || 'free';
-  if (myRole==='free'){ alert('Free members cannot create posts.'); location.href='forum_category.html?id='+catId; return; }
+  if (myRole==='free'){
+    msg('Free members cannot create posts. Return to the category to keep browsing.','err');
+    return;
+  }
+  saveBtn.disabled = false;
+  saveBtn.removeAttribute('aria-disabled');
 })();
 
 saveBtn.addEventListener('click', async ()=>{
@@ -69,11 +79,18 @@ saveBtn.addEventListener('click', async ()=>{
   if(!title || !body) return msg('Title and body required.','err');
 
   msg('Creating…');
+  saveBtn.disabled = true;
+  saveBtn.setAttribute('aria-busy', 'true');
   const { data: ins, error } = await sb.from('forum_posts').insert({
     title, body, category_id: catId, author_id: me.id   // <-- include author_id
   }).select('id').single();
 
-  if (error) return msg('Error: '+error.message,'err');
+  if (error) {
+    saveBtn.disabled = false;
+    saveBtn.removeAttribute('aria-busy');
+    msg('Error: '+error.message+' Try again.','err');
+    return;
+  }
   location.href = 'forum_post.html?id=' + ins.id;
 });
 </script>

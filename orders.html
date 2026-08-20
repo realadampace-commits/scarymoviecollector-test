@@ -35,25 +35,25 @@
   <div class="muted small">View purchases and sales (USDC on Base).</div>
 
   <div class="card">
-    <div class="tabs">
-      <button id="tabBuy"  class="tab active">Buying</button>
-      <button id="tabSell" class="tab">Selling</button>
-      <span id="status" class="muted" style="margin-left:auto"></span>
+    <div class="tabs" role="tablist" aria-label="Order history">
+      <button id="tabBuy"  class="tab active" role="tab" aria-selected="true" aria-controls="buyPane" tabindex="0" data-tab-label="Buying">Buying <span class="tab-count" aria-hidden="true">0</span></button>
+      <button id="tabSell" class="tab" role="tab" aria-selected="false" aria-controls="sellPane" tabindex="-1" data-tab-label="Selling">Selling <span class="tab-count" aria-hidden="true">0</span></button>
+      <span id="status" class="muted" role="status" aria-live="polite" style="margin-left:auto"></span>
     </div>
 
-    <div id="buyPane">
+    <div id="buyPane" role="tabpanel" aria-labelledby="tabBuy" tabindex="0">
       <div id="buyList"  class="grid" style="margin-top:8px"></div>
       <div id="buyEmpty" class="muted" style="margin-top:8px;display:none">No purchases yet.</div>
     </div>
 
-    <div id="sellPane" style="display:none">
+    <div id="sellPane" role="tabpanel" aria-labelledby="tabSell" tabindex="0" hidden>
       <div id="sellList"  class="grid" style="margin-top:8px"></div>
       <div id="sellEmpty" class="muted" style="margin-top:8px;display:none">No sales yet.</div>
     </div>
   </div>
 
   <div class="card small">
-    <strong>Note:</strong> Tx links go to BaseScan. Sellers can add a tracking number and mark as shipped; buyers can mark an order as received to complete it.
+    <strong>Note:</strong> Tx links go to BaseScan. Order history is read-only until server-verified shipping and receipt actions are available.
   </div>
 </div>
 

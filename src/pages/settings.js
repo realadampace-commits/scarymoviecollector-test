@@ -27,18 +27,24 @@ const renderAvatar = (url) => {
   avatarBox.append(image);
 };
 renderAvatar(profile?.avatar_url);
-async function save(patch, messageId) {
+async function save(patch, messageId, buttonId) {
   const message = document.getElementById(messageId);
-  try { await updateOwnProfile(client, session.user.id, patch); message.textContent = 'Saved.'; }
-  catch (error) { message.textContent = error.message || 'Unable to save.'; }
+  const button = buttonId ? document.getElementById(buttonId) : null;
+  if (button?.disabled) return;
+  if (button) button.disabled = true;
+  if (message) message.textContent = 'Saving…';
+  try { await updateOwnProfile(client, session.user.id, patch); if (message) message.textContent = 'Saved.'; }
+  catch (error) { if (message) message.textContent = error.message || 'Unable to save.'; }
+  finally { if (button) button.disabled = false; }
 }
-document.getElementById('saveUsername')?.addEventListener('click', () => save({ username: username.value.trim() }, 'userMsg'));
-document.getElementById('saveBio')?.addEventListener('click', () => save({ bio: bio.value }, 'bioMsg'));
-document.getElementById('saveShowcase')?.addEventListener('click', () => save({ showcase_ids: showcase.value.split(',').map((id) => id.trim()).filter(Boolean) }, 'showcaseMsg'));
+document.getElementById('saveUsername')?.addEventListener('click', () => save({ username: username.value.trim() }, 'userMsg', 'saveUsername'));
+document.getElementById('saveBio')?.addEventListener('click', () => save({ bio: bio.value }, 'bioMsg', 'saveBio'));
+document.getElementById('saveShowcase')?.addEventListener('click', () => save({ showcase_ids: showcase.value.split(',').map((id) => id.trim()).filter(Boolean) }, 'showcaseMsg', 'saveShowcase'));
 document.getElementById('uploadAvatar')?.addEventListener('click', async () => {
   const file = document.getElementById('avatarFile')?.files?.[0];
   const button = document.getElementById('uploadAvatar');
   const message = document.getElementById('avatarMsg');
+  if (!file) { message.textContent = 'Choose an image before uploading.'; return; }
   button.disabled = true;
   message.textContent = 'Uploading…';
   try {
@@ -72,7 +78,15 @@ try {
   row.replaceChildren(...frames.map((frame) => {
     const card = document.createElement('button'); card.type = 'button'; card.className = 'frameCard';
     if (frame.image_url === profile?.frame_url) { card.classList.add('sel'); selectedFrame = frame; }
-    card.innerHTML = `<div class="frameThumb"><img alt="" src="${frame.image_url}"></div><div>${frame.title || 'Untitled frame'}</div>`;
+    const thumb = document.createElement('div');
+    thumb.className = 'frameThumb';
+    const image = document.createElement('img');
+    image.alt = '';
+    image.src = frame.image_url;
+    thumb.append(image);
+    const title = document.createElement('div');
+    title.textContent = frame.title || 'Untitled frame';
+    card.append(thumb, title);
     card.addEventListener('click', () => { if (!canUseFrames) return; selectedFrame = frame; row.querySelectorAll('.frameCard').forEach((x) => x.classList.remove('sel')); card.classList.add('sel'); renderFrame(frame); });
     return card;
   }));
@@ -81,7 +95,7 @@ document.getElementById('saveFrame')?.addEventListener('click', () => selectedFr
 document.getElementById('clearFrame')?.addEventListener('click', () => save({ frame_url: null, frame_scale: 1, frame_offset_x: 0, frame_offset_y: 0 }, 'frameMsg').then(() => renderFrame(null)));
 document.getElementById('uploadFrame')?.addEventListener('click', async () => {
   const message = document.getElementById('uploadMsg'); const button = document.getElementById('uploadFrame'); button.disabled = true; message.textContent = 'Uploading…';
-  try { const frame = await createFrame(client, session.user.id, document.getElementById('frameFile')?.files?.[0], { title: document.getElementById('frameTitle')?.value, scale: document.getElementById('frameScale')?.value }); frames.push(frame); message.textContent = 'Frame uploaded. Reload to use it.'; } catch (error) { message.textContent = error.message || 'Unable to upload frame.'; } finally { button.disabled = false; }
+  try { const frame = await createFrame(client, session.user.id, document.getElementById('frameFile')?.files?.[0], { title: document.getElementById('frameTitle')?.value, scale: document.getElementById('frameScale')?.value }); frames.push(frame); selectedFrame = frame; renderFrame(frame); message.textContent = 'Frame uploaded and selected. Save to apply it.'; } catch (error) { message.textContent = error.message || 'Unable to upload frame.'; } finally { button.disabled = false; }
 });
 document.getElementById('logoutLocal')?.addEventListener('click', async () => { await signOut(client); location.href = 'login.html'; });
 document.getElementById('logoutGlobal')?.addEventListener('click', async () => { await signOut(client); location.href = 'login.html'; });

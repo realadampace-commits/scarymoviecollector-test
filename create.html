@@ -29,23 +29,24 @@
   <h2>Create a new Item</h2>
 
   <div class="card">
-    <div class="row"><label>Title</label><input id="title" placeholder="Item title"/></div>
-    <div class="row"><label>Description</label><textarea id="desc" rows="4" placeholder="Describe the item…"></textarea></div>
-    <div class="row"><label>Your value ($)</label><input id="price" type="number" step="1" min="0" placeholder="e.g. 150"/></div>
+    <div class="row"><label for="title">Title</label><input id="title" placeholder="Item title" required /></div>
+    <div class="row"><label for="desc">Description</label><textarea id="desc" rows="4" placeholder="Describe the item…"></textarea></div>
+    <div class="row"><label for="price">Your value ($)</label><input id="price" type="number" step="1" min="0" placeholder="e.g. 150"/></div>
   </div>
 
   <div class="card">
     <h3 style="margin:0 0 6px">Images (up to 5)</h3>
     <div class="upbox">
-      <input id="imgFiles" type="file" accept="image/*" multiple />
-      <div class="muted" style="margin-top:6px">Tip: select up to 5 images. First image becomes the main display.</div>
+      <label class="muted" for="imgFiles">Item images</label>
+      <input id="imgFiles" type="file" accept="image/*" multiple aria-describedby="imageHelp" />
+      <div id="imageHelp" class="muted" style="margin-top:6px">Tip: select up to 5 images. First image becomes the main display.</div>
       <div id="previews" class="thumbs"></div>
     </div>
   </div>
 
   <div class="card" style="display:flex;gap:10px;align-items:center">
-    <button id="saveBtn">Create Item</button>
-    <span id="msg" class="muted"></span>
+    <button id="saveBtn" type="button">Create Item</button>
+    <span id="msg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
   </div>
 </div>
 

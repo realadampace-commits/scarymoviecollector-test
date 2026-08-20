@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { createRequestTracker, getOtherParticipantId, listThreadMessages, sendMessage } from '../src/data/messages.js';
 
 function fakeClient(result) {
@@ -41,4 +43,54 @@ test('sendMessage trims body and sends explicit author identity', async () => {
   assert.deepEqual(fake.calls.find((x) => x[0] === 'insert')[1], {
     thread_id: 't1', author_id: 'u1', body: 'hello'
   });
+});
+
+test('new-chat search has a visible associated label', () => {
+  const html = readFileSync(resolve(import.meta.dirname, '../messages.html'), 'utf8');
+  assert.match(html, /<label for="userSearch">Username<\/label>/);
+  assert.match(html, /<input id="userSearch" autocomplete="off" placeholder="Message @username"\/>/);
+});
+
+test('new-chat search exposes its in-progress state and restores the action label', () => {
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
+  assert.match(script, /startBtn\.setAttribute\('aria-busy', 'true'\)/);
+  assert.match(script, /startBtn\.textContent = 'Searching…'/);
+  assert.match(script, /startBtn\.removeAttribute\('aria-busy'\)/);
+  assert.match(script, /startBtn\.textContent = 'Send'/);
+});
+
+test('message composer explains its Enter and Shift+Enter shortcuts', () => {
+  const html = readFileSync(resolve(import.meta.dirname, '../messages.html'), 'utf8');
+  assert.match(html, /aria-describedby="composerHelp"/);
+  assert.match(html, /Choose a conversation to enable messaging\. Enter to send · Shift\+Enter for a new line/);
+});
+
+test('message navigation restores focus after switching mobile views', () => {
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
+  assert.match(script, /text\.focus\(\)/);
+  assert.match(script, /function returnToInbox\(\)/);
+  assert.match(script, /shell\.classList\.remove\('show-thread'\)/);
+  assert.match(script, /CSS\.escape\(activeThread\?\.id/);
+});
+
+test('message navigation supports Escape to close the active conversation', () => {
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
+  assert.match(script, /event\.key === 'Escape'/);
+  assert.match(script, /shell\.classList\.contains\('show-thread'\)/);
+  assert.match(script, /event\.preventDefault\(\);\s*returnToInbox\(\);/);
+});
+
+test('message loading errors provide an actionable retry control', () => {
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
+  assert.match(script, /Check your connection, then retry/);
+  assert.match(script, /class=\"retry-messages\" type=\"button\"/);
+  assert.match(script, /preview\.addEventListener\('click'/);
+  assert.match(script, /selectThread\(activeThread\.id, \{ refreshInbox: false \}\)/);
+});
+
+test('conversation inbox loading errors provide an actionable retry control', () => {
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
+  assert.match(script, /class=\"retry-inbox\" type=\"button\"/);
+  assert.match(script, /status\.addEventListener\('click'/);
+  assert.match(script, /if \(event\.target\.closest\('\.retry-inbox'\)\) renderInbox\(\)/);
 });

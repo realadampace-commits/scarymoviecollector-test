@@ -22,12 +22,14 @@ document.getElementById('signup').addEventListener('click', async () => {
   finally { setBusy(false); }
 });
 
-document.getElementById('signin').addEventListener('click', async () => {
+const signIn = async () => {
   setBusy(true); setMsg('Signing in…');
   try { await signInWithPassword(client, email.value, password.value); setMsg('Signed in. Redirecting…', 'ok'); setTimeout(() => { location.href = nextUrl; }, 300); }
   catch (error) { setMsg(error.message || 'Sign-in failed.', 'err'); }
   finally { setBusy(false); }
-});
+};
+
+document.getElementById('authForm').addEventListener('submit', (event) => { event.preventDefault(); signIn(); });
 
 document.getElementById('forgot').addEventListener('click', async () => {
   setBusy(true); setMsg('Sending reset link…');

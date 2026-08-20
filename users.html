@@ -27,11 +27,12 @@
   <h2>Search Users</h2>
 
   <form id="searchForm" style="display:flex; gap:8px; margin:8px 0 16px">
-    <input id="q" placeholder="Type a username (e.g., nate008)" />
-    <button>Search</button>
+    <label for="q">Username</label>
+    <input id="q" name="q" type="search" autocomplete="username" placeholder="Type a username (e.g., nate008)" />
+    <button id="searchSubmit" type="submit">Search</button>
   </form>
 
-  <div id="results" class="muted">Type a name and press Search.</div>
+  <div id="results" class="muted" role="status" aria-live="polite" aria-atomic="true">Type a name and press Search.</div>
 </div>
 
 <script type="module" src="/src/pages/users.js"></script>

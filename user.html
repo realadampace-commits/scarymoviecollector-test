@@ -58,6 +58,7 @@
         <div id="roleBadge" class="pill" style="margin-top:6px;display:none"></div>
       </div>
     </div>
+    <div id="profileStatus" class="muted" role="status" aria-live="polite" aria-atomic="true">Loading profile…</div>
     <div id="bio" class="muted" style="margin-top:10px">—</div>
   </div>
 
@@ -72,7 +73,7 @@
   <!-- Active Portfolio -->
   <div class="sectionHead" style="margin-top:16px">
     <h3 style="margin:0">
-      <a id="portfolioLink" href="#" style="color:inherit;text-decoration:none">Portfolio</a>
+      <a id="portfolioLink" href="portfolio.html" style="color:inherit;text-decoration:none">Portfolio</a>
     </h3>
     <span id="portfolioCount" class="muted"></span>
   </div>
@@ -99,6 +100,7 @@ const roleBadge = document.getElementById('roleBadge');
 const avatarBox = document.getElementById('avatarBox');
 const frameOverlay = document.getElementById('frameOverlay');
 const bioEl = document.getElementById('bio');
+const profileStatus = document.getElementById('profileStatus');
 
 const portfolioGrid = document.getElementById('portfolioGrid');
 const portfolioCount = document.getElementById('portfolioCount');
@@ -111,13 +113,6 @@ const soldEmpty = document.getElementById('soldEmpty');
 const showcaseWrap = document.getElementById('showcaseWrap');
 const showcaseRow = document.getElementById('showcaseRow');
 
-// tiny debug line (optional)
-const dbg = (m,o)=>{ 
-  let el = document.getElementById('dbg'); 
-  if(!el){ el=document.createElement('div'); el.id='dbg'; el.style.cssText='margin:6px 0;color:#9aa;font-size:12px'; unameEl.parentElement.appendChild(el); }
-  el.textContent = '[debug] ' + m + (o?(' '+JSON.stringify(o)): '');
-  console.log('[user.html]', m, o||'');
-};
 
 const qs = new URLSearchParams(location.search);
 const rawU = decodeURIComponent((qs.get('u')||'').trim());
@@ -165,10 +160,10 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
   // If ?u is missing, show MY page (like portfolio.html)
   if (!username) {
     const { data:{ session } } = await sb.auth.getSession();
-    if (!session){ unameEl.textContent='User not found'; dbg('no ?u and no session'); return; }
+    if (!session){ unameEl.textContent='User not found'; profileStatus.textContent='Sign in to view your profile.'; return; }
     ownerId = session.user.id;
     const mep = await sb.from('profiles').select('id,username,role,bio,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y,showcase_ids').eq('id', ownerId).maybeSingle();
-    if (!mep.data){ unameEl.textContent='User not found'; dbg('self profile not found'); return; }
+    if (!mep.data){ unameEl.textContent='User not found'; profileStatus.textContent='We could not find that profile.'; return; }
     profile = mep.data;
   } else {
     // Public profile by username
@@ -176,11 +171,12 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
       .select('id,username,role,bio,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y,showcase_ids')
       .ilike('username', username)
       .maybeSingle();
-    if (!pq.data) { unameEl.textContent = 'User not found'; dbg('profile not found',{username}); return; }
+    if (!pq.data) { unameEl.textContent = 'User not found'; profileStatus.textContent = 'We could not find that profile.'; return; }
     profile = pq.data;
   }
 
   ownerId = profile.id;
+  profileStatus.textContent = '';
   
   unameEl.textContent = '@' + (profile.username || username || 'me');
   if (profile.role && profile.role !== 'free') {
@@ -213,21 +209,12 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
   
   const ids = Array.isArray(profile.showcase_ids) ? profile.showcase_ids.filter(Boolean) : [];
   if (ids.length) await loadShowcase(ids);
-})();
+})().catch(() => {
+  unameEl.textContent = 'Unable to load profile';
+  profileStatus.textContent = 'Check your connection and try again.';
+});
 
 async function loadAllItemsForUser(){
-  const debug = (msg, obj) => {
-    let el = document.getElementById('dbg');
-    if(!el){
-      el = document.createElement('div');
-      el.id = 'dbg';
-      el.style.cssText = 'margin:6px 0;color:#9aa;font-size:12px';
-      unameEl.parentElement.appendChild(el);
-    }
-    el.textContent = '[debug] ' + msg + (obj ? ' ' + JSON.stringify(obj) : '');
-    console.log('[user.html]', msg, obj || '');
-  };
-
   let rows = [];
 
   // A) Primary: by owner_id (fastest if visible)
@@ -235,9 +222,7 @@ async function loadAllItemsForUser(){
     .select('id,title,user_value,created_at,owner_id,is_for_sale,sold_at,sold_price')
     .eq('owner_id', ownerId)
     .order('created_at', { ascending:false });
-  if (qA.error) debug('A error', qA.error);
   rows = qA.data || [];
-  debug('A owner_id count', { count: rows.length });
 
   // B) Fallback: inner join by exact username (ensures join happens)
   if (!rows.length && profile?.username) {
@@ -245,9 +230,7 @@ async function loadAllItemsForUser(){
       .select('id,title,user_value,created_at,owner_id,is_for_sale,sold_at,sold_price,profiles!inner(username)')
       .eq('profiles.username', profile.username)
       .order('created_at', { ascending:false });
-    if (qB.error) debug('B error', qB.error);
     rows = qB.data || [];
-    debug('B username inner join count', { count: rows.length, username: profile.username });
   }
 
   // C) Fallback: case-insensitive username (ilike)
@@ -256,9 +239,7 @@ async function loadAllItemsForUser(){
       .select('id,title,user_value,created_at,owner_id,is_for_sale,sold_at,sold_price,profiles!inner(username)')
       .ilike('profiles.username', profile.username)
       .order('created_at', { ascending:false });
-    if (qC.error) debug('C error', qC.error);
     rows = qC.data || [];
-    debug('C username ilike join count', { count: rows.length, username: profile.username });
   }
 
   // D) Final fallback: if still nothing, render empties & stop
@@ -269,7 +250,6 @@ async function loadAllItemsForUser(){
     soldEmpty.style.display = 'block';
     portfolioCount.textContent = '';
     soldCount.textContent = '';
-    debug('No rows after all fallbacks');
     return;
   }
 
@@ -317,7 +297,6 @@ async function loadAllItemsForUser(){
     soldEmpty.style.display = 'none';
   }
 
-  debug('Rendered', { unsold: unsold.length, sold: sold.length });
 }
 
 

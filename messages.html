@@ -38,6 +38,8 @@
   .welcome { margin:auto; max-width:370px; text-align:center; color:var(--muted); }
   .welcome .avatar { margin:0 auto 13px; width:64px; height:64px; font-size:24px; }
   .welcome h2 { color:var(--ink); margin:0 0 6px; font-size:22px; }
+  .retry-messages { margin-top:10px; border:0; border-radius:999px; background:var(--messenger-blue); color:#fff; padding:9px 14px; font-weight:700; cursor:pointer; }
+  .retry-messages:hover { background:#0073e6; }
   .message-row { display:flex; align-items:flex-end; gap:8px; max-width:78%; }
   .message-row.mine { margin-left:auto; flex-direction:row-reverse; }
   .message-row .avatar { width:28px; height:28px; font-size:11px; }
@@ -45,6 +47,7 @@
   .mine .bubble { background:var(--messenger-blue); color:#fff; }
   .message-meta { display:block; color:var(--muted); font-size:11px; margin:3px 8px; }
   .composer { display:flex; gap:9px; align-items:flex-end; padding:14px 18px; border-top:1px solid var(--line); }
+  .composer-help { color:var(--muted); font-size:11px; margin:0 0 4px 8px; }
   .composer textarea { min-height:22px; max-height:120px; flex:1; resize:vertical; border:0; border-radius:20px; background:#f0f2f5; padding:10px 13px; outline:2px solid transparent; }
   .composer textarea:focus { outline-color:#b8dcff; background:#fff; }
   .send { min-width:60px; }
@@ -58,7 +61,7 @@
 <main class="messages-shell" id="messagesShell">
   <aside class="inbox" aria-label="Conversations">
     <header class="inbox-head"><h1>Chats</h1><button class="new-chat" id="focusStart" type="button" aria-label="Start a new chat">✎</button></header>
-    <form class="start-chat" id="startForm"><input id="userSearch" autocomplete="off" placeholder="Message @username" aria-label="Username"/><button id="startBtn" type="submit">Send</button></form>
+    <form class="start-chat" id="startForm"><label for="userSearch">Username</label><input id="userSearch" autocomplete="off" placeholder="Message @username"/><button id="startBtn" type="submit">Send</button></form>
     <div id="startMsg" class="start-msg" aria-live="polite"></div>
     <div id="list" class="thread-list"></div>
     <div id="status" class="empty-inbox" aria-live="polite"></div>
@@ -66,7 +69,7 @@
   <section class="conversation" aria-label="Current conversation">
     <header class="conversation-head"><button class="back" id="backToInbox" type="button" aria-label="Back to chats">‹</button><div class="avatar" id="headAvatar">?</div><div><h2 id="head">Choose a conversation</h2><div class="presence" id="subhead">Select a chat or start a new one.</div></div></header>
     <div id="preview" class="message-list" aria-live="polite"><div class="welcome"><div class="avatar">✦</div><h2>Your messages</h2><p>Choose a conversation on the left to read and reply.</p></div></div>
-    <form class="composer" id="composer"><span id="composeStatus" class="composer-status" aria-live="polite"></span><textarea id="text" rows="1" placeholder="Write a message" disabled aria-label="Message"></textarea><button id="send" class="send" type="submit" disabled>Send</button></form>
+    <form class="composer" id="composer"><span id="composeStatus" class="composer-status" aria-live="polite"></span><div style="min-width:0; flex:1"><textarea id="text" rows="1" placeholder="Write a message" disabled aria-label="Message" aria-describedby="composerHelp"></textarea><p class="composer-help" id="composerHelp">Choose a conversation to enable messaging. Enter to send · Shift+Enter for a new line</p></div><button id="send" class="send" type="submit" disabled>Send</button></form>
   </section>
 </main>
 <script type="module" src="/src/pages/messages.js"></script>

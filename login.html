@@ -18,14 +18,17 @@
 <body>
 <div class="box">
   <h2>Sign in / Sign up</h2>
-
-  <input id="email" type="email" placeholder="Email"/>
-  <input id="password" type="password" placeholder="Password (min 6)"/>
-  <button id="signup">Sign up with Email</button>
-  <button id="signin" class="alt">Sign in with Email</button>
+  <form id="authForm">
+  <label for="email">Email</label>
+  <input id="email" type="email" placeholder="Email" autocomplete="email" inputmode="email" autocapitalize="none" required/>
+  <label for="password" style="display:block;margin-top:8px">Password</label>
+  <input id="password" type="password" placeholder="Password (min 6)" autocomplete="current-password" required/>
+  <button id="signup" type="button">Sign up with Email</button>
+  <button id="signin" class="alt" type="submit">Sign in with Email</button>
   <button id="forgot" class="alt" type="button">Forgot your password?</button>
+  </form>
 
-  <div id="msg" class="msg"></div>
+  <div id="msg" class="msg" role="status" aria-live="polite"></div>
   <div class="small">After signing in you’ll be redirected to your <a href="portfolio.html">portfolio</a>.</div>
   <div id="diag" class="small"></div>
 </div>

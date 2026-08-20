@@ -18,10 +18,12 @@
   .btn.ok{background:var(--ok)}
   .stack{display:grid;gap:12px}
   .mainImg{background:#171717;border-radius:12px;display:flex;align-items:center;justify-content:center;min-height:320px;overflow:hidden;cursor:pointer}
+  .mainImg.no-image{cursor:default}
   .mainImg img{max-width:100%;max-height:520px;display:block}
   .thumbs{display:flex;gap:10px;flex-wrap:wrap}
-  .thumbs img{width:90px;height:90px;object-fit:cover;border-radius:8px;border:2px solid transparent;cursor:pointer}
-  .thumbs img.sel{border-color:#4ade80}
+  .thumbs button{width:90px;height:90px;padding:0;object-fit:cover;border-radius:8px;border:2px solid transparent;cursor:pointer;background:transparent;overflow:hidden}
+  .thumbs button.sel{border-color:#4ade80}
+  .thumbs img{width:100%;height:100%;object-fit:cover;display:block}
   /* lightbox */
   .overlay{position:fixed;inset:0;display:none;background:rgba(0,0,0,.85);z-index:999}
   .lightbox{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
@@ -58,7 +60,8 @@
     <h1 id="itemTitle" style="margin:0">Loading…</h1>
     <div class="ownerTools" id="ownerTools" style="display:none">
       <a class="btn" id="editBtn">Edit</a>
-      <button class="btn" id="deleteBtn">Delete</button>
+      <button class="btn" id="deleteBtn" type="button">Delete</button>
+      <span id="deleteMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
     </div>
   </div>
   <div class="muted" id="metaLine" style="margin-top:6px"></div>
@@ -67,7 +70,7 @@
     <!-- Left: gallery + description -->
     <div class="stack">
       <div class="card">
-        <div class="mainImg" id="mainImg">No image</div>
+        <div class="mainImg" id="mainImg" role="button" tabindex="0" aria-label="Open item image viewer">No image</div>
         <div id="thumbs" class="thumbs" style="margin-top:10px"></div>
       </div>
       <div class="card">
@@ -88,7 +91,7 @@
           <h3 style="margin:0 0 8px">Buy with USDC (Base)</h3>
           <p class="muted" style="margin:0 0 8px">Payments go directly to the seller’s wallet.</p>
           <button id="buyBtn" class="btn ok" style="background:#2a6">Buy Now</button>
-          <div id="buyMsg" class="muted" style="margin-top:6px"></div>
+          <div id="buyMsg" class="muted" style="margin-top:6px" role="status" aria-live="polite"></div>
         </div>
 
         <div class="muted" id="createdAt" style="margin-top:6px"></div>
@@ -102,8 +105,8 @@
 
         <div class="voteBox" id="voteBox" style="display:none;margin-top:12px">
           <div class="voteRow">
-            <button id="agreeBtn" class="voteBtn">Agree</button>
-            <button id="disagreeBtn" class="voteBtn">Disagree</button>
+            <button id="agreeBtn" class="voteBtn" aria-pressed="false">Agree</button>
+            <button id="disagreeBtn" class="voteBtn" aria-pressed="false">Disagree</button>
             <span id="bandHint" class="voteStats"></span>
           </div>
           <div id="disagreeBlock" class="voteInput" style="margin-top:8px">
@@ -111,7 +114,7 @@
             <input id="suggestPrice" type="number" step="1" min="0"/>
             <button id="saveSuggestion" class="voteBtn ok">Save</button>
           </div>
-          <div class="voteStats" id="voteMsg"></div>
+          <div class="voteStats" id="voteMsg" role="status" aria-live="polite"></div>
         </div>
 
         <div class="voteStats" id="guestMsg" style="display:none;margin-top:10px">
@@ -123,7 +126,7 @@
 </div>
 
 <!-- Lightbox overlay -->
-<div class="overlay" id="overlay">
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-label="Item image viewer">
   <div class="lightbox">
     <button class="navBtn navPrev" id="prevBtn" aria-label="Previous">&lt;</button>
     <img id="overlayImg" alt="">

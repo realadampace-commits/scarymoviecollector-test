@@ -15,9 +15,13 @@
 <div class="box">
   <h2>Choose a new password</h2>
   <p class="msg">Open this page using the password-reset link from your email.</p>
-  <input id="pwd1" type="password" autocomplete="new-password" placeholder="New password (min 6)"/>
-  <input id="pwd2" type="password" autocomplete="new-password" placeholder="Repeat new password"/>
-  <button id="save" type="button">Save new password</button>
+  <form id="resetForm">
+    <label for="pwd1">New password</label>
+    <input id="pwd1" type="password" autocomplete="new-password" minlength="6" required placeholder="At least 6 characters"/>
+    <label for="pwd2">Repeat new password</label>
+    <input id="pwd2" type="password" autocomplete="new-password" minlength="6" required placeholder="Repeat new password"/>
+    <button id="save" type="submit">Save new password</button>
+  </form>
   <div id="msg" class="msg" aria-live="polite"></div>
   <div class="msg" style="opacity:.8;margin-top:10px"><a href="login.html">Back to login</a></div>
 </div>

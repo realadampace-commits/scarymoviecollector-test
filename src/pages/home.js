@@ -18,8 +18,11 @@ function renderActions(session) {
   document.body.classList.remove('auth-pending');
 }
 
-try {
-  const client = getSupabaseClient();
+const client = getSupabaseClient();
+
+async function loadHome() {
+  msgEl.textContent = 'Loading items…';
+  listEl.innerHTML = '';
   const session = await getSession(client).catch((error) => {
     console.warn('Home auth-state load failed:', error);
     return null;
@@ -33,11 +36,16 @@ try {
       <div class="meta"><strong>${escapeHtml(item.title)}</strong><br><span class="muted">${formatUsd(item.user_value)}</span></div>
     </a>
   `).join('');
-} catch (error) {
+}
+
+function renderLoadError(error) {
   console.error('Home item load failed:', error);
   renderActions(null);
-  const detail = String(error?.message || '').trim();
-  msgEl.textContent = detail
-    ? `Unable to load items: ${detail}`
-    : 'Unable to load items right now.';
+  msgEl.innerHTML = 'Unable to load items right now. <button class="retry-home" type="button">Retry loading items</button>';
 }
+
+msgEl.addEventListener('click', (event) => {
+  if (event.target.closest('.retry-home')) loadHome().catch(renderLoadError);
+});
+
+loadHome().catch(renderLoadError);

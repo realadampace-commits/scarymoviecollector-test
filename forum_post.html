@@ -32,6 +32,7 @@
   .reply .metaRow{display:flex;align-items:center;gap:8px}
   .reply .rbody{white-space:pre-wrap;margin-top:6px}
   .row{display:flex;align-items:center;gap:10px;justify-content:space-between}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 </style>
   <link rel="stylesheet" href="/styles.css">
 </head>
@@ -65,15 +66,17 @@
       <span id="rcMsg" class="muted"></span>
     </div>
     <div class="replyBox" style="margin-top:10px">
-      <textarea id="rcText" placeholder="Write your reply…"></textarea>
-      <button id="rcSend" class="btn primary">Post Reply</button>
+      <label for="rcText" class="sr-only">Reply to this post</label>
+      <textarea id="rcText" placeholder="Write your reply…" aria-describedby="rcHint" required minlength="1"></textarea>
+      <button id="rcSend" class="btn primary" type="button">Post Reply</button>
     </div>
+    <div id="rcHint" class="muted">Share a helpful response with the community.</div>
   </div>
 
   <!-- Replies -->
   <div class="card">
     <h3 style="margin:0 0 8px">Replies</h3>
-    <div id="rStatus" class="muted">Loading…</div>
+    <div id="rStatus" class="muted" role="status" aria-live="polite" aria-atomic="true">Loading…</div>
     <div id="rList" style="display:grid;gap:10px;margin-top:8px"></div>
   </div>
 </div>

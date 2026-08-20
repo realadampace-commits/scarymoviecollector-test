@@ -25,7 +25,7 @@ filesEl.addEventListener('change', () => {
     image.style.cssText = 'width:120px;height:120px;object-fit:cover;border-radius:8px';
     previews.append(image);
   }
-  if (filesEl.files.length > 5) message('Only the first 5 images will be used.', 'err');
+  if (filesEl.files.length > 5) message('Only the first 5 images will be used. Select at most 5 images.', 'err');
 });
 
 const session = await requireSession(client, 'create.html');
