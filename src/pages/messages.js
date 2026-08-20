@@ -1,42 +1,153 @@
 import { getSupabaseClient } from '../supabase-client.js';
 import { getSession } from '../auth.js';
-import { listMyThreads, listThreadMessages, createThread } from '../data/messages.js';
-import { searchProfiles } from '../data/profiles.js';
+import { createRequestTracker, createThread, getOtherParticipantId, listMyThreads, listThreadMessages, sendMessage } from '../data/messages.js';
+import { getProfile, searchProfiles } from '../data/profiles.js';
 import { escapeHtml } from '../ui.js';
 
 const client = getSupabaseClient();
 const session = await getSession(client);
 if (!session) { location.href = 'login.html?next=messages.html'; throw new Error('authentication required'); }
+
+const shell = document.getElementById('messagesShell');
 const list = document.getElementById('list');
 const status = document.getElementById('status');
 const preview = document.getElementById('preview');
-const startBtn = document.getElementById('startBtn');
+const head = document.getElementById('head');
+const subhead = document.getElementById('subhead');
+const headAvatar = document.getElementById('headAvatar');
+const text = document.getElementById('text');
+const send = document.getElementById('send');
+const composeStatus = document.getElementById('composeStatus');
 const userSearch = document.getElementById('userSearch');
+const startBtn = document.getElementById('startBtn');
 const startMsg = document.getElementById('startMsg');
+let activeThread = null;
+let threadCards = [];
+const selectionRequests = createRequestTracker();
+
+const initials = (name) => String(name || '?').replace(/^@/, '').slice(0, 1).toUpperCase();
+const timeLabel = (date) => {
+  const value = new Date(date).getTime();
+  if (!Number.isFinite(value)) return '';
+  const diff = Date.now() - value;
+  if (diff < 60_000) return 'now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h`;
+  return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(new Date(value));
+};
+
+async function enrichThread(thread) {
+  const otherUserId = getOtherParticipantId(thread, session.user.id);
+  const [profile, messages] = await Promise.all([
+    otherUserId ? getProfile(client, otherUserId) : Promise.resolve(null),
+    listThreadMessages(client, thread.id)
+  ]);
+  const lastMessage = messages.at(-1);
+  return {
+    ...thread,
+    profile,
+    name: profile?.username ? `@${profile.username}` : 'Conversation',
+    preview: lastMessage?.body || 'No messages yet',
+    updatedAt: lastMessage?.created_at || thread.created_at
+  };
+}
+
+function renderThreadList() {
+  status.textContent = threadCards.length ? '' : 'No conversations yet. Start one above.';
+  list.innerHTML = threadCards.map((thread) => `<button class="thread ${thread.id === activeThread?.id ? 'active' : ''}" type="button" data-id="${escapeHtml(thread.id)}">
+    <span class="avatar">${escapeHtml(initials(thread.profile?.username))}</span>
+    <span class="thread-copy"><span class="thread-name"><span>${escapeHtml(thread.name)}</span><span class="thread-time">${escapeHtml(timeLabel(thread.updatedAt))}</span></span><span class="thread-preview">${escapeHtml(thread.preview)}</span></span>
+  </button>`).join('');
+  list.querySelectorAll('.thread').forEach((node) => node.addEventListener('click', () => selectThread(node.dataset.id)));
+}
+
+async function renderInbox(selectId = null) {
+  status.textContent = 'Loading conversations…';
+  const threads = await listMyThreads(client);
+  threadCards = await Promise.all(threads.map(enrichThread));
+  renderThreadList();
+  if (selectId && threadCards.some((thread) => thread.id === selectId)) await selectThread(selectId, { refreshInbox: false });
+}
+
+async function selectThread(id, { refreshInbox = true } = {}) {
+  const thread = threadCards.find((candidate) => candidate.id === id);
+  if (!thread) return;
+  const request = selectionRequests.start();
+  activeThread = thread;
+  shell.classList.add('show-thread');
+  head.textContent = thread.name;
+  subhead.textContent = 'Messages are private to conversation participants.';
+  headAvatar.textContent = initials(thread.profile?.username);
+  text.disabled = false;
+  send.disabled = false;
+  composeStatus.textContent = '';
+  renderThreadList();
+  preview.innerHTML = '<div class="welcome"><p>Loading messages…</p></div>';
+  try {
+    const messages = await listThreadMessages(client, id);
+    if (!selectionRequests.isCurrent(request) || activeThread?.id !== id) return;
+    preview.innerHTML = messages.map((message) => {
+      const mine = message.author_id === session.user.id;
+      const label = mine ? 'You' : thread.name;
+      return `<div class="message-row ${mine ? 'mine' : ''}"><span class="avatar" aria-hidden="true">${escapeHtml(initials(mine ? 'You' : thread.profile?.username))}</span><div><div class="bubble">${escapeHtml(message.body)}</div><span class="message-meta">${escapeHtml(label)} · ${escapeHtml(timeLabel(message.created_at))}</span></div></div>`;
+    }).join('') || '<div class="welcome"><div class="avatar">✦</div><h2>Say hello</h2><p>This is the beginning of your conversation with ' + escapeHtml(thread.name) + '.</p></div>';
+    preview.scrollTop = preview.scrollHeight;
+  } catch (error) {
+    if (!selectionRequests.isCurrent(request) || activeThread?.id !== id) return;
+    preview.innerHTML = '<div class="welcome"><h2>Unable to load messages</h2><p>Please try again.</p></div>';
+    console.error(error);
+  }
+  if (refreshInbox) renderThreadList();
+}
+
 async function startChat() {
   const term = userSearch.value.trim().replace(/^@/, '');
-  if (!term) { startMsg.textContent = 'Enter a username.'; return; }
+  if (!term) { startMsg.textContent = 'Enter a username to start a chat.'; return; }
   startMsg.textContent = 'Searching…';
-  const matches = await searchProfiles(client, term, { limit: 2 });
-  const target = matches.find((profile) => profile.id !== session.user.id);
-  if (!target) { startMsg.textContent = 'User not found.'; return; }
   startBtn.disabled = true;
   try {
+    const matches = await searchProfiles(client, term, { limit: 8 });
+    const target = matches.find((profile) => profile.id !== session.user.id);
+    if (!target) { startMsg.textContent = 'No matching member found.'; return; }
     const threadId = await createThread(client, target.id);
-    location.href = `dm.html?id=${encodeURIComponent(threadId)}`;
-  } catch (error) { startMsg.textContent = error.message || 'Unable to start chat.'; }
-  finally { startBtn.disabled = false; }
+    userSearch.value = '';
+    startMsg.textContent = '';
+    await renderInbox(threadId);
+  } catch (error) {
+    startMsg.textContent = error.message || 'Unable to start chat.';
+  } finally {
+    startBtn.disabled = false;
+  }
 }
-startBtn?.addEventListener('click', startChat);
-userSearch?.addEventListener('keydown', (event) => { if (event.key === 'Enter') startChat(); });
 
-const renderInbox = async () => {
-  const threads = await listMyThreads(client);
-  status.textContent = threads.length ? '' : 'No conversations yet.';
-  list.innerHTML = threads.map((thread) => `<div class="thread" data-id="${escapeHtml(thread.id)}"><div><strong>Conversation</strong><div class="preview">Thread ${escapeHtml(thread.id)}</div></div></div>`).join('');
-  list.querySelectorAll('.thread').forEach((node) => node.addEventListener('click', async () => {
-    const messages = await listThreadMessages(client, node.dataset.id);
-    preview.innerHTML = messages.map((message) => `<div class="card"><strong>${message.author_id === session.user.id ? 'You' : 'Participant'}</strong><div>${escapeHtml(message.body)}</div></div>`).join('') || 'No messages yet.';
-  }));
-};
-try { await renderInbox(); } catch (error) { status.textContent = 'Unable to load messages right now.'; console.error(error); }
+async function submitMessage() {
+  const body = text.value.trim();
+  const sendingThread = activeThread;
+  if (!sendingThread || !body) return;
+  const request = selectionRequests.current();
+  send.disabled = true;
+  composeStatus.textContent = 'Sending…';
+  try {
+    await sendMessage(client, { threadId: sendingThread.id, authorId: session.user.id, body });
+    if (!selectionRequests.isCurrent(request) || activeThread?.id !== sendingThread.id) {
+      await renderInbox();
+      return;
+    }
+    text.value = '';
+    composeStatus.textContent = '';
+    await renderInbox(sendingThread.id);
+  } catch (error) {
+    if (!selectionRequests.isCurrent(request) || activeThread?.id !== sendingThread.id) return;
+    composeStatus.textContent = error.message || 'Unable to send message.';
+  } finally {
+    if (selectionRequests.isCurrent(request) && activeThread?.id === sendingThread.id) send.disabled = false;
+  }
+}
+
+document.getElementById('startForm').addEventListener('submit', (event) => { event.preventDefault(); startChat(); });
+document.getElementById('composer').addEventListener('submit', (event) => { event.preventDefault(); submitMessage(); });
+document.getElementById('focusStart').addEventListener('click', () => userSearch.focus());
+document.getElementById('backToInbox').addEventListener('click', () => shell.classList.remove('show-thread'));
+text.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submitMessage(); } });
+
+try { await renderInbox(); } catch (error) { status.textContent = 'Unable to load conversations right now.'; console.error(error); }

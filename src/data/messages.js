@@ -1,3 +1,18 @@
+export function createRequestTracker() {
+  let current = 0;
+  return {
+    start() { current += 1; return current; },
+    current() { return current; },
+    isCurrent(request) { return request === current; }
+  };
+}
+
+export function getOtherParticipantId(thread, currentUserId) {
+  const participants = Array.isArray(thread?.dm_participants) ? thread.dm_participants : [];
+  if (!participants.some((participant) => participant?.user_id === currentUserId)) return null;
+  return participants.find((participant) => participant?.user_id && participant.user_id !== currentUserId)?.user_id ?? null;
+}
+
 export async function createThread(client, otherUserId) {
   if (!otherUserId || typeof otherUserId !== 'string') throw new TypeError('other user id is required');
   const { data, error } = await client.rpc('create_dm_thread', { other_user: otherUserId });
