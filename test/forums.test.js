@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createForumReply, listForumPosts } from '../src/data/forums.js';
+import { createForumReply, listCategoryPosts, listForumPosts } from '../src/data/forums.js';
 
 function fakeClient(result) {
   const calls = [];
@@ -20,6 +20,12 @@ test('listForumPosts clamps limits', async () => {
   const fake = fakeClient({ data: [], error: null });
   await listForumPosts(fake.client, { limit: 1000 });
   assert.deepEqual(fake.calls.find((x) => x[0] === 'limit'), ['limit', 100]);
+});
+
+test('listCategoryPosts includes post body for feed-card previews', async () => {
+  const fake = fakeClient({ data: [], error: null });
+  await listCategoryPosts(fake.client, 'category-1');
+  assert.match(fake.calls.find((x) => x[0] === 'select')[1], /body/);
 });
 
 test('createForumReply rejects empty body', async () => {

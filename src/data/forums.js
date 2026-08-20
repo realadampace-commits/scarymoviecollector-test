@@ -28,7 +28,7 @@ export async function listForumChildren(client, categoryId) {
 
 export async function listCategoryPosts(client, categoryId) {
   if (!categoryId || typeof categoryId !== 'string') throw new TypeError('category id is required');
-  const { data, error } = await client.from('forum_posts').select('id,title,created_at,author_id').eq('category_id', categoryId).order('created_at', { ascending: false });
+  const { data, error } = await client.from('forum_posts').select('id,title,body,created_at,author_id,category_id').eq('category_id', categoryId).order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
 }

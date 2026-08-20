@@ -3,49 +3,16 @@
 <head>
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Forum — Scream Collector</title>
+<link rel="stylesheet" href="/styles.css">
 <style>
-  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
-  a{color:#9ecbff;text-decoration:none}
-  .wrap{max-width:1000px;margin:0 auto;padding:24px}
-  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
-  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
-  .list{list-style:none;margin:0;padding:0}
-  .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .node{padding:12px;border:1px solid #2a2a2a;background:#161616;border-radius:10px;margin-bottom:10px}
-  .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;text-decoration:none}
-  input{padding:8px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
-  .topbar{display:flex;align-items:center;justify-content:space-between}
+:root{--blue:#1877f2;--canvas:#f0f2f5;--card:#fff;--ink:#050505;--muted:#65676b;--line:#e4e6eb}body{margin:0;background:var(--canvas);color:var(--ink);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:inherit;text-decoration:none}.forum-shell{max-width:1180px;margin:18px auto;display:grid;grid-template-columns:270px minmax(0,620px) 240px;gap:18px}.panel,.post,.composer{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.05)}.side{padding:14px;height:max-content;position:sticky;top:16px}.side h1{font-size:24px;margin:3px 7px 12px}.side p{font-size:13px;line-height:1.45;color:var(--muted);margin:0 7px 12px}.category-list{display:grid;gap:3px}.category{display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:8px;font-weight:650}.category:hover{background:#f0f2f5}.badge{width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:#e7f3ff;color:var(--blue);font-size:15px}.feed-head{padding:5px 4px 10px;font-weight:750}.composer{padding:13px;margin-bottom:14px}.composer-row{display:flex;gap:10px;align-items:center}.avatar{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;background:linear-gradient(135deg,#99badf,#6688b5);color:#fff;font-weight:800}.prompt{flex:1;border:0;border-radius:999px;background:#f0f2f5;color:var(--muted);padding:11px 14px}.post{padding:15px;margin-bottom:13px}.post-top{display:flex;gap:10px;align-items:center}.author{font-weight:750}.when,.meta{color:var(--muted);font-size:13px}.post h2{font-size:18px;margin:13px 0 7px}.post-body{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;color:#242526;margin:0}.post-foot{border-top:1px solid var(--line);margin-top:14px;padding-top:9px;color:var(--muted);font-size:14px;font-weight:650}.right-note{padding:15px}.right-note h2{font-size:16px;margin:0 0 9px}.right-note p{color:var(--muted);font-size:13px;line-height:1.45}.empty{padding:28px 16px;text-align:center;color:var(--muted)}@media(max-width:980px){.forum-shell{grid-template-columns:245px minmax(0,1fr);margin:12px}.right{display:none}}@media(max-width:680px){.forum-shell{display:block;margin:0}.side{position:static;border-radius:0;border-width:0 0 1px;padding:10px}.side h1{display:inline-block;margin:3px 7px}.side p{display:none}.category-list{display:flex;overflow:auto}.category{white-space:nowrap}.category .badge{display:none}.feed{padding:10px}.panel,.post,.composer{border-radius:10px}.feed-head{padding-left:4px}}
 </style>
-  <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-<app-menu></app-menu>
-<script type="module" src="/src/menu-bootstrap.js"></script>
-
-<div class="wrap">
-  <div class="topbar">
-    <a href="index.html">← Home</a>
-    <a href="forum.html">Forum</a>
-  </div>
-  <h2 style="margin-top:8px">Forum</h2>
-
-  <!-- Moderator/Owner: create a top-level category -->
-  <div id="modTop" class="card" style="display:none">
-    <h3 style="margin:0 0 8px">Moderator Tools: New Category</h3>
-    <div class="row">
-      <input id="catTitle" placeholder="Category title (e.g., Horror Movies)"/>
-      <button id="addCat" class="btn" style="background:#2a6">Create</button>
-      <span id="modMsg" class="muted"></span>
-    </div>
-  </div>
-
-  <div class="card">
-    <div id="status" class="muted">Loading categories…</div>
-    <ul id="list" class="list"></ul>
-  </div>
-</div>
-
+</head><body>
+<app-menu></app-menu><script type="module" src="/src/menu-bootstrap.js"></script>
+<main class="forum-shell">
+<aside class="panel side"><h1>Collector Forum</h1><p>Choose a category, join the conversation, and trade horror knowledge with the community.</p><nav id="list" class="category-list" aria-label="Forum categories"></nav><div id="status" class="meta" style="padding:10px 7px" aria-live="polite">Loading categories…</div></aside>
+<section class="feed"><div class="feed-head">Community feed</div><div class="composer"><div class="composer-row"><span class="avatar">S</span><span class="prompt">Pick a category to create a post</span></div></div><div id="posts" aria-live="polite"></div></section>
+<aside class="right"><div class="panel right-note"><h2>Browse by topic</h2><p>Categories keep discussions organized. Select one to see its posts and any subcategories.</p></div></aside>
+</main>
 <script type="module" src="/src/pages/forum.js"></script>
-</body>
-</html>
+</body></html>
