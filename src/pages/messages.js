@@ -50,6 +50,7 @@ async function enrichThread(thread) {
   const lastMessage = messages.at(-1);
   return {
     ...thread,
+    otherUserId,
     profile,
     name: profile?.username ? `@${profile.username}` : 'Conversation',
     preview: lastMessage?.body || 'No messages yet',
@@ -125,7 +126,8 @@ async function startChat() {
     const matches = await searchProfiles(client, term, { limit: 8 });
     const target = matches.find((profile) => profile.id !== session.user.id);
     if (!target) { startMsg.textContent = 'No matching member found.'; return; }
-    const threadId = await createThread(client, target.id);
+    const existing = threadCards.find((thread) => thread.otherUserId === target.id);
+    const threadId = existing?.id || await createThread(client, target.id);
     userSearch.value = '';
     startMsg.textContent = '';
     await renderInbox(threadId);

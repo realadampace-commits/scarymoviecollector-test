@@ -59,6 +59,12 @@ test('message avatars render profile photos and frames when available', () => {
   assert.match(script, /profile\?\.frame_url/);
 });
 
+test('username chat creation reuses an already-loaded conversation', () => {
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
+  assert.match(script, /thread\.otherUserId === target\.id/);
+  assert.match(script, /existing\?\.id \|\| await createThread/);
+});
+
 test('new-chat search exposes its in-progress state and restores the action label', () => {
   const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
   assert.match(script, /startBtn\.setAttribute\('aria-busy', 'true'\)/);
