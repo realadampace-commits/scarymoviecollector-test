@@ -51,6 +51,14 @@ test('new-chat search has a visible associated label', () => {
   assert.match(html, /<input id="userSearch" autocomplete="off" placeholder="Message @username"\/>/);
 });
 
+test('message avatars render profile photos and frames when available', () => {
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
+  assert.match(script, /avatar-media/);
+  assert.match(script, /avatar-frame/);
+  assert.match(script, /profile\?\.avatar_url/);
+  assert.match(script, /profile\?\.frame_url/);
+});
+
 test('new-chat search exposes its in-progress state and restores the action label', () => {
   const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
   assert.match(script, /startBtn\.setAttribute\('aria-busy', 'true'\)/);

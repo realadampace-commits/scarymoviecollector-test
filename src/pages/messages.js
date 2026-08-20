@@ -14,7 +14,7 @@ const status = document.getElementById('status');
 const preview = document.getElementById('preview');
 const head = document.getElementById('head');
 const subhead = document.getElementById('subhead');
-const headAvatar = document.getElementById('headAvatar');
+let headAvatar = document.getElementById('headAvatar');
 const text = document.getElementById('text');
 const send = document.getElementById('send');
 const composeStatus = document.getElementById('composeStatus');
@@ -26,6 +26,11 @@ let threadCards = [];
 const selectionRequests = createRequestTracker();
 
 const initials = (name) => String(name || '?').replace(/^@/, '').slice(0, 1).toUpperCase();
+const avatarMarkup = (profile, name, className = 'avatar') => {
+  const avatar = profile?.avatar_url ? `<img class="avatar-media" src="${escapeHtml(profile.avatar_url)}" alt="">` : escapeHtml(initials(name));
+  const frame = profile?.frame_url ? `<img class="avatar-frame" src="${escapeHtml(profile.frame_url)}" alt="">` : '';
+  return `<span class="${className}">${avatar}${frame}</span>`;
+};
 const timeLabel = (date) => {
   const value = new Date(date).getTime();
   if (!Number.isFinite(value)) return '';
@@ -55,7 +60,7 @@ async function enrichThread(thread) {
 function renderThreadList() {
   status.textContent = threadCards.length ? '' : 'No conversations yet. Start one above.';
   list.innerHTML = threadCards.map((thread) => `<button class="thread ${thread.id === activeThread?.id ? 'active' : ''}" type="button" data-id="${escapeHtml(thread.id)}">
-    <span class="avatar">${escapeHtml(initials(thread.profile?.username))}</span>
+    ${avatarMarkup(thread.profile, thread.profile?.username)}
     <span class="thread-copy"><span class="thread-name"><span>${escapeHtml(thread.name)}</span><span class="thread-time">${escapeHtml(timeLabel(thread.updatedAt))}</span></span><span class="thread-preview">${escapeHtml(thread.preview)}</span></span>
   </button>`).join('');
   list.querySelectorAll('.thread').forEach((node) => node.addEventListener('click', () => selectThread(node.dataset.id)));
@@ -84,7 +89,8 @@ async function selectThread(id, { refreshInbox = true } = {}) {
   shell.classList.add('show-thread');
   head.textContent = thread.name;
   subhead.textContent = 'Messages are private to conversation participants.';
-  headAvatar.textContent = initials(thread.profile?.username);
+  headAvatar.replaceWith(Object.assign(document.createElement('span'), { className: 'avatar', id: 'headAvatar', innerHTML: avatarMarkup(thread.profile, thread.profile?.username).replace(/^<span class="avatar">|<\/span>$/g, '') }));
+  headAvatar = document.getElementById('headAvatar');
   text.disabled = false;
   send.disabled = false;
   text.focus();
@@ -97,7 +103,7 @@ async function selectThread(id, { refreshInbox = true } = {}) {
     preview.innerHTML = messages.map((message) => {
       const mine = message.author_id === session.user.id;
       const label = mine ? 'You' : thread.name;
-      return `<div class="message-row ${mine ? 'mine' : ''}"><span class="avatar" aria-hidden="true">${escapeHtml(initials(mine ? 'You' : thread.profile?.username))}</span><div><div class="bubble">${escapeHtml(message.body)}</div><span class="message-meta">${escapeHtml(label)} · ${escapeHtml(timeLabel(message.created_at))}</span></div></div>`;
+      return `<div class="message-row ${mine ? 'mine' : ''}">${avatarMarkup(mine ? null : thread.profile, mine ? 'You' : thread.profile?.username)}<div><div class="bubble">${escapeHtml(message.body)}</div><span class="message-meta">${escapeHtml(label)} · ${escapeHtml(timeLabel(message.created_at))}</span></div></div>`;
     }).join('') || '<div class="welcome"><div class="avatar">✦</div><h2>Say hello</h2><p>This is the beginning of your conversation with ' + escapeHtml(thread.name) + '.</p></div>';
     preview.scrollTop = preview.scrollHeight;
   } catch (error) {

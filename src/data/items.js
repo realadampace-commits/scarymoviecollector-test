@@ -2,11 +2,16 @@ export async function listRecentItems(client, { limit = 24 } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 24, 1), 100);
   const { data, error } = await client
     .from('items')
-    .select('id,owner_id,title,description,user_value,image_url,created_at,is_for_sale,price_usdc,sale_currency,sold')
+    .select('id,owner_id,title,description,user_value,image_url,created_at,is_for_sale,price_usdc,sale_currency,sold,items_images(image_url,position,created_at)')
     .order('created_at', { ascending: false })
     .limit(safeLimit);
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((item) => ({
+    ...item,
+    image_url: item.image_url || item.items_images?.toSorted((a, b) => (
+      (a.position ?? 0) - (b.position ?? 0) || String(a.created_at ?? '').localeCompare(String(b.created_at ?? ''))
+    ))[0]?.image_url || null,
+  }));
 }
 
 export async function getItem(client, id) {
