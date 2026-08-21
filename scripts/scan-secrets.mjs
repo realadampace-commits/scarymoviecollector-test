@@ -7,6 +7,8 @@ const patterns = [
   /service_role/i,
   /-----BEGIN (?:RSA|OPENSSH|PRIVATE) KEY-----/,
   /\b(?:password|secret|token)\b\s*[:=]\s*['\"][A-Za-z0-9_+\/=.-]{16,}['\"]/i,
+  /\b(?:ghp|gho|ghs|ghr)_[A-Za-z0-9]{20,}\b/,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}\b/,
 ];
 let hits = [];
 async function walk(dir) {
