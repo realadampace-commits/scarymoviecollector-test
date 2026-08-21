@@ -7,6 +7,7 @@
     "check": "node --test",
     "check:pages": "node scripts/check-legacy-pages.mjs",
     "security:scan": "node scripts/scan-secrets.mjs",
+    "verify": "npm run security:scan && npm run check:pages && npm run check && npm run build && git diff --check",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"

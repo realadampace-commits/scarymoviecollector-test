@@ -11,6 +11,9 @@ cd /Users/nathanial/Projects/scarymoviecollector-test
 npm run security:scan
 npm run check:pages
 npm run check
+npm run build
+# Or run the complete local gate in one command:
+npm run verify
 git diff --check
 ```
 
