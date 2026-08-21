@@ -7,7 +7,7 @@ Secure modernization work for the Scary Movie Collectors prototype.
 This project can be maintained entirely from the headless Mac through Hermes. No local monitor, SSH session, or second device is required for repository work.
 
 ```bash
-cd /tmp/scarymoviecollector-work
+cd /Users/nathanial/Projects/scarymoviecollector-test
 npm run security:scan
 npm run check:pages
 npm run check
