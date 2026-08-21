@@ -11,7 +11,9 @@ const forbiddenPatterns = [
   /service_role/i,
   /SUPABASE_SERVICE_ROLE/i,
   /-----BEGIN (?:RSA|OPENSSH|EC) PRIVATE KEY-----/i,
-  /sk_(?:live|test)_[A-Za-z0-9]+/i
+  /sk_(?:live|test)_[A-Za-z0-9]+/i,
+  /\b(?:ghp|gho|ghs|ghr)_[A-Za-z0-9]{20,}\b/,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}\b/
 ];
 
 const failures = [];
