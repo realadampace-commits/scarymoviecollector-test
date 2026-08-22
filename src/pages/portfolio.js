@@ -74,7 +74,7 @@ document.querySelectorAll('.range').forEach((button) => button.addEventListener(
 renderRange('3M');
 if (!prepared.length) msg.textContent = 'No items yet.';
 itemsEl.innerHTML = prepared.map((item) => {
-  const image = item.preview_url ? `<img src="${escapeHtml(item.preview_url)}" alt="">` : 'No image';
+  const image = item.preview_url ? `<img src="${escapeHtml(item.preview_url)}" alt="" loading="lazy" decoding="async">` : 'No image';
   const profile = item.profiles || owner;
   return `<div class="card"><a href="item.html?id=${encodeURIComponent(item.id)}" style="color:inherit;text-decoration:none"><div class="thumb">${image}</div><div class="meta"><strong>${escapeHtml(item.title)}</strong><div class="owner">@${escapeHtml(profile?.username || 'user')}</div><div>${formatUsd(item.user_value)}</div></div></a>${username ? '' : `<div style="padding:0 10px 12px"><a class="btn" href="edit.html?id=${encodeURIComponent(item.id)}" style="background:#444;padding:8px 12px">Edit</a></div>`}</div>`;
 }).join('');
