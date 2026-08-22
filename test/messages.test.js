@@ -47,8 +47,8 @@ test('sendMessage trims body and sends explicit author identity', async () => {
 
 test('new-chat search has a visible associated label', () => {
   const html = readFileSync(resolve(import.meta.dirname, '../messages.html'), 'utf8');
-  assert.match(html, /<label for="userSearch">Username<\/label>/);
-  assert.match(html, /<input id="userSearch" autocomplete="off" placeholder="Message @username"\/>/);
+  assert.match(html, /<label class="sr-only" for="userSearch">Username<\/label>/);
+  assert.match(html, /<input id="userSearch" type="text" autocomplete="off" placeholder="Message @username" required minlength="1"\/>/);
 });
 
 test('message avatars render profile photos and frames when available', () => {
