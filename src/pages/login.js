@@ -6,7 +6,10 @@ const email = document.getElementById('email');
 const password = document.getElementById('password');
 const msg = document.getElementById('msg');
 const buttons = [document.getElementById('signup'), document.getElementById('signin'), document.getElementById('forgot')];
-const nextUrl = new URLSearchParams(location.search).get('next') || 'portfolio.html';
+const requestedNext = new URLSearchParams(location.search).get('next');
+const nextUrl = requestedNext && !/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(requestedNext) && !requestedNext.includes('\\')
+  ? requestedNext
+  : 'portfolio.html';
 const setMsg = (text, kind = '') => { msg.className = `msg ${kind}`; msg.textContent = text; };
 const setBusy = (busy) => { buttons.forEach((button) => { button.disabled = busy; }); email.disabled = busy; password.disabled = busy; };
 
