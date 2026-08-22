@@ -59,7 +59,7 @@ const selectImage = (index) => {
   });
   showImage(images[selectedIndex]?.image_url);
 };
-thumbs.innerHTML = images.map((image, index) => `<button type="button" aria-label="View image ${index + 1} of ${images.length}" aria-current="${index === 0 ? 'true' : 'false'}" data-index="${index}" class="${index === 0 ? 'sel' : ''}"><img src="${escapeHtml(image.image_url)}" alt=""></button>`).join('');
+thumbs.innerHTML = images.map((image, index) => `<button type="button" aria-label="View image ${index + 1} of ${images.length}" aria-current="${index === 0 ? 'true' : 'false'}" data-index="${index}" class="${index === 0 ? 'sel' : ''}"><img src="${escapeHtml(image.image_url)}" alt="" loading="lazy" decoding="async"></button>`).join('');
 thumbs.addEventListener('click', (event) => {
   const button = event.target.closest('button');
   if (button) selectImage(Number(button.dataset.index));
