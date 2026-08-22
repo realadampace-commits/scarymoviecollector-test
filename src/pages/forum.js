@@ -33,7 +33,7 @@ function renderLoadError(error) {
   status.setAttribute('aria-busy', 'false');
   posts.setAttribute('aria-busy', 'false');
   status.textContent = 'Unable to load categories right now.';
-  posts.innerHTML = '<div class="panel empty">Unable to load the community feed right now. <button class="retry-forum" type="button">Retry loading the forum</button></div>';
+  posts.innerHTML = '<div class="panel empty" role="alert">Unable to load the community feed right now. <button class="retry-forum" type="button">Retry loading the forum</button></div>';
 }
 
 posts.addEventListener('click', (event) => {
