@@ -32,7 +32,7 @@ async function loadHome() {
   msgEl.textContent = items.length ? '' : 'No items yet.';
   listEl.innerHTML = items.map((item) => `
     <a class="tile" href="item.html?id=${encodeURIComponent(item.id)}">
-      <div class="thumb">${item.image_url ? `<img src="${escapeHtml(item.image_url)}" alt="">` : '<span class="muted">No image</span>'}</div>
+      <div class="thumb">${item.image_url ? `<img src="${escapeHtml(item.image_url)}" alt="" loading="lazy" decoding="async">` : '<span class="muted">No image</span>'}</div>
       <div class="meta"><strong>${escapeHtml(item.title)}</strong><br><span class="muted">${formatUsd(item.user_value)}</span></div>
     </a>
   `).join('');
