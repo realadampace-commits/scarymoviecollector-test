@@ -27,3 +27,10 @@ button, input, textarea, select { font: inherit; } input, textarea, select { col
 @media (max-width:700px) { .wrap { width:min(calc(100% - 24px),var(--max)); padding-top:76px; padding-bottom:92px; } .top,.head,.topbar { align-items:stretch!important; flex-direction:column; } .top .btn,.head .btn { width:100%; } .grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; } .card { padding:15px; } .row { flex-wrap:wrap; } }
 @media (min-width:900px) { .wrap { padding-left:90px; } }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { transition:none!important; animation:none!important; } }
+@media print {
+  body { background:#fff; color:#111; }
+  body::before, app-menu, .btn, button { display:none!important; }
+  .wrap { width:100%; padding:0; }
+  .card, .panel, .tile, .itemCard, .node, .row { color:#111!important; background:#fff!important; border-color:#bbb!important; box-shadow:none!important; }
+  a { color:#111; }
+}
