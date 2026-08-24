@@ -11,6 +11,7 @@ html { background: var(--bg); scroll-padding-top: 88px; }
 body { margin: 0; min-width: 320px; background: radial-gradient(circle at 50% -10%, #22243b 0, var(--bg) 42rem); color: var(--ink); line-height: 1.5; }
 body::before { content:""; position: fixed; inset:0; pointer-events:none; opacity:.035; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.8'/%3E%3C/svg%3E"); }
 a { color: #a9ddff; text-underline-offset: 3px; } a:hover { color: white; }
+::selection { color: #fff; background: #9d294e; }
 button, input, textarea, select { font: inherit; } input, textarea, select { color:var(--ink); background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:11px 13px; min-height:44px; } input:focus,textarea:focus,select:focus,button:focus-visible,a:focus-visible { outline:3px solid var(--focus); outline-offset:2px; }
 .wrap { width:min(calc(100% - 32px), var(--max)); margin:0 auto; padding: clamp(72px,8vw,104px) 0 48px; }
 .card, .panel { background:linear-gradient(145deg, rgba(28,36,52,.96), rgba(16,21,32,.96)); border:1px solid var(--line); border-radius:var(--radius); padding:clamp(16px,3vw,26px); box-shadow:var(--shadow); }
