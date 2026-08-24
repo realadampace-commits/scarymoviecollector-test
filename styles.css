@@ -40,4 +40,5 @@ button, input, textarea, select { font: inherit; } input, textarea, select { col
   .wrap { width:100%; padding:0; }
   .card, .panel, .tile, .itemCard, .node, .row { color:#111!important; background:#fff!important; border-color:#bbb!important; box-shadow:none!important; }
   a { color:#111; }
+  a[href^="http"]::after { content:" (" attr(href) ")"; font-size:.85em; overflow-wrap:anywhere; }
 }
