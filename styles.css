@@ -18,6 +18,7 @@ button, input, textarea, select { font: inherit; } input, textarea, select { col
 .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr)); gap:18px; }
 .tile, .itemCard, .node, .row { border-color:var(--line)!important; background:var(--surface)!important; border-radius:14px!important; }
 .tile:hover, .itemCard:hover, .node:hover { border-color:#53627b!important; transform:translateY(-2px); transition:.18s ease; }
+@media (hover:none) { .tile:hover, .itemCard:hover, .node:hover { transform:none; } }
 .tile:focus-visible, .itemCard:focus-visible, .node:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
 .btn, button.btn, a.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:10px 16px; border:1px solid transparent; border-radius:11px; background:linear-gradient(135deg,var(--accent),#b62e62); color:white; font-weight:700; text-decoration:none; cursor:pointer; box-shadow:0 8px 20px rgba(239,71,111,.18); }
 .btn:hover { filter:brightness(1.1); color:white; } .muted { color:var(--muted)!important; } .ok { color:var(--success)!important; } .err { color:var(--danger)!important; }
