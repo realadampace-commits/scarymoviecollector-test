@@ -64,7 +64,7 @@
 <main class="messages-shell" id="messagesShell">
   <aside class="inbox" aria-label="Conversations">
     <header class="inbox-head"><h1>Chats</h1><button class="new-chat" id="focusStart" type="button" aria-label="Start a new chat">✎</button></header>
-    <form class="start-chat" id="startForm"><label class="sr-only" for="userSearch">Username</label><input id="userSearch" type="text" autocomplete="off" placeholder="Message @username" required minlength="1"/><button id="startBtn" type="submit">Send</button></form>
+    <form class="start-chat" id="startForm"><label class="sr-only" for="userSearch">Username</label><input id="userSearch" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Message @username" required minlength="1"/><button id="startBtn" type="submit">Send</button></form>
     <div id="startMsg" class="start-msg" aria-live="polite"></div>
     <div id="list" class="thread-list"></div>
     <div id="status" class="empty-inbox" aria-live="polite"></div>
