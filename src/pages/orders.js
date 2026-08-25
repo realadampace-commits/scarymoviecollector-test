@@ -1,7 +1,7 @@
 import { getSupabaseClient } from '../supabase-client.js';
 import { requireSession } from '../auth.js';
 import { listMyOrders } from '../data/orders.js';
-import { escapeHtml, formatUsd } from '../ui.js';
+import { escapeHtml, formatDate, formatUsd } from '../ui.js';
 
 const client = getSupabaseClient();
 const session = await requireSession(client, 'orders.html');
@@ -26,7 +26,7 @@ function render(rows, userId, target, empty) {
   target.innerHTML = rows.map((row) => `<div class="order">
     <div class="row"><strong>${row.buyer_id === userId ? 'Purchase' : 'Sale'}</strong><span class="pill ${escapeHtml(row.status || 'pending')}">${escapeHtml(row.status || 'pending')}</span></div>
     <div><a href="item.html?id=${encodeURIComponent(row.item_id)}">${escapeHtml(row.items?.title || 'View item')}</a></div>
-    <div class="row"><span>${formatUsd(Number(row.price_usdc || 0) / 1_000_000)} ${escapeHtml(row.currency || 'USDC')}</span><span class="small">${escapeHtml(new Date(row.created_at).toLocaleString())}</span></div>
+    <div class="row"><span>${formatUsd(Number(row.price_usdc || 0) / 1_000_000)} ${escapeHtml(row.currency || 'USDC')}</span><span class="small">${escapeHtml(formatDate(row.created_at))}</span></div>
     <div class="small muted">${row.status === 'pending' ? 'Payment verification is pending. No settlement is performed in the browser.' : row.status === 'paid' ? 'Payment verified by the authorized payment flow; shipping updates are server-controlled.' : row.status === 'shipped' ? 'Seller marked this order shipped. Delivery confirmation is server-controlled.' : row.status === 'completed' ? 'Order completed by the authorized marketplace flow.' : row.tx_hash ? 'Transaction recorded by the authorized payment flow.' : 'No transaction reference. This history is read-only.'}</div>
     ${row.tracking_number ? `<div class="small">Tracking: ${escapeHtml(row.tracking_number)}</div>` : ''}
   </div>`).join('');
@@ -75,6 +75,8 @@ async function loadOrders() {
     render(buying, session.user.id, buyList, buyEmpty);
     render(selling, session.user.id, sellList, sellEmpty);
     status.textContent = '';
+    buyList.setAttribute('aria-busy', 'false');
+    sellList.setAttribute('aria-busy', 'false');
   } catch (error) {
     status.innerHTML = `${escapeHtml(error.message || 'Unable to load order history.')} <button class="retry-orders" type="button">Retry loading orders</button>`;
     status.querySelector('.retry-orders')?.addEventListener('click', loadOrders, { once: true });
