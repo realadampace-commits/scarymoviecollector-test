@@ -3,6 +3,7 @@ import { requireSession, requestPasswordReset, signOut } from '../auth.js';
 import { getProfile, updateOwnProfile } from '../data/profiles.js';
 import { uploadAvatar } from '../data/avatars.js';
 import { listFrames, createFrame } from '../data/frames.js';
+import { listPortfolioItems } from '../data/items.js';
 
 const loginUrl = `login.html?next=${encodeURIComponent(`${location.pathname.split('/').pop() || 'settings.html'}${location.search}`)}`;
 
@@ -16,7 +17,21 @@ const bio = document.getElementById('bioInput');
 const showcase = document.getElementById('showcaseInput');
 if (username) username.value = profile?.username || '';
 if (bio) bio.value = profile?.bio || '';
-if (showcase) showcase.value = Array.isArray(profile?.showcase_ids) ? profile.showcase_ids.join(', ') : '';
+if (showcase) {
+  showcase.value = Array.isArray(profile?.showcase_ids) ? profile.showcase_ids.join(',') : '';
+  const picker = document.getElementById('showcaseItems');
+  const chosen = new Set(showcase.value.split(',').map((id) => id.trim()).filter(Boolean));
+  try {
+    const items = await listPortfolioItems(client, session.user.id);
+    picker.replaceChildren(...items.map((item) => {
+      const label = document.createElement('label'); label.className = 'showcaseChoice';
+      const check = document.createElement('input'); check.type = 'checkbox'; check.value = item.id; check.checked = chosen.has(item.id);
+      check.addEventListener('change', () => { const selected = [...picker.querySelectorAll('input:checked')]; if (selected.length > 6) { check.checked = false; return; } showcase.value = selected.map((input) => input.value).join(','); });
+      label.append(check, document.createTextNode(item.title || 'Untitled item')); return label;
+    }));
+    if (!items.length) picker.textContent = 'Add items to your portfolio first, then you can feature them here.';
+  } catch (error) { picker.textContent = 'Unable to load your items. You can still use the showcase.'; }
+}
 const avatarBox = document.getElementById('avatarBox');
 const renderAvatar = (url) => {
   avatarBox.replaceChildren();

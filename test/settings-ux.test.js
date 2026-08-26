@@ -46,7 +46,7 @@ test('settings text controls have explicit labels and useful input metadata', ()
   assert.match(page, /id="username" name="username" autocomplete="username"/);
   assert.match(page, /<label class="muted" for="bioInput">About you<\/label>/);
   assert.match(page, /id="bioInput" name="bio" autocomplete="off"/);
-  assert.match(page, /<label class="muted" for="showcaseInput">Item IDs<\/label>/);
+  assert.match(page, /<div id="showcaseItems" class="showcasePicker"/);
   assert.match(page, /id="showcaseInput" name="showcase" autocomplete="off"/);
 });
 

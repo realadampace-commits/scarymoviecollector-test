@@ -12,7 +12,9 @@
   .row{display:grid;grid-template-columns:160px 1fr;gap:16px;align-items:center}
   input,button,textarea{padding:10px;border-radius:6px;border:1px solid #333;background:#222;color:#eee}
   button{border:none;background:crimson;cursor:pointer}
-  .muted{color:var(--muted)}
+  .showcasePicker{display:grid;gap:8px;margin:10px 0;max-height:260px;overflow:auto}
+  .showcaseChoice{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #333;border-radius:8px;cursor:pointer}
+  .showcaseChoice:has(input:checked){border-color:#2a6;background:#18251d}
   .ok{color:#9f9}.err{color:#f88}
   .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   /* avatar + frame */
@@ -94,10 +96,10 @@
   <!-- Showcase -->
   <div class="card">
     <h3>Showcase Favorites</h3>
-    <p class="muted" style="margin-top:6px">Paste up to 5 item IDs (from item URLs) separated by commas.</p>
+    <p class="muted" style="margin-top:6px">Pick up to 6 items to feature on your public profile.</p>
+    <div id="showcaseItems" class="showcasePicker" aria-live="polite"></div>
+    <input id="showcaseInput" name="showcase" autocomplete="off" aria-label="Selected showcase item IDs" style="display:none"/>
     <div class="tools">
-      <label class="muted" for="showcaseInput">Item IDs</label>
-      <input id="showcaseInput" name="showcase" autocomplete="off" placeholder="65a7f..., b91c4..., ..." style="flex:1"/>
       <button id="saveShowcase">Save Showcase</button>
       <span id="showcaseMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
     </div>
