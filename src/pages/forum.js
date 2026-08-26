@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '../supabase-client.js';
-import { listForumCategories, listForumPosts } from '../data/forums.js';
+import { listForumCategories, listForumPosts, createForumCategory } from '../data/forums.js';
+import { getSession } from '../auth.js';
 import { escapeHtml } from '../ui.js';
 import { formatShortDate } from '../utils/date.js';
 
@@ -7,6 +8,9 @@ const client = getSupabaseClient();
 const list = document.getElementById('list');
 const status = document.getElementById('status');
 const posts = document.getElementById('posts');
+const adminTools = document.getElementById('adminTools');
+const categoryForm = document.getElementById('categoryForm');
+const adminStatus = document.getElementById('adminStatus');
 const initials = (value) => String(value || 'U').slice(0, 1).toUpperCase();
 const when = (value) => formatShortDate(value, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
@@ -42,4 +46,27 @@ posts.addEventListener('click', (event) => {
   if (event.target.closest('.retry-forum')) loadForum().catch(renderLoadError);
 });
 
+async function setupAdminTools() {
+  const session = await getSession(client);
+  if (!session?.user?.id) return;
+  const { data: profile } = await client.from('profiles').select('role').eq('id', session.user.id).maybeSingle();
+  if (['moderator', 'owner'].includes(profile?.role)) adminTools.hidden = false;
+}
+
+categoryForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = new FormData(categoryForm);
+  adminStatus.textContent = 'Adding category…';
+  try {
+    await createForumCategory(client, { title: form.get('title'), description: form.get('description') });
+    categoryForm.reset();
+    adminStatus.textContent = 'Category added.';
+    await loadForum();
+  } catch (error) {
+    console.error(error);
+    adminStatus.textContent = 'Unable to add category. Check the fields and try again.';
+  }
+});
+
+setupAdminTools().catch(() => {});
 loadForum().catch(renderLoadError);
