@@ -30,6 +30,8 @@ async function loadForum() {
 
 function renderLoadError(error) {
   console.error(error);
+  list.innerHTML = '';
+  posts.setAttribute('aria-busy', 'false');
   status.setAttribute('aria-busy', 'false');
   posts.setAttribute('aria-busy', 'false');
   status.textContent = 'Unable to load categories right now.';
