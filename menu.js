@@ -12,6 +12,7 @@ class AppMenu extends HTMLElement {
 
     const root = this.attachShadow({ mode: 'open' });
     root.innerHTML = `
+      <svg aria-hidden="true" style="position:absolute;width:0;height:0"><symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></symbol><symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8 3 3-2 2 2 2-3 3-2-2-3 3"/></symbol><symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.5-5 6-5s6 2 6 5M16 5.5a3 3 0 0 1 0 5.8M18 15c2 .6 3 2 3 4"/></symbol><symbol id="i-item" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4zM4 7v10l8 4 8-4V7M12 11v10"/></symbol><symbol id="i-forum" viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 13h5"/></symbol><symbol id="i-message" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z"/><path d="M8 9h8M8 12h5"/></symbol><symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 8h14l1 13H4zM8 8a4 4 0 0 1 8 0"/></symbol><symbol id="i-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/><circle cx="12" cy="12" r="9"/></symbol><symbol id="i-settings" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M4 12h-1m18 0h-1M12 4V3m0 18v-1M6.3 6.3l-.7-.7m13.1 13.1-.7-.7m0-12.4.7-.7M5.6 18.7l.7-.7"/></symbol><symbol id="i-exit" viewBox="0 0 24 24"><path d="M10 4H4v16h6M14 8l4 4-4 4M9 12h9"/></symbol></svg>
       <style>
         :host { position: fixed; top: 12px; right: 12px; z-index: 999; }
         .menu { position: relative; display:flex; align-items:flex-start; justify-content:center; }
@@ -29,7 +30,9 @@ class AppMenu extends HTMLElement {
         li{display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:8px;}
         li:hover{background:#232323;}
         a{text-decoration:none;color:#eee;display:flex;align-items:center;gap:10px;flex:1;}
-        .ico{width:22px;text-align:center;opacity:.9;}
+        .ico{width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;color:#f05a67;}
+        .ico svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+        .active .ico{color:#ff9b63;}
         .active>a{font-weight:600;color:#fff;}
         .overlay{position:fixed;inset:0;background:transparent;display:none;}
         .overlay.show{display:block;}
