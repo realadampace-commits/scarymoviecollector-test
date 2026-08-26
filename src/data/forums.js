@@ -14,16 +14,18 @@ export async function listForumReplies(client, postId) {
 
 export async function getForumCategory(client, categoryId) {
   if (!categoryId || typeof categoryId !== 'string') throw new TypeError('category id is required');
-  const { data, error } = await client.from('forum_categories').select('id,title,description,cover_image_url,parent_id').eq('id', categoryId).maybeSingle();
-  if (error) throw error;
-  return data;
+  let result = await client.from('forum_categories').select('id,title,description,cover_image_url,parent_id').eq('id', categoryId).maybeSingle();
+  if (result.error) result = await client.from('forum_categories').select('id,title,parent_id').eq('id', categoryId).maybeSingle();
+  if (result.error) throw result.error;
+  return result.data;
 }
 
 export async function listForumChildren(client, categoryId) {
   if (!categoryId || typeof categoryId !== 'string') throw new TypeError('category id is required');
-  const { data, error } = await client.from('forum_categories').select('id,title,description,cover_image_url,parent_id').eq('parent_id', categoryId).order('title', { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+  let result = await client.from('forum_categories').select('id,title,description,cover_image_url,parent_id').eq('parent_id', categoryId).order('title', { ascending: true });
+  if (result.error) result = await client.from('forum_categories').select('id,title,parent_id').eq('parent_id', categoryId).order('title', { ascending: true });
+  if (result.error) throw result.error;
+  return result.data ?? [];
 }
 
 export async function listCategoryPosts(client, categoryId, { limit = 100 } = {}) {
@@ -35,13 +37,14 @@ export async function listCategoryPosts(client, categoryId, { limit = 100 } = {}
 }
 
 export async function listForumCategories(client) {
-  const { data, error } = await client
+  let result = await client
     .from('forum_categories')
     .select('id,title,description,cover_image_url,created_at,parent_id')
     .is('parent_id', null)
     .order('title', { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+  if (result.error) result = await client.from('forum_categories').select('id,title,created_at,parent_id').is('parent_id', null).order('title', { ascending: true });
+  if (result.error) throw result.error;
+  return result.data ?? [];
 }
 
 export async function createForumCategory(client, { title, description = '', coverImageUrl = '' } = {}) {
