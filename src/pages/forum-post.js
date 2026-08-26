@@ -39,9 +39,12 @@ async function renderReplies() {
   status.textContent = 'Loading replies…';
   list.setAttribute('aria-busy', 'true');
   const replies = await listForumReplies(client, id);
-  status.textContent = replies.length ? '' : 'No replies yet.';
+  const authorIds = [...new Set(replies.map((reply) => reply.author_id).filter(Boolean))];
+  const { data: profiles } = authorIds.length ? await client.from('profiles').select('id,username,avatar_url').in('id', authorIds) : { data: [] };
+  const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
+  status.textContent = replies.length ? '' : 'No comments yet.';
   document.getElementById('commentCount').textContent = `${replies.length} comment${replies.length === 1 ? '' : 's'}`;
-  list.innerHTML = replies.map((reply) => `<div class="reply"><div><div class="metaRow"><strong>@${escapeHtml(reply.author_id || 'user')}</strong><span class="muted">${escapeHtml(when(reply.created_at))}</span></div><div class="rbody">${escapeHtml(reply.body)}</div></div></div>`).join('');
+  list.innerHTML = replies.map((reply) => { const profile = profileMap.get(reply.author_id); const name = profile?.username || 'Community member'; const photo = profile?.avatar_url ? `<img src="${escapeHtml(profile.avatar_url)}" alt="">` : escapeHtml(name.slice(0, 1).toUpperCase()); return `<div class="reply"><span class="reply-ava">${photo}</span><div><div class="metaRow"><strong>${escapeHtml(name)}</strong><span class="muted">${escapeHtml(when(reply.created_at))}</span></div><div class="rbody">${escapeHtml(reply.body)}</div></div></div>`; }).join('');
   list.removeAttribute('aria-busy');
 }
 
