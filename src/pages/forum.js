@@ -58,7 +58,7 @@ categoryForm?.addEventListener('submit', async (event) => {
   const form = new FormData(categoryForm);
   adminStatus.textContent = 'Adding category…';
   try {
-    await createForumCategory(client, { title: form.get('title'), description: form.get('description') });
+    await createForumCategory(client, { title: form.get('title'), description: form.get('description'), coverImageUrl: form.get('coverImageUrl') });
     categoryForm.reset();
     adminStatus.textContent = 'Category added.';
     await loadForum();
