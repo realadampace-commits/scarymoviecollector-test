@@ -15,15 +15,38 @@ const owner = item.owner_id === session.user.id;
 const title = document.getElementById('title');
 const price = document.getElementById('price');
 const desc = document.getElementById('desc');
-title.value = item.title || ''; price.value = item.price ?? ''; desc.value = item.description || '';
+title.value = item.title || ''; price.value = item.user_value ?? ''; desc.value = item.description || '';
 document.getElementById('backLink').href = `item.html?id=${encodeURIComponent(id)}`;
 const grid = document.getElementById('grid');
 const newFiles = document.getElementById('newFiles');
 const addBtn = document.getElementById('addBtn');
 const imageMsg = document.getElementById('msg');
 const capMsg = document.getElementById('capMsg');
-const unsupported = ['sellToggle','sellPriceUsdc','saveSelling','soldPrice','markSold','undoSold'];
-unsupported.forEach((key) => { const element = document.getElementById(key); if (element) element.disabled = true; });
+const sellToggle = document.getElementById('sellToggle');
+const saveSelling = document.getElementById('saveSelling');
+const soldPrice = document.getElementById('soldPrice');
+const markSold = document.getElementById('markSold');
+const undoSold = document.getElementById('undoSold');
+sellToggle.checked = Boolean(item.is_for_sale);
+soldPrice.value = item.sold_price ?? '';
+if (item.sold) { soldPrice.disabled = true; markSold.style.display = 'none'; undoSold.style.display = ''; }
+if (!owner) [sellToggle, saveSelling, soldPrice, markSold, undoSold].forEach((element) => { element.disabled = true; });
+saveSelling.addEventListener('click', async () => {
+  saveSelling.disabled = true;
+  try { await updateOwnItem(client, id, session.user.id, { is_for_sale: sellToggle.checked }); document.getElementById('sellNote').textContent = 'Sale status saved.'; }
+  catch (error) { document.getElementById('sellNote').textContent = error.message || 'Unable to save sale status.'; }
+  finally { saveSelling.disabled = false; }
+});
+markSold.addEventListener('click', async () => {
+  markSold.disabled = true;
+  try { await updateOwnItem(client, id, session.user.id, { sold: true, is_for_sale: false, sold_price: Number(soldPrice.value) || 0, sold_at: new Date().toISOString() }); location.reload(); }
+  catch (error) { document.getElementById('soldMsg').textContent = error.message || 'Unable to mark sold.'; markSold.disabled = false; }
+});
+undoSold.addEventListener('click', async () => {
+  undoSold.disabled = true;
+  try { await updateOwnItem(client, id, session.user.id, { sold: false, sold_price: null, sold_at: null }); location.reload(); }
+  catch (error) { document.getElementById('soldMsg').textContent = error.message || 'Unable to undo sale.'; undoSold.disabled = false; }
+});
 
 let images = await listItemImages(client, id);
 function renderImages() {
@@ -57,7 +80,7 @@ document.getElementById('saveDetails').addEventListener('click', async () => {
   const saveButton = document.getElementById('saveDetails');
   if (saveButton.disabled) return;
   saveButton.disabled = true; saveButton.setAttribute('aria-busy', 'true'); message.textContent = 'Saving…';
-  try { await updateOwnItem(client, id, session.user.id, { title: title.value.trim(), description: desc.value, price: Number(price.value) }); message.textContent = 'Saved.'; }
+  try { await updateOwnItem(client, id, session.user.id, { title: title.value.trim(), description: desc.value, user_value: Number(price.value) }); message.textContent = 'Saved.'; }
   catch (error) { message.textContent = error.message || 'Unable to save changes. Try again.'; }
   finally { saveButton.disabled = false; saveButton.removeAttribute('aria-busy'); }
 });

@@ -20,9 +20,10 @@ test('edit photo uploader has an accessible label and usage guidance', () => {
   assert.match(page, /id="newFiles"[^>]*aria-describedby="photoHelp"/);
 });
 
-test('edit selling controls have explicit labels instead of placeholder-only names', () => {
-  assert.match(page, /<label for="sellPriceUsdc">Price in USDC<\/label>/);
-  assert.match(page, /<input id="sellPriceUsdc"[^>]*placeholder="e\.g\. 25\.00"/);
+test('edit selling controls are manual and contain no crypto payment fields', () => {
+  assert.match(page, /Manual Sale Status/);
+  assert.match(page, /Sales are arranged manually\. No payments are processed on this site\./);
+  assert.doesNotMatch(page, /sellPriceUsdc|Price in USDC|USDC \(Base\)/);
   assert.match(page, /<label for="soldPrice">Sold price \(USD\)<\/label>/);
 });
 
@@ -32,4 +33,11 @@ test('edit async actions expose live feedback and prevent duplicate saves', asyn
   const script = await readFile(new URL('../src/pages/edit.js', import.meta.url), 'utf8');
   assert.match(script, /saveButton\.disabled = true; saveButton\.setAttribute\('aria-busy', 'true'\)/);
   assert.match(script, /finally \{ saveButton\.disabled = false; saveButton\.removeAttribute\('aria-busy'\); \}/);
+});
+
+test('edit value reads and writes the authoritative user_value field', async () => {
+  const script = await readFile(new URL('../src/pages/edit.js', import.meta.url), 'utf8');
+  assert.match(script, /price\.value = item\.user_value \?\? ''/);
+  assert.match(script, /user_value: Number\(price\.value\)/);
+  assert.doesNotMatch(script, /price: Number\(price\.value\)/);
 });

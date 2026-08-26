@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 const page = await readFile(new URL('../settings.html', import.meta.url), 'utf8');
 
 test('settings action feedback is announced and not silently missed', () => {
-  const messageIds = ['usdcMsg', 'avatarMsg', 'userMsg', 'bioMsg', 'showcaseMsg', 'frameMsg', 'uploadMsg', 'pwdMsg', 'logoutMsg'];
+  const messageIds = ['avatarMsg', 'userMsg', 'bioMsg', 'showcaseMsg', 'frameMsg', 'uploadMsg', 'pwdMsg', 'logoutMsg'];
   for (const id of messageIds) {
     assert.match(page, new RegExp(`<span id="${id}"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"`));
   }
@@ -26,6 +26,13 @@ test('uploaded frames are selected immediately instead of requiring a reload', a
   assert.doesNotMatch(source, /Frame uploaded\. Reload to use it\./);
 });
 
+test('frame choices expose and update their selected state', async () => {
+  const source = await readFile(new URL('../src/pages/settings.js', import.meta.url), 'utf8');
+  assert.match(source, /card\.setAttribute\('aria-pressed', String\(isSelected\)\)/);
+  assert.match(source, /row\.querySelectorAll\('\.frameCard'\)\.forEach\(\(option\) => \{ option\.classList\.remove\('sel'\); option\.setAttribute\('aria-pressed', 'false'\); \}\)/);
+  assert.match(source, /card\.classList\.add\('sel'\); card\.setAttribute\('aria-pressed', 'true'\); renderFrame\(frame\)/);
+});
+
 test('profile picture upload explains the required selection before starting', async () => {
   assert.match(page, /<label class="muted" for="avatarFile">Choose a profile picture<\/label>/);
   const source = await readFile(new URL('../src/pages/settings.js', import.meta.url), 'utf8');
@@ -33,8 +40,8 @@ test('profile picture upload explains the required selection before starting', a
 });
 
 test('settings text controls have explicit labels and useful input metadata', () => {
-  assert.match(page, /<label class="muted" for="usdcAddr">Base wallet address<\/label>/);
-  assert.match(page, /id="usdcAddr" name="usdcAddr" autocomplete="off" inputmode="text"/);
+  assert.doesNotMatch(page, /usdcAddr|USDC \(Base\)|wallet address/);
+  assert.doesNotMatch(page, /saveUsdc|usdcMsg/);
   assert.match(page, /<label class="muted" for="username">New username<\/label>/);
   assert.match(page, /id="username" name="username" autocomplete="username"/);
   assert.match(page, /<label class="muted" for="bioInput">About you<\/label>/);

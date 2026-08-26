@@ -45,9 +45,15 @@ test('guest login link preserves the current item context', () => {
   assert.match(script, /item\.html\?id=\$\{encodeURIComponent\(id\)\}/);
 });
 
-test('item purchase and vote feedback is announced as live status', () => {
-  assert.match(html, /id="buyMsg"[^>]*role="status"[^>]*aria-live="polite"/);
+test('item purchase UI is removed while vote feedback remains announced', () => {
+  assert.doesNotMatch(html, /buyCard|buyBtn|buyMsg|USDC|payment/);
   assert.match(html, /id="voteMsg"[^>]*role="status"[^>]*aria-live="polite"/);
+});
+
+test('item vote submission prevents duplicate saves while a request is pending', () => {
+  assert.match(script, /const saveSuggestionButton = document\.getElementById\('saveSuggestion'\)/);
+  assert.match(script, /saveSuggestionButton\.disabled = true;[\s\S]*voteMsg\.textContent = 'Saving vote…'/);
+  assert.match(script, /finally \{ saveSuggestionButton\.disabled = false; \}/);
 });
 
 test('item deletion exposes non-blocking progress and error feedback', () => {

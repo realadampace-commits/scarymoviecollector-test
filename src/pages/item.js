@@ -2,7 +2,7 @@ import { getSupabaseClient } from '../supabase-client.js';
 import { getSession } from '../auth.js';
 import { getItemDetail } from '../data/item-detail.js';
 import { deleteOwnItem } from '../data/items.js';
-import { createOrderIntent } from '../data/order-intent.js';
+
 import { saveItemVote } from '../data/item-votes.js';
 import { escapeHtml, formatUsd } from '../ui.js';
 
@@ -121,28 +121,6 @@ else {
   document.getElementById('loginLink').href = `login.html?next=${encodeURIComponent(`item.html?id=${encodeURIComponent(id)}`)}`;
 }
 
-if (session && session.user.id !== item.owner_id && !item.sold && item.is_for_sale) {
-  const buyCard = document.getElementById('buyCard');
-  const buyButton = document.getElementById('buyBtn');
-  const buyMsg = document.getElementById('buyMsg');
-  buyCard.style.display = '';
-  buyButton.addEventListener('click', async () => {
-    buyButton.disabled = true;
-    buyMsg.textContent = 'Preparing order…';
-    try {
-      const order = await createOrderIntent(client, {
-        itemId: item.id,
-        buyerId: session.user.id,
-        sellerId: item.owner_id,
-        priceUsdc: item.price_usdc ?? item.user_value
-      });
-      buyMsg.textContent = `Order ${order.id} is pending payment verification.`;
-    } catch (error) {
-      buyButton.disabled = false;
-      buyMsg.textContent = error.message || 'Unable to prepare order.';
-    }
-  });
-}
 
 if (session?.user?.id === item.owner_id) {
   const ownerTools = document.getElementById('ownerTools');
@@ -177,10 +155,14 @@ const setChoice = (agree) => {
 };
 agreeButton.addEventListener('click', () => setChoice(true));
 disagreeButton.addEventListener('click', () => setChoice(false));
-document.getElementById('saveSuggestion').addEventListener('click', async () => {
+const saveSuggestionButton = document.getElementById('saveSuggestion');
+saveSuggestionButton.addEventListener('click', async () => {
   if (choice === null || !session) { voteMsg.textContent = 'Choose a vote first.'; return; }
+  saveSuggestionButton.disabled = true;
+  voteMsg.textContent = 'Saving vote…';
   try {
     await saveItemVote(client, { itemId: id, voterId: session.user.id, agree: choice, suggestedPrice: document.getElementById('suggestPrice').value });
     voteMsg.textContent = 'Vote saved.';
   } catch (error) { voteMsg.textContent = error.message || 'Unable to save vote.'; }
+  finally { saveSuggestionButton.disabled = false; }
 });

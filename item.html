@@ -45,8 +45,7 @@
   .ownerTools{display:flex;gap:8px;flex-wrap:wrap}
 </style>
 
-<!-- Ethers (for on-chain USDC transfers) -->
-<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -79,20 +78,13 @@
       </div>
     </div>
 
-    <!-- Right: price + buy + votes -->
+    <!-- Right: price + votes -->
     <div class="stack">
       <div class="card">
         <h3 style="margin:0 0 8px">Price</h3>
         <div style="font-size:28px;font-weight:700" id="price">$0</div>
         <div class="muted" id="saleLine" style="margin-top:6px"></div>
 
-        <!-- Buy card (USDC on Base) -->
-        <div id="buyCard" class="card" style="display:none;margin-top:12px">
-          <h3 style="margin:0 0 8px">Buy with USDC (Base)</h3>
-          <p class="muted" style="margin:0 0 8px">Payments go directly to the seller’s wallet.</p>
-          <button id="buyBtn" class="btn ok" style="background:#2a6">Buy Now</button>
-          <div id="buyMsg" class="muted" style="margin-top:6px" role="status" aria-live="polite"></div>
-        </div>
 
         <div class="muted" id="createdAt" style="margin-top:6px"></div>
       </div>
