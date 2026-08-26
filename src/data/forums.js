@@ -5,6 +5,23 @@ export async function getForumPost(client, postId) {
   return data;
 }
 
+export async function getForumPostLikeState(client, postId, userId = null) {
+  const { data, error } = await client.from('forum_post_likes').select('user_id').eq('post_id', postId);
+  if (error) throw error;
+  return { count: data?.length ?? 0, liked: Boolean(userId && data?.some((row) => row.user_id === userId)) };
+}
+
+export async function toggleForumPostLike(client, { postId, userId, liked }) {
+  if (liked) {
+    const { error } = await client.from('forum_post_likes').delete().eq('post_id', postId).eq('user_id', userId);
+    if (error) throw error;
+  } else {
+    const { error } = await client.from('forum_post_likes').insert({ post_id: postId, user_id: userId });
+    if (error) throw error;
+  }
+  return getForumPostLikeState(client, postId, userId);
+}
+
 export async function listForumReplies(client, postId) {
   if (!postId || typeof postId !== 'string') throw new TypeError('post id is required');
   const { data, error } = await client.from('forum_replies').select('id,post_id,author_id,body,created_at').eq('post_id', postId).order('created_at', { ascending: true });
