@@ -1,6 +1,6 @@
 import { getSupabaseClient } from '../supabase-client.js';
 import { getSession } from '../auth.js';
-import { getForumPost, listForumReplies } from '../data/forums.js';
+import { getForumPost, listForumReplies, getForumPostLikeState, toggleForumPostLike } from '../data/forums.js';
 import { createForumReply } from '../data/forums.js';
 import { escapeHtml } from '../ui.js';
 import { getProfile } from '../data/profiles.js';
@@ -40,6 +40,7 @@ async function renderReplies() {
   list.setAttribute('aria-busy', 'true');
   const replies = await listForumReplies(client, id);
   status.textContent = replies.length ? '' : 'No replies yet.';
+  document.getElementById('commentCount').textContent = `${replies.length} comment${replies.length === 1 ? '' : 's'}`;
   list.innerHTML = replies.map((reply) => `<div class="reply"><div><div class="metaRow"><strong>@${escapeHtml(reply.author_id || 'user')}</strong><span class="muted">${escapeHtml(when(reply.created_at))}</span></div><div class="rbody">${escapeHtml(reply.body)}</div></div></div>`).join('');
   list.removeAttribute('aria-busy');
 }
@@ -55,6 +56,12 @@ status.addEventListener('click', (event) => {
 });
 
 const session = await getSession(client);
+const likeState = await getForumPostLikeState(client, id, session?.user?.id);
+const actions = document.getElementById('postActions');
+actions.innerHTML = `<div class="post-stats"><span id="likeCount">${likeState.count ? `♡ ${likeState.count}` : 'Be the first to like this'}</span><span id="commentCount">Loading comments…</span></div><div class="post-actions"><button id="likeBtn" class="btn-action${likeState.liked ? ' liked' : ''}" type="button">${likeState.liked ? '♥ Liked' : '♡ Like'}</button><button id="commentBtn" class="btn-action" type="button">💬 Comment</button><button id="shareBtn" class="btn-action" type="button">↗ Share</button></div>`;
+likeBtn.addEventListener('click', async () => { if (!session) { likeBtn.textContent = 'Sign in to like'; return; } likeBtn.disabled = true; try { const next = await toggleForumPostLike(client, { postId:id, userId:session.user.id, liked:likeBtn.classList.contains('liked') }); likeBtn.classList.toggle('liked', next.liked); likeBtn.textContent = next.liked ? '♥ Liked' : '♡ Like'; likeCount.textContent = next.count ? `♡ ${next.count}` : 'Be the first to like this'; } finally { likeBtn.disabled = false; } });
+commentBtn.addEventListener('click', () => { replyBox.style.display = ''; replyText.focus(); });
+shareBtn.addEventListener('click', async () => { await navigator.clipboard?.writeText(location.href); shareBtn.textContent = '✓ Copied'; });
 if (session) {
   replyBox.style.display = '';
   replySend.addEventListener('click', async () => {
