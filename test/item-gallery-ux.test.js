@@ -56,6 +56,11 @@ test('item vote submission prevents duplicate saves while a request is pending',
   assert.match(script, /finally \{ saveSuggestionButton\.disabled = false; \}/);
 });
 
+test('agree votes keep an actionable save control visible', () => {
+  assert.match(html, /id="disagreeBlock"[\s\S]*?<\/div>\s*<button id="saveSuggestion"/);
+  assert.match(script, /document\.getElementById\('disagreeBlock'\)\.style\.display = agree \? 'none' : 'flex';/);
+});
+
 test('item vote submission refreshes displayed vote totals', () => {
   assert.match(script, /await saveItemVote[\s\S]*renderVoteSummary\(await getItemVotes\(client, id\)\)/);
 });
