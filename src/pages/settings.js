@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '../supabase-client.js';
-import { requireSession, signOut } from '../auth.js';
+import { requireSession, requestPasswordReset, signOut } from '../auth.js';
 import { getProfile, updateOwnProfile } from '../data/profiles.js';
 import { uploadAvatar } from '../data/avatars.js';
 import { listFrames, createFrame } from '../data/frames.js';
@@ -99,6 +99,16 @@ document.getElementById('uploadFrame')?.addEventListener('click', async () => {
   const message = document.getElementById('uploadMsg'); const button = document.getElementById('uploadFrame'); button.disabled = true; message.textContent = 'Uploading…';
   try { const frame = await createFrame(client, session.user.id, document.getElementById('frameFile')?.files?.[0], { title: document.getElementById('frameTitle')?.value, scale: document.getElementById('frameScale')?.value }); frames.push(frame); selectedFrame = frame; renderFrame(frame); message.textContent = 'Frame uploaded and selected. Save to apply it.'; } catch (error) { message.textContent = error.message || 'Unable to upload frame.'; } finally { button.disabled = false; }
 });
+document.getElementById('sendReset')?.addEventListener('click', async () => {
+  const button = document.getElementById('sendReset');
+  const message = document.getElementById('pwdMsg');
+  if (button.disabled) return;
+  button.disabled = true; message.textContent = 'Sending…';
+  try { await requestPasswordReset(client, session.user.email, new URL('reset.html', location.href).href); message.textContent = 'Password reset email sent.'; }
+  catch (error) { message.textContent = error.message || 'Unable to send password reset email.'; }
+  finally { button.disabled = false; }
+});
+
 document.getElementById('logoutLocal')?.addEventListener('click', async () => { await signOut(client); location.href = 'login.html'; });
 document.getElementById('logoutGlobal')?.addEventListener('click', async () => { await signOut(client); location.href = 'login.html'; });
 } catch (error) {
