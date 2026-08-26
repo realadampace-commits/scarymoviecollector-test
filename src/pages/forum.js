@@ -56,9 +56,18 @@ async function setupAdminTools() {
 categoryForm?.addEventListener('submit', async (event) => {
   event.preventDefault();
   const form = new FormData(categoryForm);
+  let coverImageUrl = form.get('coverImageUrl');
+  const coverFile = form.get('coverFile');
+  if (coverFile?.size) {
+    if (coverFile.size > 5 * 1024 * 1024 || !coverFile.type.startsWith('image/')) throw new TypeError('invalid banner image');
+    const path = `${crypto.randomUUID()}-${coverFile.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`;
+    const upload = await client.storage.from('forum-covers').upload(path, coverFile, { upsert: false, contentType: coverFile.type });
+    if (upload.error) throw upload.error;
+    coverImageUrl = client.storage.from('forum-covers').getPublicUrl(path).data.publicUrl;
+  }
   adminStatus.textContent = 'Adding category…';
   try {
-    await createForumCategory(client, { title: form.get('title'), description: form.get('description'), coverImageUrl: form.get('coverImageUrl') });
+    await createForumCategory(client, { title: form.get('title'), description: form.get('description'), coverImageUrl });
     categoryForm.reset();
     adminStatus.textContent = 'Category added.';
     await loadForum();
