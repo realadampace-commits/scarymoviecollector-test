@@ -10,7 +10,7 @@ const saveBtn = document.getElementById('save');
 const msgEl   = document.getElementById('msg');
 const msg=(t,cls='muted')=>{msgEl.className=cls; msgEl.textContent=t;};
 
-let me=null, myRole='free';
+let me=null, myRole='free', creating=false;
 
 (async function init(){
   const { data:{ session } } = await sb.auth.getSession();
@@ -31,10 +31,12 @@ let me=null, myRole='free';
 })();
 
 saveBtn.addEventListener('click', async ()=>{
+  if (creating) return;
   const title = titleEl.value.trim();
   const body  = bodyEl.value.trim();
   if(!title || !body) return msg('Title and body required.','err');
 
+  creating = true;
   msg('Creating…');
   saveBtn.disabled = true;
   saveBtn.setAttribute('aria-busy', 'true');
@@ -43,6 +45,7 @@ saveBtn.addEventListener('click', async ()=>{
   }).select('id').single();
 
   if (error) {
+    creating = false;
     saveBtn.disabled = false;
     saveBtn.removeAttribute('aria-busy');
     msg('Error: '+error.message+' Try again.','err');

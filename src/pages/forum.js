@@ -14,9 +14,11 @@ const adminStatus = document.getElementById('adminStatus');
 const initials = (value) => String(value || 'U').slice(0, 1).toUpperCase();
 const when = (value) => formatShortDate(value, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-async function postCard(post, session) {
+async function postCard(post, session, profile) {
   const [likes, replies] = await Promise.all([getForumPostLikeState(client, post.id, session?.user?.id), listForumReplies(client, post.id)]);
-  return `<article class="post" data-post-id="${post.id}" data-liked="${likes.liked}"><div class="post-top"><span class="avatar">${escapeHtml(initials(post.author_id))}</span><div><div class="author">Community member</div><div class="when">${escapeHtml(when(post.created_at))} · 🌐</div></div><a class="post-more" aria-label="Open discussion" href="forum_post.html?id=${encodeURIComponent(post.id)}">•••</a></div><a class="post-content" href="forum_post.html?id=${encodeURIComponent(post.id)}"><h2>${escapeHtml(post.title || '(untitled)')}</h2><p class="post-body">${escapeHtml(post.body || '')}</p></a><div class="post-stats"><span class="like-count">${likes.count ? `♡ ${likes.count}` : 'Be the first to like this'}</span><span class="reply-count">${replies.length} comment${replies.length === 1 ? '' : 's'}</span></div><div class="post-actions"><button class="feed-like${likes.liked ? ' liked' : ''}" type="button">${likes.liked ? '♥ Liked' : '♡ Like'}</button><button class="feed-comment" type="button">💬 Comment</button><button class="feed-share" type="button">↗ Share</button></div><div class="inline-comments" hidden><div class="comment-list">${replies.map((r) => `<p><strong>${escapeHtml(initials(r.author_id))}</strong> ${escapeHtml(r.body)}</p>`).join('')}</div><form class="inline-comment-form"><input name="body" maxlength="2000" placeholder="Write a comment…" required><button type="submit">Post</button><small class="comment-status" role="status"></small></form></div></article>`;
+  const displayName = profile?.username || 'Community member';
+  const avatar = profile?.avatar_url ? `<img src="${escapeHtml(profile.avatar_url)}" alt="">` : escapeHtml(initials(displayName));
+  return `<article class="post" data-post-id="${post.id}" data-liked="${likes.liked}"><div class="post-top"><span class="avatar">${avatar}</span><div><div class="author">${escapeHtml(displayName)}</div><div class="when">${escapeHtml(when(post.created_at))} · 🌐</div></div><a class="post-more" aria-label="Open discussion" href="forum_post.html?id=${encodeURIComponent(post.id)}">•••</a></div><a class="post-content" href="forum_post.html?id=${encodeURIComponent(post.id)}"><h2>${escapeHtml(post.title || '(untitled)')}</h2><p class="post-body">${escapeHtml(post.body || '')}</p></a><div class="post-stats"><span class="like-count">${likes.count ? `♡ ${likes.count}` : 'Be the first to like this'}</span><span class="reply-count">${replies.length} comment${replies.length === 1 ? '' : 's'}</span></div><div class="post-actions"><button class="feed-like${likes.liked ? ' liked' : ''}" type="button">${likes.liked ? '♥ Liked' : '♡ Like'}</button><button class="feed-comment" type="button">💬 Comment</button><button class="feed-share" type="button">↗ Share</button></div><div class="inline-comments" hidden><div class="comment-list">${replies.map((r) => `<p><strong>${escapeHtml(initials(r.author_id))}</strong> ${escapeHtml(r.body)}</p>`).join('')}</div><form class="inline-comment-form"><input name="body" maxlength="2000" placeholder="Write a comment…" required><button type="submit">Post</button><small class="comment-status" role="status"></small></form></div></article>`;
 }
 
 async function loadForum() {
@@ -31,7 +33,10 @@ async function loadForum() {
   status.textContent = categories.length ? '' : 'No categories yet.';
   list.innerHTML = categories.map((category, index) => `<a class="category" style="--cover:url('${escapeHtml(category.cover_image_url || '')}');--hue:${index * 37}" href="forum_category.html?id=${encodeURIComponent(category.id)}"><span class="badge"><svg aria-hidden="true"><use href="#forum-icon"/></svg></span><span><strong>${escapeHtml(category.title)}</strong>${category.description ? `<small>${escapeHtml(category.description)}</small>` : ''}</span></a>`).join('');
   const session = await getSession(client);
-  posts.innerHTML = (await Promise.all(recentPosts.map((post) => postCard(post, session)))).join('') || '<div class="panel empty">No posts yet. Choose a category to start the first discussion.</div>';
+  const authorIds = [...new Set(recentPosts.map((post) => post.author_id).filter(Boolean))];
+  const { data: profiles } = authorIds.length ? await client.from('profiles').select('id,username,avatar_url').in('id', authorIds) : { data: [] };
+  const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
+  posts.innerHTML = (await Promise.all(recentPosts.map((post) => postCard(post, session, profileMap.get(post.author_id))))).join('') || '<div class="panel empty">No posts yet. Choose a category to start the first discussion.</div>';
 }
 
 function renderLoadError(error) {
