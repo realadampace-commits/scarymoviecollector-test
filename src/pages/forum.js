@@ -24,7 +24,7 @@ async function loadForum() {
   status.setAttribute('aria-busy', 'false');
   posts.setAttribute('aria-busy', 'false');
   status.textContent = categories.length ? '' : 'No categories yet.';
-  list.innerHTML = categories.map((category) => `<a class="category" href="forum_category.html?id=${encodeURIComponent(category.id)}"><span class="badge">#</span><span>${escapeHtml(category.title)}</span></a>`).join('');
+  list.innerHTML = categories.map((category, index) => `<a class="category" style="--cover:url('${escapeHtml(category.cover_image_url || '')}');--hue:${index * 37}" href="forum_category.html?id=${encodeURIComponent(category.id)}"><span class="badge"><svg aria-hidden="true"><use href="#forum-icon"/></svg></span><span><strong>${escapeHtml(category.title)}</strong>${category.description ? `<small>${escapeHtml(category.description)}</small>` : ''}</span></a>`).join('');
   posts.innerHTML = recentPosts.map(postCard).join('') || '<div class="panel empty">No posts yet. Choose a category to start the first discussion.</div>';
 }
 
