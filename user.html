@@ -91,6 +91,7 @@
 
 <script type="module">
 import { getSupabaseClient } from './src/supabase-client.js';
+import { escapeHtml } from './src/ui.js';
 const sb = getSupabaseClient();
 
 // DOM
@@ -142,10 +143,10 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
     <span class="pill soldPill">Sold for ${money(soldPrice || 0)}</span>
   ` : (forSale ? `<span class="pill" style="border-color:#2a6;color:#9f9">For sale</span>` : '');
   return `
-    <a class="itemCard" href="item.html?id=${encodeURIComponent(id)}" title="${title||'Item'}">
-      <div class="thumb">${img ? `<img src="${img}" alt="">` : `<span class="muted">No image</span>`}</div>
+    <a class="itemCard" href="item.html?id=${encodeURIComponent(id)}" title="${escapeHtml(title || 'Item')}">
+      <div class="thumb">${img ? `<img src="${escapeHtml(img)}" alt="">` : `<span class="muted">No image</span>`}</div>
       <div class="itemBody">
-        <h4 class="itemTitle">${title || 'Untitled'}</h4>
+        <h4 class="itemTitle">${escapeHtml(title || 'Untitled')}</h4>
         <div class="row2">
           <div class="price">${money(price || 0)}</div>
           ${soldInfo}
@@ -312,13 +313,13 @@ async function loadShowcase(ids){
     showcaseRow.innerHTML = withPrev.map(r=>{
       return `
         <a class="mini" href="item.html?id=${encodeURIComponent(r.id)}">
-          <div class="thumb">${r.preview_url ? `<img src="${r.preview_url}" alt="">` : `<span class="muted">No image</span>`}</div>
+          <div class="thumb">${r.preview_url ? `<img src="${escapeHtml(r.preview_url)}" alt="">` : `<span class="muted">No image</span>`}</div>
           <div class="itemBody">
             <div style="display:flex;justify-content:space-between;gap:6px;align-items:center">
               <div style="font-weight:700;font-size:14px">${money(r.user_value||0)}</div>
               ${r.sold_at ? `<span class="pill soldPill" style="font-size:11px">Sold</span>` : ''}
             </div>
-            <div class="muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.title||'Untitled'}</div>
+            <div class="muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(r.title || 'Untitled')}</div>
           </div>
         </a>
       `;
