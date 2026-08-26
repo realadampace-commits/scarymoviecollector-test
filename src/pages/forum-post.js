@@ -3,6 +3,7 @@ import { getSession } from '../auth.js';
 import { getForumPost, listForumReplies } from '../data/forums.js';
 import { createForumReply } from '../data/forums.js';
 import { escapeHtml } from '../ui.js';
+import { getProfile } from '../data/profiles.js';
 import { formatShortDate } from '../utils/date.js';
 
 const forumDateOptions = { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' };
@@ -28,7 +29,11 @@ if (!post) { title.textContent = 'Post not found'; throw new Error('post not fou
 title.textContent = post.title || '(untitled)';
 body.textContent = post.body || '';
 document.getElementById('pWhen').textContent = when(post.created_at);
-meta.innerHTML = `@${escapeHtml(post.author_id || 'user')} • <span>${escapeHtml(when(post.created_at))}</span>`;
+const author = await getProfile(client, post.author_id).catch(() => null);
+const authorName = author?.username || 'Community member';
+const avatar = document.getElementById('pAvaImg');
+if (author?.avatar_url) { avatar.src = author.avatar_url; avatar.alt = `${authorName}'s profile photo`; }
+meta.innerHTML = `<strong>${escapeHtml(authorName)}</strong> · <span>${escapeHtml(when(post.created_at))}</span>`;
 
 async function renderReplies() {
   status.textContent = 'Loading replies…';

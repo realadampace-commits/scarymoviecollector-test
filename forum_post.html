@@ -4,34 +4,14 @@
 <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Post — Scream Collector</title>
 <style>
-  :root{--bg:#111;--panel:#1b1b1b;--ink:#eee;--muted:#a9adb4;--accent:#2a6;--danger:#933}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
-  a{color:#9ecbff;text-decoration:none}
-  .wrap{max-width:900px;margin:0 auto;padding:24px}
-
-  .card{background:var(--panel);border-radius:12px;padding:16px;margin-top:16px}
-  .muted{color:var(--muted)} .ok{color:#9f9}.err{color:#f88}
-  .btn{background:#444;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer;text-decoration:none}
-  .btn.primary{background:var(--accent)}
-  .btn.danger{background:var(--danger)}
-
-  .header{display:flex;align-items:center;gap:12px}
-  .ava{position:relative;width:48px;height:48px;border-radius:50%;background:#333;overflow:hidden;flex:0 0 auto}
-  .ava img{width:100%;height:100%;object-fit:cover;display:block}
-  .frame{position:absolute;inset:0;background-size:contain;background-position:center;background-repeat:no-repeat;pointer-events:none;transform: translate(var(--frameX, 0px), var(--frameY, 0px)) scale(var(--frameScale, 1))}
-
-  .title{font-size:22px;margin:0}
-  .meta{font-size:13px;opacity:.75}
-  .body{white-space:pre-wrap;margin-top:10px}
-
-  .replyBox{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}
-  textarea{width:100%;min-height:100px;padding:10px;border-radius:8px;border:1px solid #333;background:#222;color:#eee}
-  input,textarea{font-family:inherit}
-
-  .reply{display:flex;gap:10px;border:1px solid #2a2a2a;background:#161616;border-radius:12px;padding:12px}
-  .reply .metaRow{display:flex;align-items:center;gap:8px}
-  .reply .rbody{white-space:pre-wrap;margin-top:6px}
-  .row{display:flex;align-items:center;gap:10px;justify-content:space-between}
+  :root{--bg:#f0f2f5;--panel:#fff;--ink:#050505;--muted:#65676b;--accent:#1877f2;--line:#e4e6eb}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,Arial,Helvetica,sans-serif}
+  a{color:#1877f2;text-decoration:none}
+  .wrap{max-width:680px;margin:0 auto;padding:24px 16px}
+  .card{background:var(--panel);border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.08);border-radius:12px;padding:16px;margin-top:14px}
+  .muted{color:var(--muted)} .ok{color:#237a3b}.err{color:#c5221f}
+  .btn{background:#e4e6eb;color:#050505;border:none;border-radius:7px;padding:10px 16px;cursor:pointer;text-decoration:none;font-weight:700}.btn.primary{background:var(--accent);color:#fff}
+  .header{display:flex;align-items:center;gap:10px}.ava{position:relative;width:44px;height:44px;border-radius:50%;background:#d8dadf;overflow:hidden;flex:0 0 auto}.ava img{width:100%;height:100%;object-fit:cover;display:block}.title{font-size:20px;margin:0 0 3px}.meta{font-size:13px;color:var(--muted)}.body{white-space:pre-wrap;margin-top:14px;font-size:16px;line-height:1.45;color:#242526}.replyBox{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start}textarea{box-sizing:border-box;width:100%;min-height:90px;padding:12px;border-radius:9px;border:1px solid var(--line);background:#f0f2f5;color:#050505}.reply{display:flex;gap:10px;border:0;background:#f0f2f5;border-radius:14px;padding:12px}.reply .metaRow{display:flex;align-items:center;gap:8px}.reply .rbody{white-space:pre-wrap;margin-top:6px}.row{display:flex;align-items:center;gap:10px;justify-content:space-between}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 </style>
   <link rel="stylesheet" href="/styles.css">
