@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const page = await readFile(new URL('../forum_new_post.html', import.meta.url), 'utf8');
+const page = `${await readFile(new URL('../forum_new_post.html', import.meta.url), 'utf8')}\n${await readFile(new URL('../src/pages/forum-new-post.js', import.meta.url), 'utf8')}`;
 
 test('new-post fields are labeled and required', () => {
   assert.match(page, /<label for="title">Title<\/label>/);

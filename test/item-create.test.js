@@ -55,3 +55,19 @@ test('createOwnItem preserves the upload failure when rollback also fails', asyn
     /upload lookup failed/
   );
 });
+
+test('createOwnItem preserves upload failure when rollback resolves with an error', async () => {
+  let itemQueries = 0;
+  const client = {
+    from() {
+      itemQueries += 1;
+      if (itemQueries === 1) return { insert() { return this; }, select() { return this; }, single: async () => ({ data: { id: 'item-1' }, error: null }) };
+      if (itemQueries === 2) return { select() { return this; }, eq() { return this; }, maybeSingle: async () => ({ data: null, error: new Error('upload failed') }) };
+      return { delete() { return this; }, eq() { return this; }, then(resolve) { resolve({ error: new Error('rollback failed') }); } };
+    },
+  };
+  await assert.rejects(
+    () => createOwnItem(client, 'owner-1', { title: 'Mask', userValue: 42, files: [{ name: 'mask.jpg', type: 'image/jpeg', size: 1 }] }),
+    /upload failed/
+  );
+});

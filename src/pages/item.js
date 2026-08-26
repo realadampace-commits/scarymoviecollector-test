@@ -3,7 +3,7 @@ import { getSession } from '../auth.js';
 import { getItemDetail } from '../data/item-detail.js';
 import { deleteOwnItem } from '../data/items.js';
 
-import { saveItemVote } from '../data/item-votes.js';
+import { getItemVotes, saveItemVote } from '../data/item-votes.js';
 import { escapeHtml, formatUsd } from '../ui.js';
 
 const client = getSupabaseClient();
@@ -109,10 +109,13 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'ArrowRight') nextButton.click();
 });
 
-agg.textContent = `Agree: ${votes.agree} • Disagree: ${votes.disagree}`;
-const total = votes.agree + votes.disagree;
-fill.style.width = `${total ? (votes.agree / total) * 100 : 0}%`;
-avg.textContent = `Average suggested: ${votes.averageSuggested == null ? '—' : formatUsd(votes.averageSuggested)}`;
+function renderVoteSummary(summary) {
+  agg.textContent = `Agree: ${summary.agree} • Disagree: ${summary.disagree}`;
+  const total = summary.agree + summary.disagree;
+  fill.style.width = `${total ? (summary.agree / total) * 100 : 0}%`;
+  avg.textContent = `Average suggested: ${summary.averageSuggested == null ? '—' : formatUsd(summary.averageSuggested)}`;
+}
+renderVoteSummary(votes);
 
 const session = await getSession(client);
 if (session) voteBox.style.display = '';
@@ -162,6 +165,7 @@ saveSuggestionButton.addEventListener('click', async () => {
   voteMsg.textContent = 'Saving vote…';
   try {
     await saveItemVote(client, { itemId: id, voterId: session.user.id, agree: choice, suggestedPrice: document.getElementById('suggestPrice').value });
+    renderVoteSummary(await getItemVotes(client, id));
     voteMsg.textContent = 'Vote saved.';
   } catch (error) { voteMsg.textContent = error.message || 'Unable to save vote.'; }
   finally { saveSuggestionButton.disabled = false; }

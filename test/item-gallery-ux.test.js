@@ -56,6 +56,10 @@ test('item vote submission prevents duplicate saves while a request is pending',
   assert.match(script, /finally \{ saveSuggestionButton\.disabled = false; \}/);
 });
 
+test('item vote submission refreshes displayed vote totals', () => {
+  assert.match(script, /await saveItemVote[\s\S]*renderVoteSummary\(await getItemVotes\(client, id\)\)/);
+});
+
 test('item deletion exposes non-blocking progress and error feedback', () => {
   assert.match(html, /id="deleteMsg"[^>]*role="status"[^>]*aria-live="polite"/);
   assert.match(script, /deleteMsg\.textContent = 'Deleting item…'/);

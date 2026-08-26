@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const page = readFileSync(resolve(import.meta.dirname, '../item-search.html'), 'utf8');
+const page = `${readFileSync(resolve(import.meta.dirname, '../item-search.html'), 'utf8')}\n${readFileSync(resolve(import.meta.dirname, '../src/pages/item-search.js'), 'utf8')}`;
 
 test('item search has a named form control and announced status', () => {
   assert.match(page, /<form class="controls" id="searchForm">/);
