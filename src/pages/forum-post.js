@@ -31,10 +31,23 @@ document.getElementById('pWhen').textContent = when(post.created_at);
 meta.innerHTML = `@${escapeHtml(post.author_id || 'user')} • <span>${escapeHtml(when(post.created_at))}</span>`;
 
 async function renderReplies() {
+  status.textContent = 'Loading replies…';
+  list.setAttribute('aria-busy', 'true');
   const replies = await listForumReplies(client, id);
   status.textContent = replies.length ? '' : 'No replies yet.';
   list.innerHTML = replies.map((reply) => `<div class="reply"><div><div class="metaRow"><strong>@${escapeHtml(reply.author_id || 'user')}</strong><span class="muted">${escapeHtml(when(reply.created_at))}</span></div><div class="rbody">${escapeHtml(reply.body)}</div></div></div>`).join('');
+  list.removeAttribute('aria-busy');
 }
+
+function renderRepliesError(error) {
+  console.error(error);
+  list.removeAttribute('aria-busy');
+  status.innerHTML = 'Unable to load replies right now. <button class="retry-replies" type="button">Retry loading replies</button>';
+}
+
+status.addEventListener('click', (event) => {
+  if (event.target.closest('.retry-replies')) renderReplies().catch(renderRepliesError);
+});
 
 const session = await getSession(client);
 if (session) {
@@ -51,9 +64,9 @@ if (session) {
     replySend.setAttribute('aria-busy', 'true');
     try {
       await createForumReply(client, { postId: id, authorId: session.user.id, body: replyBody });
-      replyText.value = ''; replyMsg.textContent = 'Reply posted.'; await renderReplies();
+      replyText.value = ''; replyMsg.textContent = 'Reply posted.'; await renderReplies().catch(renderRepliesError);
     } catch (error) { replyMsg.textContent = error.message || 'Unable to post reply.'; }
     finally { replySend.disabled = false; replySend.textContent = 'Post Reply'; replySend.removeAttribute('aria-busy'); }
   });
 }
-await renderReplies();
+renderReplies().catch(renderRepliesError);

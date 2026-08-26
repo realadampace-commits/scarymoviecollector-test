@@ -28,6 +28,8 @@
   <a href="index.html">← Home</a>
   <h2>Create a new Item</h2>
 
+  <form id="createForm">
+
   <div class="card">
     <div class="row"><label for="title">Title</label><input id="title" placeholder="Item title" required /></div>
     <div class="row"><label for="desc">Description</label><textarea id="desc" rows="4" placeholder="Describe the item…"></textarea></div>
@@ -45,9 +47,10 @@
   </div>
 
   <div class="card" style="display:flex;gap:10px;align-items:center">
-    <button id="saveBtn" type="button">Create Item</button>
+    <button id="saveBtn" type="submit">Create Item</button>
     <span id="msg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>
   </div>
+  </form>
 </div>
 
 <script type="module" src="/src/pages/create.js"></script>

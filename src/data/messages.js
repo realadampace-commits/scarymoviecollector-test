@@ -36,10 +36,10 @@ export async function listThreadMessages(client, threadId, { limit = 100 } = {})
     .from('dm_messages')
     .select('id,thread_id,author_id,body,created_at')
     .eq('thread_id', threadId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
     .limit(safeLimit);
   if (error) throw error;
-  return data ?? [];
+  return [...(data ?? [])].reverse();
 }
 
 export async function sendMessage(client, { threadId, authorId, body }) {
@@ -52,5 +52,6 @@ export async function sendMessage(client, { threadId, authorId, body }) {
     .select()
     .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error('message was not sent');
   return data;
 }

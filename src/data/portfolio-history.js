@@ -3,7 +3,12 @@ const rangesInDays = { '1W': 7, '1M': 31, '3M': 92, '6M': 183, '1Y': 365 };
 export function buildPortfolioHistory(items) {
   let total = 0;
   return [...(items ?? [])]
-    .filter((item) => Number.isFinite(new Date(item.created_at).getTime()) && Number.isFinite(Number(item.user_value)) && Number(item.user_value) >= 0)
+    .filter((item) => item.user_value !== null
+      && item.user_value !== undefined
+      && (typeof item.user_value !== 'string' || item.user_value.trim() !== '')
+      && Number.isFinite(new Date(item.created_at).getTime())
+      && Number.isFinite(Number(item.user_value))
+      && Number(item.user_value) >= 0)
     .sort((left, right) => new Date(left.created_at) - new Date(right.created_at))
     .map((item) => {
       total += Number(item.user_value);

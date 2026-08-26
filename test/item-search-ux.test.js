@@ -25,3 +25,10 @@ test('item search ignores stale responses when a newer query finishes first', ()
   assert.match(page, /if \(requestId !== searchToken\) return;/g);
   assert.ok((page.match(/if \(requestId !== searchToken\) return;/g) || []).length >= 3);
 });
+
+test('item search escapes database values before inserting result markup', () => {
+  assert.match(page, /item\.html\?id=\$\{escapeHtml\(it\.id\)\}/);
+  assert.match(page, /src="\$\{escapeHtml\(it\.preview_url\)\}"/);
+  assert.match(page, /<span>\$\{escapeHtml\(uname\)\}<\/span>/);
+  assert.doesNotMatch(page, /src="\$\{it\.preview_url\}"/);
+});

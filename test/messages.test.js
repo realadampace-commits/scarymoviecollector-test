@@ -12,7 +12,8 @@ function fakeClient(result) {
     order(...args) { calls.push(['order', ...args]); return this; },
     limit(...args) { calls.push(['limit', ...args]); return this; },
     insert(...args) { calls.push(['insert', ...args]); return this; },
-    maybeSingle() { calls.push(['maybeSingle']); return Promise.resolve(result); }
+    maybeSingle() { calls.push(['maybeSingle']); return Promise.resolve(result); },
+    then(resolve) { return Promise.resolve(result).then(resolve); }
   };
   return { client: { from(table) { calls.push(['from', table]); return builder; } }, calls };
 }
@@ -37,6 +38,19 @@ test('listThreadMessages rejects missing thread ids', async () => {
   await assert.rejects(() => listThreadMessages({}, ''), /thread id is required/);
 });
 
+test('listThreadMessages fetches the latest page and returns it in chronological order', async () => {
+  const latestFirst = [
+    { id: 'm3', created_at: '2026-08-22T03:00:00Z' },
+    { id: 'm2', created_at: '2026-08-22T02:00:00Z' }
+  ];
+  const fake = fakeClient({ data: latestFirst, error: null });
+
+  const messages = await listThreadMessages(fake.client, 't1', { limit: 2 });
+
+  assert.deepEqual(fake.calls.find((x) => x[0] === 'order'), ['order', 'created_at', { ascending: false }]);
+  assert.deepEqual(messages.map((message) => message.id), ['m2', 'm3']);
+});
+
 test('sendMessage trims body and sends explicit author identity', async () => {
   const fake = fakeClient({ data: { id: 'm1' }, error: null });
   await sendMessage(fake.client, { threadId: 't1', authorId: 'u1', body: ' hello ' });
@@ -45,10 +59,19 @@ test('sendMessage trims body and sends explicit author identity', async () => {
   });
 });
 
+test('sendMessage rejects when the database did not create a message', async () => {
+  const fake = fakeClient({ data: null, error: null });
+
+  await assert.rejects(
+    () => sendMessage(fake.client, { threadId: 't1', authorId: 'u1', body: 'hello' }),
+    /message was not sent/
+  );
+});
+
 test('new-chat search has a visible associated label', () => {
   const html = readFileSync(resolve(import.meta.dirname, '../messages.html'), 'utf8');
   assert.match(html, /<label class="sr-only" for="userSearch">Username<\/label>/);
-  assert.match(html, /<input id="userSearch" type="text" autocomplete="off" placeholder="Message @username" required minlength="1"\/>/);
+  assert.match(html, /<input id="userSearch" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Message @username" required minlength="1"\/>/);
 });
 
 test('message avatars render profile photos and frames when available', () => {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getProfile, updateOwnProfile } from '../src/data/profiles.js';
+import { getProfile, searchProfiles, updateOwnProfile } from '../src/data/profiles.js';
 
 function fakeClient(result) {
   const calls = [];
@@ -15,6 +15,20 @@ function fakeClient(result) {
 
 test('getProfile rejects missing ids', async () => {
   await assert.rejects(() => getProfile({}, ''), /profile id is required/);
+});
+
+test('searchProfiles treats username wildcard characters literally', async () => {
+  const calls = [];
+  const chain = {
+    select() { return this; },
+    ilike(...args) { calls.push(args); return this; },
+    order() { return this; },
+    limit() { return Promise.resolve({ data: [], error: null }); }
+  };
+
+  await searchProfiles({ from() { return chain; } }, String.raw`100%_real\name`);
+
+  assert.deepEqual(calls[0], ['username', String.raw`%100\%\_real\\name%`]);
 });
 
 test('updateOwnProfile drops role and other protected fields', async () => {

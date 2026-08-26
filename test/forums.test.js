@@ -61,3 +61,11 @@ test('forum category status is announced as one complete status message', () => 
   const page = readFileSync(resolve(import.meta.dirname, '../forum.html'), 'utf8');
   assert.match(page, /id="status"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"/);
 });
+
+test('forum post reply loading failures offer an in-place retry', () => {
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/forum-post.js'), 'utf8');
+  assert.match(script, /Retry loading replies/);
+  assert.match(script, /status\.addEventListener\('click'/);
+  assert.match(script, /renderReplies\(\)\.catch\(renderRepliesError\)/);
+  assert.doesNotMatch(script, /Unable to load replies: \$\{.*message/);
+});

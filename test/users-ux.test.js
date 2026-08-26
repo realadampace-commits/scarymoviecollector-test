@@ -32,3 +32,11 @@ test('user search offers an accessible retry after a failed request', () => {
   assert.match(script, /\.retry-users/);
   assert.match(script, /runSearch\(input\.value\.trim\(\)\)/);
 });
+
+test('user search ignores stale results and loading cleanup from older requests', () => {
+  const script = fs.readFileSync(path.join(process.cwd(), 'src/pages/users.js'), 'utf8');
+  assert.match(script, /let searchToken = 0;/);
+  assert.match(script, /const requestId = \+\+searchToken;/);
+  assert.ok((script.match(/if \(requestId !== searchToken\) return;/g) || []).length >= 2);
+  assert.match(script, /if \(requestId === searchToken\) \{[\s\S]*submit\.disabled = false;[\s\S]*results\.removeAttribute\('aria-busy'\);[\s\S]*\}/);
+});

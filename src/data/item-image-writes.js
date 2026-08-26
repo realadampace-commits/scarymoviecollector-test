@@ -5,7 +5,9 @@ export function validateImageUploadPlan(existingCount, files, maxImages = 5) {
   if (current + files.length > maxImages) throw new RangeError(`maximum ${maxImages} images allowed`);
   return files.map((file) => {
     if (!file || typeof file.name !== 'string' || !String(file.type).startsWith('image/')) throw new TypeError('only image files are allowed');
-    return { name: file.name, type: file.type, size: Number(file.size) };
+    const size = Number(file.size);
+    if (!Number.isFinite(size) || size <= 0 || size > 10 * 1024 * 1024) throw new RangeError('image size must be between 1 byte and 10 MB');
+    return { name: file.name, type: file.type, size };
   });
 }
 

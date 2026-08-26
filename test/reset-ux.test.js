@@ -15,3 +15,7 @@ test('password reset fields have visible labels and native validation metadata',
 test('password reset can be submitted with the keyboard', () => {
   assert.match(page, /id="save"[^>]*type="submit"/);
 });
+
+test('password reset feedback is announced without interrupting the page', () => {
+  assert.match(page, /id="msg"[^>]*role="status"[^>]*aria-live="polite"/);
+});

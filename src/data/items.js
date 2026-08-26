@@ -2,7 +2,7 @@ export async function listRecentItems(client, { limit = 24 } = {}) {
   const safeLimit = Math.min(Math.max(Number(limit) || 24, 1), 100);
   const { data, error } = await client
     .from('items')
-    .select('id,owner_id,title,description,user_value,image_url,created_at,is_for_sale,price_usdc,sale_currency,sold,items_images(image_url,position,created_at)')
+    .select('id,owner_id,title,description,user_value,image_url,created_at,is_for_sale,sold,items_images(image_url,position,created_at)')
     .order('created_at', { ascending: false })
     .limit(safeLimit);
   if (error) throw error;
@@ -18,7 +18,7 @@ export async function getItem(client, id) {
   if (!id || typeof id !== 'string') throw new TypeError('item id is required');
   const { data, error } = await client
     .from('items')
-    .select('id,owner_id,title,description,user_value,image_url,created_at,is_for_sale,price_usdc,sale_currency,sold')
+    .select('id,owner_id,title,description,user_value,image_url,created_at,is_for_sale,sold')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
@@ -29,12 +29,15 @@ export async function deleteOwnItem(client, itemId, ownerId) {
   if (!itemId || !ownerId || typeof itemId !== 'string' || typeof ownerId !== 'string') {
     throw new TypeError('item and owner ids are required');
   }
-  const { error } = await client
+  const { data, error } = await client
     .from('items')
     .delete()
     .eq('id', itemId)
-    .eq('owner_id', ownerId);
+    .eq('owner_id', ownerId)
+    .select('id')
+    .maybeSingle();
   if (error) throw error;
+  if (!data) throw new Error('owned item was not deleted');
 }
 
 export async function listPortfolioItems(client, ownerId) {

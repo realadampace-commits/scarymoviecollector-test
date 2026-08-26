@@ -12,7 +12,14 @@ test('create item form exposes labels, native validation, and announced feedback
   assert.match(page, /<label class="muted" for="imgFiles">Item images<\/label>/);
   assert.match(page, /id="title"[^>]*required/);
   assert.match(page, /id="msg"[^>]*role="status"[^>]*aria-live="polite"[^>]*aria-atomic="true"/);
-  assert.match(page, /<button id="saveBtn" type="button">Create Item<\/button>/);
+  assert.match(page, /<form id="createForm">/);
+  assert.match(page, /<button id="saveBtn" type="submit">Create Item<\/button>/);
+});
+
+test('create item uses form submission so keyboard and native validation work', () => {
+  assert.match(source, /createForm\.addEventListener\('submit', async \(event\) => \{/);
+  assert.match(source, /event\.preventDefault\(\);/);
+  assert.doesNotMatch(source, /saveBtn\.addEventListener\('click'/);
 });
 
 test('image selection feedback remains actionable when more than five files are chosen', () => {

@@ -150,11 +150,11 @@ async function runSearch(){
     const uname = it.profiles?.username ? '@'+it.profiles.username : 'user';
     return `
       <div class="item">
-        <a href="item.html?id=${it.id}" style="color:inherit;text-decoration:none">
-          <div class="thumb">${it.preview_url ? `<img src="${it.preview_url}" alt="">` : 'No image'}</div>
+        <a href="item.html?id=${escapeHtml(it.id)}" style="color:inherit;text-decoration:none">
+          <div class="thumb">${it.preview_url ? `<img src="${escapeHtml(it.preview_url)}" alt="">` : 'No image'}</div>
           <div class="meta">
             <div><strong>${escapeHtml(it.title||'(untitled)')}</strong></div>
-            <div class="owner">${ava}<span>${uname}</span></div>
+            <div class="owner">${ava}<span>${escapeHtml(uname)}</span></div>
             <div class="muted" style="margin-top:4px">$${(it.user_value||0).toLocaleString()}</div>
           </div>
         </a>

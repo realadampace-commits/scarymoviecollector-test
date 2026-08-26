@@ -14,13 +14,29 @@ test('validateImageUploadPlan rejects invalid inputs', () => {
   assert.throws(() => validateImageUploadPlan(0, null), /array/);
 });
 
+test('validateImageUploadPlan rejects empty, invalid-size, and oversized images before upload', () => {
+  for (const size of [0, Number.NaN, Number.POSITIVE_INFINITY, 10 * 1024 * 1024 + 1]) {
+    assert.throws(
+      () => validateImageUploadPlan(0, [{ name: 'poster.png', type: 'image/png', size }]),
+      /image size/
+    );
+  }
+});
+
 function uploadClient({ item = { id: 'item-1' }, count = 0, rowError = null } = {}) {
   const calls = [];
   const client = {
     from(table) {
       calls.push(['from', table]);
       if (table === 'items') return { select() { return this; }, eq() { return this; }, maybeSingle: async () => ({ data: item, error: null }) };
-      if (table === 'items_images') return { select() { return this; }, eq() { return { count, error: null }; }, insert(value) { calls.push(['insert', value]); return Promise.resolve({ error: rowError }); } };
+      if (table === 'items_images') return {
+        deleting: false,
+        select() { return this; },
+        eq() { return this.deleting ? this : { count, error: null }; },
+        insert(value) { calls.push(['insert', value]); return Promise.resolve({ error: rowError }); },
+        delete() { this.deleting = true; return this; },
+        in() { calls.push(['delete-images']); return Promise.resolve({ error: null }); }
+      };
       throw new Error(`unexpected table ${table}`);
     },
     storage: { from() { return {

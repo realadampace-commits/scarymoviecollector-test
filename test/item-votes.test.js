@@ -10,3 +10,18 @@ test('getItemVotes aggregates agreement and suggestions', async () => {
 test('saveItemVote requires a valid price for disagreement', async () => {
   await assert.rejects(() => saveItemVote({}, { itemId: 'i1', voterId: 'u1', agree: false }), /suggested price/);
 });
+
+test('saveItemVote rejects malformed identities before database access', async () => {
+  let queried = false;
+  const client = { from() { queried = true; throw new Error('database should not be queried'); } };
+
+  await assert.rejects(
+    () => saveItemVote(client, { itemId: 123, voterId: 'u1', agree: true }),
+    /item and voter ids must be strings/
+  );
+  await assert.rejects(
+    () => saveItemVote(client, { itemId: 'i1', voterId: {}, agree: true }),
+    /item and voter ids must be strings/
+  );
+  assert.equal(queried, false);
+});

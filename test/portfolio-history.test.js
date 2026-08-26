@@ -20,6 +20,15 @@ test('buildPortfolioHistory ignores invalid values and dates', () => {
   assert.deepEqual(buildPortfolioHistory([{ created_at: 'bad', user_value: 200 }, { created_at: '2026-01-01T00:00:00.000Z', user_value: -9 }]), []);
 });
 
+test('buildPortfolioHistory ignores missing and blank values instead of treating them as zero', () => {
+  assert.deepEqual(buildPortfolioHistory([
+    { created_at: '2026-01-01T00:00:00.000Z', user_value: null },
+    { created_at: '2026-01-02T00:00:00.000Z', user_value: '' },
+    { created_at: '2026-01-03T00:00:00.000Z', user_value: '   ' },
+    { created_at: '2026-01-04T00:00:00.000Z', user_value: 25 },
+  ]), [{ at: '2026-01-04T00:00:00.000Z', value: 25 }]);
+});
+
 test('selectPortfolioRange keeps the appropriate recent points and preserves a baseline', () => {
   const history = buildPortfolioHistory(items);
   const now = new Date('2026-03-15T00:00:00.000Z');

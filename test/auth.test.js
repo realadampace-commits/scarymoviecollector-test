@@ -41,6 +41,15 @@ test('requestPasswordReset rejects invalid email or missing recovery URL', async
   await assert.rejects(() => requestPasswordReset(client, 'fan@example.com', ''), /recovery URL/);
 });
 
+test('requestPasswordReset only sends links to absolute HTTP recovery URLs', async () => {
+  let called = false;
+  const client = { auth: { async resetPasswordForEmail() { called = true; throw new Error('must not be called'); } } };
+
+  await assert.rejects(() => requestPasswordReset(client, 'fan@example.com', 'javascript:alert(1)'), /HTTP recovery URL/);
+  await assert.rejects(() => requestPasswordReset(client, 'fan@example.com', '/reset.html'), /HTTP recovery URL/);
+  assert.equal(called, false);
+});
+
 test('resetPassword validates confirmation and delegates the new password', async () => {
   const calls = [];
   const client = { auth: { async updateUser(payload) { calls.push(payload); return { data: { user: { id: 'u1' } }, error: null }; } } };

@@ -8,6 +8,7 @@ const descEl = document.getElementById('desc');
 const priceEl = document.getElementById('price');
 const filesEl = document.getElementById('imgFiles');
 const previews = document.getElementById('previews');
+const createForm = document.getElementById('createForm');
 const saveBtn = document.getElementById('saveBtn');
 const msgEl = document.getElementById('msg');
 
@@ -29,7 +30,8 @@ filesEl.addEventListener('change', () => {
 });
 
 const session = await requireSession(client, 'create.html');
-saveBtn.addEventListener('click', async () => {
+createForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
   saveBtn.disabled = true;
   message('Creating…');
   try {

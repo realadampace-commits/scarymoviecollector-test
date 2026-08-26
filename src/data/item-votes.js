@@ -16,6 +16,7 @@ export async function getItemVotes(client, itemId) {
 }
 
 export async function saveItemVote(client, { itemId, voterId, agree, suggestedPrice = null }) {
+  if (typeof itemId !== 'string' || typeof voterId !== 'string') throw new TypeError('item and voter ids must be strings');
   if (!itemId || !voterId || typeof agree !== 'boolean') throw new TypeError('item, voter, and vote are required');
   const price = agree ? null : Number(suggestedPrice);
   if (!agree && (suggestedPrice === null || suggestedPrice === undefined || !Number.isFinite(price) || price < 0)) throw new TypeError('a non-negative suggested price is required');

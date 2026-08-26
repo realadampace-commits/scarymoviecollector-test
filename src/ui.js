@@ -13,3 +13,9 @@ export function formatUsd(centsOrDollars) {
   if (!Number.isFinite(amount)) return '$0.00';
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 }
+
+export function formatDate(value) {
+  if (value === null || value === undefined || value === '') return 'Date unavailable';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Date unavailable' : date.toLocaleString();
+}

@@ -20,6 +20,14 @@ test('direct message sending announces progress before the request completes', (
   assert.match(source, /status\.textContent = 'Sending…';/);
 });
 
+test('direct message composer ignores repeated submissions while a send is in progress', () => {
+  const source = readFileSync(resolve(import.meta.dirname, '../src/pages/dm.js'), 'utf8');
+  const submit = source.slice(source.indexOf('async function submit()'), source.indexOf("send.addEventListener('click'"));
+  assert.match(submit, /if \(sending\) return;/);
+  assert.ok(submit.indexOf('sending = true;') < submit.indexOf('await sendMessage('));
+  assert.match(submit, /finally \{ sending = false; send\.disabled = false; \}/);
+});
+
 test('direct message threads explain their empty state instead of showing a blank panel', async () => {
   const source = readFileSync(resolve(import.meta.dirname, '../src/pages/dm.js'), 'utf8');
   assert.match(source, /messages\.length/);

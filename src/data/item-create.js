@@ -22,7 +22,11 @@ export async function createOwnItem(client, ownerId, { title, description = '', 
     if (selectedFiles.length) await uploadOwnItemImages(client, item.id, ownerId, selectedFiles);
     return item;
   } catch (uploadError) {
-    await client.from('items').delete().eq('id', item.id).eq('owner_id', ownerId);
+    try {
+      await client.from('items').delete().eq('id', item.id).eq('owner_id', ownerId);
+    } catch {
+      // Preserve the actionable upload failure even if best-effort rollback also fails.
+    }
     throw uploadError;
   }
 }

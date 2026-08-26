@@ -9,6 +9,7 @@ export async function uploadOwnItemImages(client, itemId, ownerId, files) {
   if (countError) throw countError;
   const plan = validateImageUploadPlan(count ?? 0, files);
   const uploaded = [];
+  const uploadedUrls = [];
   try {
     for (const [index, file] of files.entries()) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -17,12 +18,16 @@ export async function uploadOwnItemImages(client, itemId, ownerId, files) {
       if (error) throw error;
       uploaded.push(path);
       const { data: publicData } = client.storage.from('item-images').getPublicUrl(path);
+      uploadedUrls.push(publicData.publicUrl);
       const { error: rowError } = await client.from('items_images').insert({ item_id: itemId, image_url: publicData.publicUrl, position: (count ?? 0) + index });
       if (rowError) throw rowError;
     }
     return plan;
   } catch (error) {
-    await Promise.all(uploaded.map((path) => client.storage.from('item-images').remove([path])));
+    await Promise.allSettled([
+      client.from('items_images').delete().eq('item_id', itemId).in('image_url', uploadedUrls),
+      ...uploaded.map((path) => client.storage.from('item-images').remove([path]))
+    ]);
     throw error;
   }
 }

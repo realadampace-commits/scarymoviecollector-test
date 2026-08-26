@@ -6,26 +6,37 @@ const results = document.getElementById('results');
 const input = document.getElementById('q');
 const submit = document.getElementById('searchSubmit');
 const initial = new URLSearchParams(location.search).get('q') || '';
+let searchToken = 0;
 input.value = initial;
 
 async function runSearch(query) {
-  if (!query) { results.textContent = 'Type a name and press Search.'; return; }
+  const requestId = ++searchToken;
+  if (!query) {
+    results.textContent = 'Type a name and press Search.';
+    submit.disabled = false;
+    results.removeAttribute('aria-busy');
+    return;
+  }
   submit.disabled = true;
   results.setAttribute('aria-busy', 'true');
   results.textContent = 'Searching…';
   try {
     const users = await searchProfiles(getSupabaseClient(), query);
+    if (requestId !== searchToken) return;
     if (!users.length) { results.textContent = 'No users found.'; return; }
     results.innerHTML = users.map((user) => {
       const role = user.role || 'free';
       return `<div class="row"><div><div><strong>@${escapeHtml(user.username)}</strong> <span class="roleTag role-${escapeHtml(role)}">${escapeHtml(role)}</span></div><div class="muted">${escapeHtml(user.id)}</div></div><a href="user.html?u=${encodeURIComponent(user.username)}" aria-label="View @${escapeHtml(user.username)} profile">View</a></div>`;
     }).join('');
   } catch (error) {
+    if (requestId !== searchToken) return;
     console.error(error);
     results.innerHTML = 'Unable to search users right now. <button class="retry-users" type="button">Retry searching users</button>';
   } finally {
-    submit.disabled = false;
-    results.removeAttribute('aria-busy');
+    if (requestId === searchToken) {
+      submit.disabled = false;
+      results.removeAttribute('aria-busy');
+    }
   }
 }
 

@@ -29,14 +29,17 @@ async function render() {
   }
 }
 head.textContent = `Conversation ${threadId}`;
+let sending = false;
 async function submit() {
+  if (sending) return;
   const body = text.value.trim();
   if (!body) return;
+  sending = true;
   send.disabled = true;
   status.textContent = 'Sending…';
   try { await sendMessage(client, { threadId, authorId: session.user.id, body }); text.value = ''; status.textContent = 'Sent.'; await render(); }
   catch (error) { status.textContent = error.message || 'Unable to send message.'; }
-  finally { send.disabled = false; }
+  finally { sending = false; send.disabled = false; }
 }
 send.addEventListener('click', submit);
 list.addEventListener('click', (event) => {

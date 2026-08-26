@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getItem, listRecentItems } from '../src/data/items.js';
+import { deleteOwnItem, getItem, listRecentItems } from '../src/data/items.js';
 
 function fakeClient(result) {
   const calls = [];
@@ -32,4 +32,25 @@ test('listRecentItems uses the first gallery image when the legacy image is empt
 
 test('getItem rejects missing ids before querying', async () => {
   await assert.rejects(() => getItem({ from() { throw new Error('must not query'); } }), /item id is required/);
+});
+
+test('deleteOwnItem rejects when no owned item was deleted', async () => {
+  const calls = [];
+  const builder = {
+    delete() { calls.push(['delete']); return this; },
+    eq(...args) { calls.push(['eq', ...args]); return this; },
+    select(...args) { calls.push(['select', ...args]); return this; },
+    maybeSingle() { calls.push(['maybeSingle']); return Promise.resolve({ data: null, error: null }); },
+  };
+  const client = { from(table) { calls.push(['from', table]); return builder; } };
+
+  await assert.rejects(() => deleteOwnItem(client, 'item-1', 'owner-1'), /owned item was not deleted/);
+  assert.deepEqual(calls, [
+    ['from', 'items'],
+    ['delete'],
+    ['eq', 'id', 'item-1'],
+    ['eq', 'owner_id', 'owner-1'],
+    ['select', 'id'],
+    ['maybeSingle'],
+  ]);
 });

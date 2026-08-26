@@ -77,7 +77,9 @@ try {
   document.getElementById('modTools').style.display = ['moderator', 'owner'].includes(profile?.role) ? 'block' : 'none';
   row.replaceChildren(...frames.map((frame) => {
     const card = document.createElement('button'); card.type = 'button'; card.className = 'frameCard';
-    if (frame.image_url === profile?.frame_url) { card.classList.add('sel'); selectedFrame = frame; }
+    const isSelected = frame.image_url === profile?.frame_url;
+    card.setAttribute('aria-pressed', String(isSelected));
+    if (isSelected) { card.classList.add('sel'); selectedFrame = frame; }
     const thumb = document.createElement('div');
     thumb.className = 'frameThumb';
     const image = document.createElement('img');
@@ -87,7 +89,7 @@ try {
     const title = document.createElement('div');
     title.textContent = frame.title || 'Untitled frame';
     card.append(thumb, title);
-    card.addEventListener('click', () => { if (!canUseFrames) return; selectedFrame = frame; row.querySelectorAll('.frameCard').forEach((x) => x.classList.remove('sel')); card.classList.add('sel'); renderFrame(frame); });
+    card.addEventListener('click', () => { if (!canUseFrames) return; selectedFrame = frame; row.querySelectorAll('.frameCard').forEach((option) => { option.classList.remove('sel'); option.setAttribute('aria-pressed', 'false'); }); card.classList.add('sel'); card.setAttribute('aria-pressed', 'true'); renderFrame(frame); });
     return card;
   }));
 } catch (error) { frameMsg.textContent = error.message || 'Unable to load frames.'; }
