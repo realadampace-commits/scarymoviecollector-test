@@ -30,8 +30,10 @@ try {
   const [category, children, session] = await Promise.all([getForumCategory(client, id), listForumChildren(client, id), getSession(client)]);
   if (!category) { title.textContent = 'Category not found'; throw new Error('category not found'); }
   title.textContent = category.title;
+  document.getElementById('catDescription').textContent = category.description || 'Posts stay organized in this category.';
+  const banner = document.getElementById('categoryBanner');
+  if (category.cover_image_url) banner.style.setProperty('--banner', `url("${String(category.cover_image_url).replaceAll('"', '')}")`);
   if (children.length) {
-    childrenCard.style.display = '';
     childrenList.innerHTML = children.map((child) => `<a class="subcat-row" href="forum_category.html?id=${encodeURIComponent(child.id)}"><span class="badge">#</span><span>${escapeHtml(child.title)}</span></a>`).join('');
     postsCard.style.display = 'none';
   } else {

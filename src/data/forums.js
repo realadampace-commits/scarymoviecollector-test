@@ -14,14 +14,14 @@ export async function listForumReplies(client, postId) {
 
 export async function getForumCategory(client, categoryId) {
   if (!categoryId || typeof categoryId !== 'string') throw new TypeError('category id is required');
-  const { data, error } = await client.from('forum_categories').select('id,title,parent_id').eq('id', categoryId).maybeSingle();
+  const { data, error } = await client.from('forum_categories').select('id,title,description,cover_image_url,parent_id').eq('id', categoryId).maybeSingle();
   if (error) throw error;
   return data;
 }
 
 export async function listForumChildren(client, categoryId) {
   if (!categoryId || typeof categoryId !== 'string') throw new TypeError('category id is required');
-  const { data, error } = await client.from('forum_categories').select('id,title,parent_id').eq('parent_id', categoryId).order('title', { ascending: true });
+  const { data, error } = await client.from('forum_categories').select('id,title,description,cover_image_url,parent_id').eq('parent_id', categoryId).order('title', { ascending: true });
   if (error) throw error;
   return data ?? [];
 }
@@ -42,6 +42,20 @@ export async function listForumCategories(client) {
     .order('title', { ascending: true });
   if (error) throw error;
   return data ?? [];
+}
+
+export async function createForumCategory(client, { title, description = '', coverImageUrl = '' } = {}) {
+  const cleanTitle = String(title ?? '').trim();
+  if (!cleanTitle) throw new TypeError('category title is required');
+  const { data, error } = await client.from('forum_categories').insert({ title: cleanTitle, description: String(description).trim() || null, cover_image_url: String(coverImageUrl).trim() || null }).select().maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteForumCategory(client, categoryId) {
+  if (!categoryId || typeof categoryId !== 'string') throw new TypeError('category id is required');
+  const { error } = await client.from('forum_categories').delete().eq('id', categoryId);
+  if (error) throw error;
 }
 
 export async function listForumPosts(client, { categoryId, limit = 25 } = {}) {
