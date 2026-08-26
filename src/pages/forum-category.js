@@ -18,7 +18,7 @@ const when = (value) => formatShortDate(value, { month: 'short', day: 'numeric',
 if (!id) { location.href = 'forum.html'; throw new Error('missing category id'); }
 function postCard(post, profile) {
   const displayName = profile?.username || 'Community member';
-  const avatar = profile?.avatar_url ? `<img src="${escapeHtml(profile.avatar_url)}" alt="">` : escapeHtml(initials(displayName));
+  const avatar = profile?.avatar_url ? `<img class="avatar-photo" src="${escapeHtml(profile.avatar_url)}" alt="">` : `<span class="avatar-initial">${escapeHtml(initials(displayName))}</span>`;
   const frame = profile?.frame_url ? `<img class="avatar-frame" src="${escapeHtml(profile.frame_url)}" alt="">` : '';
   return `<article class="post"><div class="post-top"><span class="avatar">${avatar}${frame}</span><div><div class="author">${escapeHtml(displayName)}</div><div class="when">${escapeHtml(when(post.created_at))} · 🌐</div></div><a class="post-more" aria-label="Open discussion" href="forum_post.html?id=${encodeURIComponent(post.id)}">•••</a></div><a class="post-content" href="forum_post.html?id=${encodeURIComponent(post.id)}"><h2>${escapeHtml(post.title || '(untitled)')}</h2><p class="post-body">${escapeHtml(post.body || '')}</p></a><div class="post-stats"><span>♡ 0</span><span>0 comments</span></div><div class="post-actions"><a href="forum_post.html?id=${encodeURIComponent(post.id)}">♡ Like</a><a href="forum_post.html?id=${encodeURIComponent(post.id)}">💬 Comment</a><a href="forum_post.html?id=${encodeURIComponent(post.id)}">↗ Share</a></div></article>`;
 }
