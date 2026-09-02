@@ -167,13 +167,13 @@
       <button id="feClose" type="button" style="background:#333;border:none;border-radius:6px;padding:6px 10px;cursor:pointer">Close</button>
     </div>
 
-    <div style="display:flex;gap:16px;align-items:center;margin:12px 0">
+    <div class="frame-editor-body" style="display:flex;gap:16px;align-items:center;margin:12px 0">
       <div class="avatarWrap">
         <div class="avatar" id="feAva"></div>
         <div id="feOverlay" class="frameOverlay"></div>
       </div>
       <div style="flex:1">
-        <div style="display:grid;grid-template-columns:80px 1fr auto;align-items:center;gap:8px">
+        <div class="frame-editor-controls" style="display:grid;grid-template-columns:80px 1fr auto;align-items:center;gap:8px">
           <label for="feX">X:</label>
           <input id="feX" type="range" min="-80" max="80" step="1" aria-describedby="feXv">
           <span id="feXv" class="muted"></span>
@@ -189,7 +189,7 @@
       </div>
     </div>
 
-    <div style="display:flex;gap:8px;justify-content:flex-end">
+    <div class="frame-editor-actions" style="display:flex;gap:8px;justify-content:flex-end">
       <button id="feSave" style="background:#2a6;border:none;border-radius:6px;padding:8px 12px;cursor:pointer">
         Save
       </button>
@@ -204,5 +204,4 @@
 <script type="module" src="/src/pages/settings.js"></script>
 </body>
 </html>
-
 
