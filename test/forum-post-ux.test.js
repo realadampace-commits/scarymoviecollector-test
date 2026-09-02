@@ -44,3 +44,12 @@ test('forum share controls only claim success after a clipboard write', () => {
   assert.match(feedScript, /share\.textContent = 'Unable to copy link'/);
   assert.match(script, /shareBtn\.textContent = 'Unable to copy link'/);
 });
+
+test('post authors and admins receive a guarded delete action', () => {
+  assert.match(script, /post\.author_id === session\.user\.id/);
+  assert.match(script, /\['moderator', 'owner'\]\.includes\(viewerProfile\?\.role\)/);
+  assert.match(script, /id="deletePostBtn"/);
+  assert.match(script, /Delete this forum post and all of its replies\?/);
+  assert.match(script, /deleteForumPost\(client, \{ postId: id, userId: session\.user\.id \}\)/);
+  assert.match(script, /Unable to delete this post\. Refresh and try again\./);
+});

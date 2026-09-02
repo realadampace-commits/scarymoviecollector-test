@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createForumReply, getForumPostEngagement, listCategoryPosts, listForumPosts } from '../src/data/forums.js';
+import { createForumReply, deleteForumPost, getForumPostEngagement, listCategoryPosts, listForumPosts } from '../src/data/forums.js';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -12,6 +12,7 @@ function fakeClient(result) {
     limit(...args) { calls.push(['limit', ...args]); return this; },
     eq(...args) { calls.push(['eq', ...args]); return this; },
     insert(...args) { calls.push(['insert', ...args]); return this; },
+    delete(...args) { calls.push(['delete', ...args]); return this; },
     maybeSingle() { calls.push(['maybeSingle']); return Promise.resolve(result); },
     then(resolve) { return Promise.resolve(result).then(resolve); }
   };
@@ -43,6 +44,20 @@ test('listForumPosts rejects a non-string category id', async () => {
 
 test('createForumReply rejects empty body', async () => {
   await assert.rejects(() => createForumReply({}, { postId: 'p', authorId: 'u', body: ' ' }), /required/);
+});
+
+test('deleteForumPost deletes one exact post and confirms a row was removed', async () => {
+  const fake = fakeClient({ data: { id: 'post-1' }, error: null });
+  assert.deepEqual(await deleteForumPost(fake.client, { postId: 'post-1', userId: 'user-1' }), { id: 'post-1' });
+  assert.deepEqual(fake.calls.find((call) => call[0] === 'delete'), ['delete']);
+  assert.deepEqual(fake.calls.find((call) => call[0] === 'eq'), ['eq', 'id', 'post-1']);
+  assert.deepEqual(fake.calls.find((call) => call[0] === 'select'), ['select', 'id']);
+});
+
+test('deleteForumPost rejects incomplete identities and missing deletes', async () => {
+  await assert.rejects(() => deleteForumPost({}, { postId: 'post-1' }), /post and user ids are required/);
+  const fake = fakeClient({ data: null, error: null });
+  await assert.rejects(() => deleteForumPost(fake.client, { postId: 'post-1', userId: 'user-1' }), /post was not deleted/);
 });
 
 test('getForumPostEngagement batches and aggregates likes and replies', async () => {
@@ -109,4 +124,11 @@ test('forum post reply loading failures offer an in-place retry', () => {
   assert.match(script, /status\.addEventListener\('click'/);
   assert.match(script, /renderReplies\(\)\.catch\(renderRepliesError\)/);
   assert.doesNotMatch(script, /Unable to load replies: \$\{.*message/);
+});
+
+test('forum post deletion policy permits authors and elevated admins only', () => {
+  const migration = readFileSync(resolve(import.meta.dirname, '../supabase/migrations/202609020002_forum_post_delete_permissions.sql'), 'utf8');
+  assert.match(migration, /author_id = \(select auth\.uid\(\)\)/);
+  assert.match(migration, /p\.role in \('moderator', 'owner'\)/);
+  assert.match(migration, /for delete[\s\S]*to authenticated/);
 });

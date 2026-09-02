@@ -5,6 +5,19 @@ export async function getForumPost(client, postId) {
   return data;
 }
 
+export async function deleteForumPost(client, { postId, userId } = {}) {
+  if (!postId || typeof postId !== 'string' || !userId || typeof userId !== 'string') throw new TypeError('post and user ids are required');
+  const { data, error } = await client
+    .from('forum_posts')
+    .delete()
+    .eq('id', postId)
+    .select('id')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('post was not deleted');
+  return data;
+}
+
 export async function getForumPostLikeState(client, postId, userId = null) {
   const { data, error } = await client.from('forum_post_likes').select('user_id').eq('post_id', postId);
   if (error) throw error;

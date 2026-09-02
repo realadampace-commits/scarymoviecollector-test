@@ -1,6 +1,6 @@
 import { getSupabaseClient } from '../supabase-client.js';
 import { getSession } from '../auth.js';
-import { getForumPost, listForumReplies, getForumPostLikeState, toggleForumPostLike } from '../data/forums.js';
+import { deleteForumPost, getForumPost, listForumReplies, getForumPostLikeState, toggleForumPostLike } from '../data/forums.js';
 import { createForumReply } from '../data/forums.js';
 import { escapeHtml, profileAvatarMarkup } from '../ui.js';
 import { getProfile } from '../data/profiles.js';
@@ -62,9 +62,15 @@ status.addEventListener('click', (event) => {
 });
 
 const session = await getSession(client);
+const viewerProfile = session?.user?.id ? await getProfile(client, session.user.id).catch(() => null) : null;
+const canDeletePost = Boolean(session?.user?.id && (post.author_id === session.user.id || ['moderator', 'owner'].includes(viewerProfile?.role)));
 const likeState = await getForumPostLikeState(client, id, session?.user?.id);
 const actions = document.getElementById('postActions');
-actions.innerHTML = `<div class="post-stats"><span id="likeCount">${likeState.count ? `♡ ${likeState.count}` : 'Be the first to like this'}</span><span id="commentCount">Loading comments…</span></div><div class="post-actions"><button id="likeBtn" class="btn-action${likeState.liked ? ' liked' : ''}" type="button">${likeState.liked ? '♥ Liked' : '♡ Like'}</button><button id="commentBtn" class="btn-action" type="button">💬 Comment</button><button id="shareBtn" class="btn-action" type="button">↗ Share</button></div>`;
+actions.innerHTML = `<div class="post-stats"><span id="likeCount">${likeState.count ? `♡ ${likeState.count}` : 'Be the first to like this'}</span><span id="commentCount">Loading comments…</span></div><div class="post-actions${canDeletePost ? ' can-delete' : ''}"><button id="likeBtn" class="btn-action${likeState.liked ? ' liked' : ''}" type="button">${likeState.liked ? '♥ Liked' : '♡ Like'}</button><button id="commentBtn" class="btn-action" type="button">💬 Comment</button><button id="shareBtn" class="btn-action" type="button">↗ Share</button>${canDeletePost ? '<button id="deletePostBtn" class="btn-action danger-action" type="button">Delete post</button>' : ''}</div><p id="postDeleteStatus" class="muted" role="status" aria-live="polite"></p>`;
+const likeBtn = document.getElementById('likeBtn');
+const likeCount = document.getElementById('likeCount');
+const commentBtn = document.getElementById('commentBtn');
+const shareBtn = document.getElementById('shareBtn');
 likeBtn.addEventListener('click', async () => { if (!session) { likeBtn.textContent = 'Sign in to like'; return; } likeBtn.disabled = true; try { const next = await toggleForumPostLike(client, { postId:id, userId:session.user.id, liked:likeBtn.classList.contains('liked') }); likeBtn.classList.toggle('liked', next.liked); likeBtn.textContent = next.liked ? '♥ Liked' : '♡ Like'; likeCount.textContent = next.count ? `♡ ${next.count}` : 'Be the first to like this'; } finally { likeBtn.disabled = false; } });
 commentBtn.addEventListener('click', () => { replyBox.style.display = ''; replyText.focus(); });
 shareBtn.addEventListener('click', async () => {
@@ -74,6 +80,24 @@ shareBtn.addEventListener('click', async () => {
     shareBtn.textContent = '✓ Copied';
   } catch {
     shareBtn.textContent = 'Unable to copy link';
+  }
+});
+document.getElementById('deletePostBtn')?.addEventListener('click', async (event) => {
+  if (!confirm('Delete this forum post and all of its replies? This cannot be undone.')) return;
+  const button = event.currentTarget;
+  const deleteStatus = document.getElementById('postDeleteStatus');
+  button.disabled = true;
+  button.textContent = 'Deleting…';
+  deleteStatus.textContent = 'Deleting post…';
+  try {
+    await deleteForumPost(client, { postId: id, userId: session.user.id });
+    deleteStatus.textContent = 'Post deleted.';
+    location.href = 'forum.html';
+  } catch (error) {
+    console.error(error);
+    deleteStatus.textContent = 'Unable to delete this post. Refresh and try again.';
+    button.disabled = false;
+    button.textContent = 'Delete post';
   }
 });
 if (session) {
