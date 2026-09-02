@@ -29,6 +29,29 @@ export async function listForumReplies(client, postId) {
   return data ?? [];
 }
 
+export async function getForumPostEngagement(client, postIds, userId = null) {
+  const ids = [...new Set((postIds || []).filter((id) => typeof id === 'string' && id))];
+  if (!ids.length) return new Map();
+  const [likesResult, repliesResult] = await Promise.all([
+    client.from('forum_post_likes').select('post_id,user_id').in('post_id', ids),
+    client.from('forum_replies').select('id,post_id,author_id,body,created_at').in('post_id', ids).order('created_at', { ascending: true }),
+  ]);
+  if (likesResult.error) throw likesResult.error;
+  if (repliesResult.error) throw repliesResult.error;
+  const engagement = new Map(ids.map((id) => [id, { likes: { count: 0, liked: false }, replies: [] }]));
+  for (const like of likesResult.data || []) {
+    const state = engagement.get(like.post_id);
+    if (!state) continue;
+    state.likes.count += 1;
+    if (userId && like.user_id === userId) state.likes.liked = true;
+  }
+  for (const reply of repliesResult.data || []) {
+    const state = engagement.get(reply.post_id);
+    if (state) state.replies.push(reply);
+  }
+  return engagement;
+}
+
 export async function getForumCategory(client, categoryId) {
   if (!categoryId || typeof categoryId !== 'string') throw new TypeError('category id is required');
   let result = await client.from('forum_categories').select('id,title,description,cover_image_url,parent_id').eq('id', categoryId).maybeSingle();

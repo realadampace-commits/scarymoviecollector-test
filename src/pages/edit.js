@@ -7,8 +7,15 @@ import { updateOwnItem } from '../data/item-edit.js';
 
 const id = new URLSearchParams(location.search).get('id');
 if (!id) { location.href = 'index.html'; throw new Error('missing item id'); }
-const client = getSupabaseClient();
-const session = await requireSession(client);
+let client;
+let session;
+try {
+  client = getSupabaseClient();
+  session = await requireSession(client);
+} catch {
+  location.replace(`login.html?next=${encodeURIComponent(`edit.html?id=${id}`)}`);
+}
+if (session) {
 const item = await getItem(client, id);
 if (!item) { document.getElementById('permNote').textContent = 'Item not found.'; throw new Error('item not found'); }
 const owner = item.owner_id === session.user.id;
@@ -84,3 +91,4 @@ document.getElementById('saveDetails').addEventListener('click', async () => {
   catch (error) { message.textContent = error.message || 'Unable to save changes. Try again.'; }
   finally { saveButton.disabled = false; saveButton.removeAttribute('aria-busy'); }
 });
+}

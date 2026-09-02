@@ -22,6 +22,12 @@ test('create item uses form submission so keyboard and native validation work', 
   assert.doesNotMatch(source, /saveBtn\.addEventListener\('click'/);
 });
 
+test('create item redirects guests to sign in without exposing a working form', () => {
+  assert.match(source, /location\.replace\('login\.html\?next=create\.html'\)/);
+  assert.match(source, /try \{[\s\S]*client = getSupabaseClient\(\);[\s\S]*session = await requireSession\(client\)/);
+  assert.match(source, /if \(session\) createForm\.addEventListener/);
+});
+
 test('image selection feedback remains actionable when more than five files are chosen', () => {
   assert.match(source, /Only the first 5 images will be used\./);
   assert.match(source, /Only the first 5 images will be used\. Select at most 5 images\./);

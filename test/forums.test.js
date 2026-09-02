@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createForumReply, listCategoryPosts, listForumPosts } from '../src/data/forums.js';
+import { createForumReply, getForumPostEngagement, listCategoryPosts, listForumPosts } from '../src/data/forums.js';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -43,6 +43,47 @@ test('listForumPosts rejects a non-string category id', async () => {
 
 test('createForumReply rejects empty body', async () => {
   await assert.rejects(() => createForumReply({}, { postId: 'p', authorId: 'u', body: ' ' }), /required/);
+});
+
+test('getForumPostEngagement batches and aggregates likes and replies', async () => {
+  const calls = [];
+  const rows = {
+    forum_post_likes: [
+      { post_id: 'p1', user_id: 'me' },
+      { post_id: 'p1', user_id: 'other' },
+    ],
+    forum_replies: [
+      { id: 'r1', post_id: 'p1', author_id: 'other', body: 'First', created_at: '2026-01-01' },
+      { id: 'r2', post_id: 'p2', author_id: 'me', body: 'Second', created_at: '2026-01-02' },
+    ],
+  };
+  const client = {
+    from(table) {
+      return {
+        select(columns) {
+          calls.push(['select', table, columns]);
+          return this;
+        },
+        in(column, values) {
+          calls.push(['in', table, column, values]);
+          return table === 'forum_replies' ? this : Promise.resolve({ data: rows[table], error: null });
+        },
+        order(column, options) {
+          calls.push(['order', table, column, options]);
+          return Promise.resolve({ data: rows[table], error: null });
+        },
+      };
+    },
+  };
+  const result = await getForumPostEngagement(client, ['p1', 'p2', 'p1'], 'me');
+  assert.deepEqual(result.get('p1'), { likes: { count: 2, liked: true }, replies: [rows.forum_replies[0]] });
+  assert.deepEqual(result.get('p2'), { likes: { count: 0, liked: false }, replies: [rows.forum_replies[1]] });
+  assert.equal(calls.filter(([kind]) => kind === 'in').length, 2);
+  assert.deepEqual(calls.find(([kind, table]) => kind === 'in' && table === 'forum_post_likes')[3], ['p1', 'p2']);
+});
+
+test('getForumPostEngagement avoids database calls for an empty post list', async () => {
+  assert.deepEqual(await getForumPostEngagement({}, []), new Map());
 });
 
 test('forum feed errors offer an in-place retry', () => {

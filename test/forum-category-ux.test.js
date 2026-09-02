@@ -30,3 +30,16 @@ test('guests can reach sign-in and return to the category before posting', () =>
   assert.match(code, /Sign in to post/);
   assert.match(code, /login\.html\?next=\$\{encodeURIComponent\(returnUrl\)\}/);
 });
+
+test('category cards render real engagement instead of hard-coded zero counts', () => {
+  assert.match(code, /getForumPostEngagement/);
+  assert.match(code, /engagement\.likes\.count/);
+  assert.match(code, /engagement\.replies\.length/);
+  assert.doesNotMatch(code, /<span>♡ 0<\/span><span>0 comments<\/span>/);
+});
+
+test('parent categories reveal their populated subcategory navigation', () => {
+  assert.match(page, /id="childrenCard"[^>]*style="display:none"/);
+  assert.match(code, /if \(children\.length\) \{[\s\S]*childrenCard\.style\.display = ''/);
+  assert.match(code, /postsCard\.style\.display = 'none'/);
+});

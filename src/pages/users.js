@@ -26,7 +26,7 @@ async function runSearch(query) {
     if (!users.length) { results.textContent = 'No users found.'; return; }
     results.innerHTML = users.map((user) => {
       const role = user.role || 'free';
-      return `<div class="row"><div><div><strong>@${escapeHtml(user.username)}</strong> <span class="roleTag role-${escapeHtml(role)}">${escapeHtml(role)}</span></div><div class="muted">${escapeHtml(user.id)}</div></div><a href="user.html?u=${encodeURIComponent(user.username)}" aria-label="View @${escapeHtml(user.username)} profile">View</a></div>`;
+      return `<div class="row"><div><strong>@${escapeHtml(user.username)}</strong> <span class="roleTag role-${escapeHtml(role)}">${escapeHtml(role)}</span></div><a href="user.html?u=${encodeURIComponent(user.username)}" aria-label="View @${escapeHtml(user.username)} profile">View</a></div>`;
     }).join('');
   } catch (error) {
     if (requestId !== searchToken) return;

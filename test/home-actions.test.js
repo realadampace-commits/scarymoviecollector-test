@@ -36,3 +36,12 @@ test('home item loading errors offer a retry without exposing backend error deta
   assert.match(script, /loadHome\(\)\.catch\(renderLoadError\)/);
   assert.doesNotMatch(script, /Unable to load items: \$\{detail\}/);
 });
+
+test('home loads session and items concurrently', () => {
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/home.js'), 'utf8');
+  assert.match(script, /const \[session, items\] = await Promise\.all/);
+});
+
+test('home exposes one primary page heading', () => {
+  assert.match(homePage, /<h1[^>]*>Recent Items<\/h1>/);
+});

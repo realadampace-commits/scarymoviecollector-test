@@ -26,6 +26,11 @@ test('user search gives each profile link a unique accessible name', () => {
   assert.match(script, /aria-label=\"View @\$\{escapeHtml\(user\.username\)\} profile\"/);
 });
 
+test('user search does not expose internal profile identifiers', () => {
+  const script = fs.readFileSync(path.join(process.cwd(), 'src/pages/users.js'), 'utf8');
+  assert.doesNotMatch(script, /escapeHtml\(user\.id\)/);
+});
+
 test('user search offers an accessible retry after a failed request', () => {
   const script = fs.readFileSync(path.join(process.cwd(), 'src/pages/users.js'), 'utf8');
   assert.match(script, /Retry searching users/);

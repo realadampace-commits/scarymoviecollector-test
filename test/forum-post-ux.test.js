@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 
 const page = await readFile(new URL('../forum_post.html', import.meta.url), 'utf8');
 const script = await readFile(new URL('../src/pages/forum-post.js', import.meta.url), 'utf8');
+const feedScript = await readFile(new URL('../src/pages/forum.js', import.meta.url), 'utf8');
 
 test('reply composer has an accessible name and supporting hint', () => {
   assert.match(page, /<label for="rcText"[^>]*>Reply to this post<\/label>/);
@@ -26,4 +27,20 @@ test('reply composer prevents blank posts and exposes posting progress', () => {
   assert.match(script, /Write a reply before posting\./);
   assert.match(script, /replySend\.textContent = 'Posting…';/);
   assert.match(script, /replySend\.setAttribute\('aria-busy', 'true'\)/);
+});
+
+test('inline forum comment composer has a persistent accessible label', () => {
+  assert.match(feedScript, /<label class="sr-only">Write a comment<input/);
+});
+
+test('forum feed batches engagement instead of loading it once per card', () => {
+  assert.match(feedScript, /getForumPostEngagement/);
+  assert.doesNotMatch(feedScript, /async function postCard/);
+  assert.doesNotMatch(feedScript, /recentPosts\.map\(\(post\) => postCard[\s\S]*Promise\.all/);
+});
+
+test('forum share controls only claim success after a clipboard write', () => {
+  assert.match(feedScript, /if \(!navigator\.clipboard\?\.writeText\) throw new Error\('clipboard unavailable'\)/);
+  assert.match(feedScript, /share\.textContent = 'Unable to copy link'/);
+  assert.match(script, /shareBtn\.textContent = 'Unable to copy link'/);
 });

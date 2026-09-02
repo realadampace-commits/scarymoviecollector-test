@@ -23,12 +23,14 @@ const client = getSupabaseClient();
 async function loadHome() {
   msgEl.textContent = 'Loading items…';
   listEl.innerHTML = '';
-  const session = await getSession(client).catch((error) => {
-    console.warn('Home auth-state load failed:', error);
-    return null;
-  });
+  const [session, items] = await Promise.all([
+    getSession(client).catch((error) => {
+      console.warn('Home auth-state load failed:', error);
+      return null;
+    }),
+    listRecentItems(client),
+  ]);
   renderActions(session);
-  const items = await listRecentItems(client);
   msgEl.textContent = items.length ? '' : 'No items yet.';
   listEl.innerHTML = items.map((item) => `
     <a class="tile" href="item.html?id=${encodeURIComponent(item.id)}">

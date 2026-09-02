@@ -64,7 +64,15 @@ const actions = document.getElementById('postActions');
 actions.innerHTML = `<div class="post-stats"><span id="likeCount">${likeState.count ? `♡ ${likeState.count}` : 'Be the first to like this'}</span><span id="commentCount">Loading comments…</span></div><div class="post-actions"><button id="likeBtn" class="btn-action${likeState.liked ? ' liked' : ''}" type="button">${likeState.liked ? '♥ Liked' : '♡ Like'}</button><button id="commentBtn" class="btn-action" type="button">💬 Comment</button><button id="shareBtn" class="btn-action" type="button">↗ Share</button></div>`;
 likeBtn.addEventListener('click', async () => { if (!session) { likeBtn.textContent = 'Sign in to like'; return; } likeBtn.disabled = true; try { const next = await toggleForumPostLike(client, { postId:id, userId:session.user.id, liked:likeBtn.classList.contains('liked') }); likeBtn.classList.toggle('liked', next.liked); likeBtn.textContent = next.liked ? '♥ Liked' : '♡ Like'; likeCount.textContent = next.count ? `♡ ${next.count}` : 'Be the first to like this'; } finally { likeBtn.disabled = false; } });
 commentBtn.addEventListener('click', () => { replyBox.style.display = ''; replyText.focus(); });
-shareBtn.addEventListener('click', async () => { await navigator.clipboard?.writeText(location.href); shareBtn.textContent = '✓ Copied'; });
+shareBtn.addEventListener('click', async () => {
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+    await navigator.clipboard.writeText(location.href);
+    shareBtn.textContent = '✓ Copied';
+  } catch {
+    shareBtn.textContent = 'Unable to copy link';
+  }
+});
 if (session) {
   replyBox.style.display = '';
   replySend.addEventListener('click', async () => {
