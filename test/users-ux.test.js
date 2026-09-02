@@ -9,7 +9,8 @@ test('user search has an accessible named query and announced result status', ()
   assert.match(page, /<label for="q">Username<\/label>/);
   assert.match(page, /<input id="q" name="q" type="search" autocomplete="username"/);
   assert.match(page, /<button id="searchSubmit" type="submit">Search<\/button>/);
-  assert.match(page, /<div id="results" class="muted" role="status" aria-live="polite" aria-atomic="true">/);
+  assert.match(page, /<div id="userStatus" class="muted" role="status" aria-live="polite" aria-atomic="true">Loading members…<\/div>/);
+  assert.match(page, /<div id="results" aria-label="Member directory"><\/div>/);
 });
 
 test('user search exposes and manages its loading state without duplicate submits', () => {
@@ -33,9 +34,16 @@ test('user search does not expose internal profile identifiers', () => {
 
 test('user search offers an accessible retry after a failed request', () => {
   const script = fs.readFileSync(path.join(process.cwd(), 'src/pages/users.js'), 'utf8');
-  assert.match(script, /Retry searching users/);
+  assert.match(script, /Retry loading members/);
   assert.match(script, /\.retry-users/);
   assert.match(script, /runSearch\(input\.value\.trim\(\)\)/);
+});
+
+test('user directory browses all members by default and filters when queried', () => {
+  const script = fs.readFileSync(path.join(process.cwd(), 'src/pages/users.js'), 'utf8');
+  assert.match(script, /query\s*\? await searchProfiles[\s\S]*: await listProfiles/);
+  assert.match(script, /Showing \$\{users\.length\} member/);
+  assert.match(script, /runSearch\(initial\);/);
 });
 
 test('user search ignores stale results and loading cleanup from older requests', () => {

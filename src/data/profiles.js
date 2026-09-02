@@ -1,3 +1,19 @@
+export async function listProfiles(client, { pageSize = 1000 } = {}) {
+  const safePageSize = Math.min(Math.max(Number(pageSize) || 1000, 1), 1000);
+  const profiles = [];
+  for (let from = 0; ; from += safePageSize) {
+    const { data, error } = await client
+      .from('profiles')
+      .select('id,username,role')
+      .not('username', 'is', null)
+      .order('username', { ascending: true })
+      .range(from, from + safePageSize - 1);
+    if (error) throw error;
+    profiles.push(...(data ?? []));
+    if ((data?.length ?? 0) < safePageSize) return profiles;
+  }
+}
+
 export async function searchProfiles(client, query, { limit = 50 } = {}) {
   const term = String(query ?? '').trim();
   if (!term) return [];
