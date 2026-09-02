@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { createRequestTracker, getOtherParticipantId, listThreadMessages, sendMessage } from '../src/data/messages.js';
+import { createRequestTracker, deleteThreadForEveryone, getOtherParticipantId, hideThreadForUser, listMyThreads, listThreadMessages, sendMessage } from '../src/data/messages.js';
 
 function fakeClient(result) {
   const calls = [];
@@ -12,6 +12,7 @@ function fakeClient(result) {
     order(...args) { calls.push(['order', ...args]); return this; },
     limit(...args) { calls.push(['limit', ...args]); return this; },
     insert(...args) { calls.push(['insert', ...args]); return this; },
+    upsert(...args) { calls.push(['upsert', ...args]); return Promise.resolve(result); },
     maybeSingle() { calls.push(['maybeSingle']); return Promise.resolve(result); },
     then(resolve) { return Promise.resolve(result).then(resolve); }
   };
@@ -36,6 +37,24 @@ test('getOtherParticipantId returns the other member in a direct-message thread'
 
 test('listThreadMessages rejects missing thread ids', async () => {
   await assert.rejects(() => listThreadMessages({}, ''), /thread id is required/);
+});
+
+test('listMyThreads excludes conversations hidden by the current user', async () => {
+  const client = { from(table) { return table === 'dm_threads'
+    ? { select() { return this; }, order() { return Promise.resolve({ data: [{ id: 'visible' }, { id: 'hidden' }], error: null }); } }
+    : { select() { return Promise.resolve({ data: [{ thread_id: 'hidden' }], error: null }); } };
+  } };
+  assert.deepEqual(await listMyThreads(client), [{ id: 'visible' }]);
+});
+
+test('thread deletion modes call separate protected database operations', async () => {
+  const fake = fakeClient({ data: null, error: null });
+  await hideThreadForUser(fake.client, { threadId: 't1', userId: 'u1' });
+  assert.deepEqual(fake.calls.find((x) => x[0] === 'upsert'), ['upsert', { thread_id: 't1', user_id: 'u1' }, { onConflict: 'thread_id,user_id' }]);
+  const rpcCalls = [];
+  const client = { async rpc(name, args) { rpcCalls.push([name, args]); return { data: true, error: null }; } };
+  assert.equal(await deleteThreadForEveryone(client, 't1'), true);
+  assert.deepEqual(rpcCalls, [['delete_dm_thread_for_all', { target_thread: 't1' }]]);
 });
 
 test('listThreadMessages fetches the latest page and returns it in chronological order', async () => {
@@ -71,7 +90,8 @@ test('sendMessage rejects when the database did not create a message', async () 
 test('new-chat search has a visible associated label', () => {
   const html = readFileSync(resolve(import.meta.dirname, '../messages.html'), 'utf8');
   assert.match(html, /<label class="sr-only" for="userSearch">Username<\/label>/);
-  assert.match(html, /<input id="userSearch" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Message @username" required minlength="1"\/>/);
+  assert.match(html, /id="userSearch"[^>]*role="combobox"[^>]*aria-controls="userSuggestions"[^>]*aria-expanded="false"/);
+  assert.match(html, /id="userSuggestions"[^>]*role="listbox"/);
 });
 
 test('message avatars render profile photos and frames when available', () => {
@@ -86,12 +106,49 @@ test('username chat creation reuses an already-loaded conversation', () => {
   assert.match(script, /existing\?\.id \|\| await createThread/);
 });
 
+test('new-chat search offers debounced keyboard-accessible suggestions while typing', () => {
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
+  assert.match(script, /userSearch\.addEventListener\('input'/);
+  assert.match(script, /setTimeout\(updateSuggestions, 180\)/);
+  assert.match(script, /role="option"/);
+  assert.match(script, /event\.key === 'ArrowDown'/);
+  assert.match(script, /profile\.username\?\.toLowerCase\(\) === term\.toLowerCase\(\)/);
+});
+
+test('messages provide delete-for-me and delete-for-everyone controls', () => {
+  const html = readFileSync(resolve(import.meta.dirname, '../messages.html'), 'utf8');
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
+  assert.match(html, /id="deleteForMe"[^>]*>Delete for me/);
+  assert.match(html, /id="deleteForAll"[^>]*>Delete for everyone/);
+  assert.match(script, /hideThreadForUser/);
+  assert.match(script, /deleteThreadForEveryone/);
+  assert.match(script, /The other person will still have it/);
+  assert.match(script, /All messages will be permanently removed/);
+});
+
+test('profile message links can open the canonical conversation directly', () => {
+  const profile = readFileSync(resolve(import.meta.dirname, '../user.html'), 'utf8');
+  const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
+  assert.match(profile, /id="messageLink"[^>]*>Message<\/a>/);
+  assert.match(profile, /messages\.html\?u=/);
+  assert.match(script, /new URLSearchParams\(location\.search\)\.get\('u'\)/);
+});
+
+test('database migration enforces one canonical thread per user pair', () => {
+  const migration = readFileSync(resolve(import.meta.dirname, '../supabase/migrations/202609020003_canonical_dm_threads_and_deletion.sql'), 'utf8');
+  assert.match(migration, /primary key \(user_low, user_high\)/);
+  assert.match(migration, /on conflict \(user_low, user_high\) do nothing/);
+  assert.match(migration, /update public\.dm_messages[\s\S]*set thread_id = pairs\.canonical_id/);
+  assert.match(migration, /delete_dm_thread_for_all/);
+  assert.match(migration, /dm_thread_hidden/);
+});
+
 test('new-chat search exposes its in-progress state and restores the action label', () => {
   const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
   assert.match(script, /startBtn\.setAttribute\('aria-busy', 'true'\)/);
   assert.match(script, /startBtn\.textContent = 'Searching…'/);
   assert.match(script, /startBtn\.removeAttribute\('aria-busy'\)/);
-  assert.match(script, /startBtn\.textContent = 'Send'/);
+  assert.match(script, /startBtn\.textContent = 'Open'/);
 });
 
 test('message composer explains its Enter and Shift+Enter shortcuts', () => {

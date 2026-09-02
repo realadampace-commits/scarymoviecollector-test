@@ -21,12 +21,28 @@ export async function createThread(client, otherUserId) {
 }
 
 export async function listMyThreads(client) {
-  const { data, error } = await client
-    .from('dm_threads')
-    .select('id,created_at,dm_participants!inner(user_id)')
-    .order('created_at', { ascending: false });
+  const [threadsResult, hiddenResult] = await Promise.all([
+    client.from('dm_threads').select('id,created_at,dm_participants!inner(user_id)').order('created_at', { ascending: false }),
+    client.from('dm_thread_hidden').select('thread_id')
+  ]);
+  if (threadsResult.error) throw threadsResult.error;
+  if (hiddenResult.error) throw hiddenResult.error;
+  const hidden = new Set((hiddenResult.data ?? []).map((row) => row.thread_id));
+  return (threadsResult.data ?? []).filter((thread) => !hidden.has(thread.id));
+}
+
+export async function hideThreadForUser(client, { threadId, userId } = {}) {
+  if (!threadId || !userId) throw new TypeError('thread and user ids are required');
+  const { error } = await client.from('dm_thread_hidden').upsert({ thread_id: threadId, user_id: userId }, { onConflict: 'thread_id,user_id' });
   if (error) throw error;
-  return data ?? [];
+}
+
+export async function deleteThreadForEveryone(client, threadId) {
+  if (!threadId || typeof threadId !== 'string') throw new TypeError('thread id is required');
+  const { data, error } = await client.rpc('delete_dm_thread_for_all', { target_thread: threadId });
+  if (error) throw error;
+  if (!data) throw new Error('thread was not deleted');
+  return data;
 }
 
 export async function listThreadMessages(client, threadId, { limit = 100 } = {}) {

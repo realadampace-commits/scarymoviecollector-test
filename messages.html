@@ -14,6 +14,12 @@
   .new-chat { width:36px; height:36px; border:0; border-radius:50%; background:#e7f3ff; color:#006fe6; cursor:pointer; font-size:20px; line-height:1; }
   .new-chat:hover { background:#d8edff; }
   .start-chat { display:flex; gap:8px; padding:0 16px 12px; }
+  .search-wrap { min-width:0; flex:1; position:relative; }
+  .search-wrap input { width:100%; }
+  .suggestions { position:absolute; top:calc(100% + 5px); left:0; right:0; z-index:20; padding:5px; background:#151414; border:1px solid var(--line); box-shadow:0 15px 35px rgba(0,0,0,.45); }
+  .suggestion { width:100%; display:flex; justify-content:space-between; gap:8px; padding:10px; color:var(--ink); background:transparent; border:0; text-align:left; cursor:pointer; }
+  .suggestion:hover,.suggestion[aria-selected="true"] { background:#2b2021; }
+  .suggestion-role { color:var(--muted); font-size:12px; text-transform:uppercase; }
   .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
   .start-chat input { min-width:0; flex:1; border:0; border-radius:999px; background:#f0f2f5; padding:10px 13px; outline:2px solid transparent; }
   .start-chat input:focus { outline-color:#b8dcff; background:#fff; }
@@ -30,7 +36,11 @@
   .thread-preview { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--muted); font-size:13px; margin-top:3px; }
   .empty-inbox { padding:22px 14px; color:var(--muted); text-align:center; font-size:14px; }
   .conversation { min-width:0; display:flex; flex-direction:column; background:#fff; }
-  .conversation-head { min-height:68px; display:flex; align-items:center; gap:12px; padding:0 22px; border-bottom:1px solid var(--line); }
+  .conversation-head { min-height:68px; display:flex; align-items:center; gap:12px; padding:8px 22px; border-bottom:1px solid var(--line); }
+  .conversation-title { min-width:0; flex:1; }
+  .thread-delete-actions { display:flex; gap:6px; }
+  .thread-delete-actions button { padding:7px 9px; color:var(--muted); background:transparent; border:1px solid var(--line); border-radius:2px; cursor:pointer; font-size:12px; }
+  .thread-delete-actions .delete-all { color:#ef6679; }
   .conversation-head h2 { margin:0; font-size:16px; }
   .presence { color:var(--muted); font-size:12px; margin-top:2px; }
   .back { display:none; border:0; background:none; color:var(--messenger-blue); padding:6px; font-size:22px; cursor:pointer; }
@@ -52,7 +62,7 @@
   .composer textarea:focus { outline-color:#b8dcff; background:#fff; }
   .send { min-width:60px; }
   .composer-status { position:absolute; transform:translateY(-36px); color:var(--muted); font-size:12px; }
-  @media (max-width:760px) { body { background:#fff; } .messages-shell { height:100vh; min-height:0; margin:0; border:0; border-radius:0; display:block; } .inbox,.conversation { height:100%; } .conversation { display:none; } .messages-shell.show-thread .inbox { display:none; } .messages-shell.show-thread .conversation { display:flex; } .back { display:block; } .message-list { padding:18px 14px; } }
+  @media (max-width:760px) { body { background:#fff; } .messages-shell { height:100vh; min-height:0; margin:0; border:0; border-radius:0; display:block; } .inbox,.conversation { height:100%; } .conversation { display:none; } .messages-shell.show-thread .inbox { display:none; } .messages-shell.show-thread .conversation { display:flex; } .back { display:block; } .message-list { padding:18px 14px; } .conversation-head { flex-wrap:wrap; }.thread-delete-actions { width:100%; padding-left:42px; }.thread-delete-actions button { flex:1; } }
 </style>
 <link rel="stylesheet" href="/styles.css">
 </head>
@@ -62,13 +72,13 @@
 <main class="messages-shell" id="messagesShell">
   <aside class="inbox" aria-label="Conversations">
     <header class="inbox-head"><h1>Chats</h1><button class="new-chat" id="focusStart" type="button" aria-label="Start a new chat">✎</button></header>
-    <form class="start-chat" id="startForm"><label class="sr-only" for="userSearch">Username</label><input id="userSearch" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Message @username" required minlength="1"/><button id="startBtn" type="submit">Send</button></form>
+    <form class="start-chat" id="startForm"><label class="sr-only" for="userSearch">Username</label><div class="search-wrap"><input id="userSearch" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Message @username" role="combobox" aria-autocomplete="list" aria-controls="userSuggestions" aria-expanded="false" required minlength="1"/><div id="userSuggestions" class="suggestions" role="listbox" aria-label="Matching users" hidden></div></div><button id="startBtn" type="submit">Open</button></form>
     <div id="startMsg" class="start-msg" aria-live="polite"></div>
     <div id="list" class="thread-list"></div>
     <div id="status" class="empty-inbox" aria-live="polite"></div>
   </aside>
   <section class="conversation" aria-label="Current conversation">
-    <header class="conversation-head"><button class="back" id="backToInbox" type="button" aria-label="Back to chats">‹</button><div class="avatar" id="headAvatar">?</div><div><h2 id="head">Choose a conversation</h2><div class="presence" id="subhead">Select a chat or start a new one.</div></div></header>
+    <header class="conversation-head"><button class="back" id="backToInbox" type="button" aria-label="Back to chats">‹</button><div class="avatar" id="headAvatar">?</div><div class="conversation-title"><h2 id="head">Choose a conversation</h2><div class="presence" id="subhead">Select a chat or start a new one.</div></div><div id="threadDeleteActions" class="thread-delete-actions" hidden><button id="deleteForMe" type="button">Delete for me</button><button id="deleteForAll" class="delete-all" type="button">Delete for everyone</button></div></header>
     <div id="preview" class="message-list" aria-live="polite"><div class="welcome"><div class="avatar">✦</div><h2>Your messages</h2><p>Choose a conversation on the left to read and reply.</p></div></div>
     <form class="composer" id="composer"><span id="composeStatus" class="composer-status" aria-live="polite"></span><div style="min-width:0; flex:1"><textarea id="text" rows="1" placeholder="Write a message" disabled aria-label="Message" aria-describedby="composerHelp"></textarea><p class="composer-help" id="composerHelp">Choose a conversation to enable messaging. Enter to send · Shift+Enter for a new line</p></div><button id="send" class="send" type="submit" disabled>Send</button></form>
   </section>

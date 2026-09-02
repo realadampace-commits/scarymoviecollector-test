@@ -56,6 +56,7 @@
       <div style="flex:1;min-width:220px">
         <h1 id="uname" style="margin:0;font-size:22px">Loading…</h1>
         <div id="roleBadge" class="pill" style="margin-top:6px;display:none"></div>
+        <a id="messageLink" class="btn" href="messages.html" style="display:none;margin-top:10px">Message</a>
       </div>
     </div>
     <div id="profileStatus" class="muted" role="status" aria-live="polite" aria-atomic="true">Loading profile…</div>
@@ -101,6 +102,7 @@ const avatarBox = document.getElementById('avatarBox');
 const frameOverlay = document.getElementById('frameOverlay');
 const bioEl = document.getElementById('bio');
 const profileStatus = document.getElementById('profileStatus');
+const messageLink = document.getElementById('messageLink');
 
 const portfolioGrid = document.getElementById('portfolioGrid');
 const portfolioCount = document.getElementById('portfolioCount');
@@ -177,6 +179,11 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
 
   ownerId = profile.id;
   profileStatus.textContent = '';
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user?.id !== ownerId && profile.username) {
+    messageLink.href = 'messages.html?u=' + encodeURIComponent(profile.username);
+    messageLink.style.display = 'inline-flex';
+  }
   
   unameEl.textContent = '@' + (profile.username || username || 'me');
   if (profile.role && profile.role !== 'free') {

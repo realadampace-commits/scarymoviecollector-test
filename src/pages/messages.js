@@ -1,6 +1,6 @@
 import { getSupabaseClient } from '../supabase-client.js';
 import { getSession } from '../auth.js';
-import { createRequestTracker, createThread, getOtherParticipantId, listMyThreads, listThreadMessages, sendMessage } from '../data/messages.js';
+import { createRequestTracker, createThread, deleteThreadForEveryone, getOtherParticipantId, hideThreadForUser, listMyThreads, listThreadMessages, sendMessage } from '../data/messages.js';
 import { getProfile, searchProfiles } from '../data/profiles.js';
 import { escapeHtml, profileAvatarMarkup } from '../ui.js';
 
@@ -22,9 +22,17 @@ const composeStatus = document.getElementById('composeStatus');
 const userSearch = document.getElementById('userSearch');
 const startBtn = document.getElementById('startBtn');
 const startMsg = document.getElementById('startMsg');
+const suggestions = document.getElementById('userSuggestions');
+const threadDeleteActions = document.getElementById('threadDeleteActions');
+const deleteForMe = document.getElementById('deleteForMe');
+const deleteForAll = document.getElementById('deleteForAll');
 let activeThread = null;
 let threadCards = [];
 const selectionRequests = createRequestTracker();
+const suggestionRequests = createRequestTracker();
+let suggestionTimer = null;
+let suggestedProfiles = [];
+let selectedProfile = null;
 
 const avatarMarkup = (profile, name, className = 'avatar') => profileAvatarMarkup(profile, { name, className });
 const timeLabel = (date) => {
@@ -96,6 +104,7 @@ async function selectThread(id, { refreshInbox = true } = {}) {
   send.disabled = false;
   text.focus();
   composeStatus.textContent = '';
+  threadDeleteActions.hidden = false;
   renderThreadList();
   preview.innerHTML = '<div class="welcome"><p>Loading messages…</p></div>';
   try {
@@ -115,7 +124,35 @@ async function selectThread(id, { refreshInbox = true } = {}) {
   if (refreshInbox) renderThreadList();
 }
 
-async function startChat() {
+function closeSuggestions() {
+  suggestions.hidden = true;
+  suggestions.replaceChildren();
+  userSearch.setAttribute('aria-expanded', 'false');
+}
+
+function renderSuggestions(profiles) {
+  suggestedProfiles = profiles.filter((profile) => profile.id !== session.user.id);
+  if (!suggestedProfiles.length) { closeSuggestions(); return; }
+  suggestions.innerHTML = suggestedProfiles.map((profile, index) => `<button class="suggestion" id="user-suggestion-${index}" type="button" role="option" data-id="${escapeHtml(profile.id)}" aria-selected="false"><span>@${escapeHtml(profile.username)}</span><span class="suggestion-role">${escapeHtml(profile.role || 'member')}</span></button>`).join('');
+  suggestions.hidden = false;
+  userSearch.setAttribute('aria-expanded', 'true');
+}
+
+async function updateSuggestions() {
+  const term = userSearch.value.trim().replace(/^@/, '');
+  selectedProfile = null;
+  const request = suggestionRequests.start();
+  if (!term) { closeSuggestions(); return; }
+  try {
+    const matches = await searchProfiles(client, term, { limit: 8 });
+    if (suggestionRequests.isCurrent(request)) renderSuggestions(matches);
+  } catch (error) {
+    if (suggestionRequests.isCurrent(request)) closeSuggestions();
+    console.error(error);
+  }
+}
+
+async function startChat(chosenProfile = selectedProfile) {
   const term = userSearch.value.trim().replace(/^@/, '');
   if (!term) { startMsg.textContent = 'Enter a username to start a chat.'; return; }
   startMsg.textContent = 'Searching…';
@@ -123,12 +160,14 @@ async function startChat() {
   startBtn.setAttribute('aria-busy', 'true');
   startBtn.textContent = 'Searching…';
   try {
-    const matches = await searchProfiles(client, term, { limit: 8 });
-    const target = matches.find((profile) => profile.id !== session.user.id);
+    const matches = chosenProfile ? [chosenProfile] : await searchProfiles(client, term, { limit: 8 });
+    const target = chosenProfile || matches.find((profile) => profile.id !== session.user.id && profile.username?.toLowerCase() === term.toLowerCase());
     if (!target) { startMsg.textContent = 'No matching member found.'; return; }
     const existing = threadCards.find((thread) => thread.otherUserId === target.id);
     const threadId = existing?.id || await createThread(client, target.id);
     userSearch.value = '';
+    selectedProfile = null;
+    closeSuggestions();
     startMsg.textContent = '';
     await renderInbox(threadId);
   } catch (error) {
@@ -136,7 +175,40 @@ async function startChat() {
   } finally {
     startBtn.disabled = false;
     startBtn.removeAttribute('aria-busy');
-    startBtn.textContent = 'Send';
+    startBtn.textContent = 'Open';
+  }
+}
+
+async function removeActiveThread(mode) {
+  const thread = activeThread;
+  if (!thread) return;
+  const forEveryone = mode === 'all';
+  const warning = forEveryone
+    ? `Delete the entire conversation with ${thread.name} for both people? All messages will be permanently removed.`
+    : `Remove the conversation with ${thread.name} from your messages? The other person will still have it.`;
+  if (!confirm(warning)) return;
+  deleteForMe.disabled = true;
+  deleteForAll.disabled = true;
+  composeStatus.textContent = forEveryone ? 'Deleting conversation for everyone…' : 'Removing conversation…';
+  try {
+    if (forEveryone) await deleteThreadForEveryone(client, thread.id);
+    else await hideThreadForUser(client, { threadId: thread.id, userId: session.user.id });
+    selectionRequests.start();
+    activeThread = null;
+    shell.classList.remove('show-thread');
+    threadDeleteActions.hidden = true;
+    text.disabled = true;
+    send.disabled = true;
+    head.textContent = 'Choose a conversation';
+    subhead.textContent = 'Select a chat or start a new one.';
+    preview.innerHTML = '<div class="welcome"><div class="avatar">✦</div><h2>Your messages</h2><p>Choose a conversation on the left to read and reply.</p></div>';
+    await renderInbox();
+  } catch (error) {
+    console.error(error);
+    composeStatus.textContent = 'Unable to delete this conversation. Try again.';
+  } finally {
+    deleteForMe.disabled = false;
+    deleteForAll.disabled = false;
   }
 }
 
@@ -167,6 +239,35 @@ async function submitMessage() {
 document.getElementById('startForm').addEventListener('submit', (event) => { event.preventDefault(); startChat(); });
 document.getElementById('composer').addEventListener('submit', (event) => { event.preventDefault(); submitMessage(); });
 document.getElementById('focusStart').addEventListener('click', () => userSearch.focus());
+userSearch.addEventListener('input', () => {
+  selectedProfile = null;
+  clearTimeout(suggestionTimer);
+  suggestionTimer = setTimeout(updateSuggestions, 180);
+});
+userSearch.addEventListener('keydown', (event) => {
+  if (event.key === 'ArrowDown' && !suggestions.hidden) { event.preventDefault(); suggestions.querySelector('.suggestion')?.focus(); }
+  if (event.key === 'Escape') closeSuggestions();
+});
+suggestions.addEventListener('click', (event) => {
+  const option = event.target.closest('.suggestion');
+  if (!option) return;
+  selectedProfile = suggestedProfiles.find((profile) => profile.id === option.dataset.id) || null;
+  if (!selectedProfile) return;
+  userSearch.value = `@${selectedProfile.username}`;
+  closeSuggestions();
+  startChat(selectedProfile);
+});
+suggestions.addEventListener('keydown', (event) => {
+  if (!['ArrowDown', 'ArrowUp', 'Escape'].includes(event.key)) return;
+  event.preventDefault();
+  if (event.key === 'Escape') { closeSuggestions(); userSearch.focus(); return; }
+  const options = [...suggestions.querySelectorAll('.suggestion')];
+  const current = options.indexOf(document.activeElement);
+  const next = event.key === 'ArrowDown' ? (current + 1) % options.length : (current - 1 + options.length) % options.length;
+  options[next]?.focus();
+});
+deleteForMe.addEventListener('click', () => removeActiveThread('me'));
+deleteForAll.addEventListener('click', () => removeActiveThread('all'));
 function returnToInbox() {
   shell.classList.remove('show-thread');
   list.querySelector(`[data-id="${CSS.escape(activeThread?.id || '')}"]`)?.focus();
@@ -188,3 +289,8 @@ document.addEventListener('keydown', (event) => {
 text.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submitMessage(); } });
 
 await renderInbox();
+const profileFromUrl = new URLSearchParams(location.search).get('u');
+if (profileFromUrl) {
+  userSearch.value = `@${profileFromUrl.replace(/^@/, '')}`;
+  await startChat();
+}
