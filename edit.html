@@ -71,6 +71,18 @@
     <div id="photoHelp" class="small" style="margin-top:6px">Up to 5 images total. First image is treated as the main image. Existing photos cannot be removed here.</div>
   </div> <!-- 🧱 close Photos card -->
 
+  <div class="card">
+    <div class="tools"><strong>3D model</strong><span id="modelState" class="muted">Checking…</span></div>
+    <div class="tools" style="margin-top:12px">
+      <label for="modelFiles">Model package</label>
+      <input id="modelFiles" type="file" accept=".glb,.gltf,.obj,.mtl,.fbx,.stl,.bin,.png,.jpg,.jpeg,.webp" multiple aria-describedby="modelHelp" />
+      <button id="uploadModel" class="btn add" type="button">Upload 3D model</button>
+      <button id="removeModel" class="btn del" type="button" style="display:none">Remove 3D model</button>
+    </div>
+    <div id="modelHelp" class="small" style="margin-top:6px">Select one GLB, glTF, OBJ, FBX, or STL model plus its MTL, BIN, PNG, JPEG, or WebP companion files. Up to 30 files and 100 MB total. Uploading replaces the current model.</div>
+    <div id="modelMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></div>
+  </div>
+
   <!-- Manual sale status -->
   <div class="card">
     <h3 style="margin:0 0 8px">Manual Sale Status</h3>
@@ -101,5 +113,3 @@
 <script type="module" src="/src/pages/edit.js"></script>
 </body>
 </html>
-
-

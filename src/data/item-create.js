@@ -1,4 +1,5 @@
 import { uploadOwnItemImages } from './item-image-upload.js';
+import { uploadOwnItemModel } from './item-models.js';
 
 function requiredText(value, label) {
   const text = String(value ?? '').trim();
@@ -6,7 +7,7 @@ function requiredText(value, label) {
   return text;
 }
 
-export async function createOwnItem(client, ownerId, { title, description = '', userValue, files = [] } = {}) {
+export async function createOwnItem(client, ownerId, { title, description = '', userValue, files = [], modelFiles = [] } = {}) {
   if (!ownerId || typeof ownerId !== 'string') throw new TypeError('owner id is required');
   const cleanTitle = requiredText(title, 'title');
   const value = Number(userValue);
@@ -20,6 +21,7 @@ export async function createOwnItem(client, ownerId, { title, description = '', 
   if (error) throw error;
   try {
     if (selectedFiles.length) await uploadOwnItemImages(client, item.id, ownerId, selectedFiles);
+    if (Array.from(modelFiles || []).length) await uploadOwnItemModel(client, item.id, ownerId, modelFiles);
     return item;
   } catch (uploadError) {
     try {

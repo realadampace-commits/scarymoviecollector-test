@@ -46,6 +46,16 @@
     </div>
   </div>
 
+  <div class="card">
+    <h3 style="margin:0 0 6px">3D model (optional)</h3>
+    <div class="upbox">
+      <label class="muted" for="modelFiles">Model package</label>
+      <input id="modelFiles" type="file" accept=".glb,.gltf,.obj,.mtl,.fbx,.stl,.bin,.png,.jpg,.jpeg,.webp" multiple aria-describedby="modelHelp modelSummary" />
+      <div id="modelHelp" class="muted" style="margin-top:6px">Select one GLB, glTF, OBJ, FBX, or STL model plus any MTL, BIN, PNG, JPEG, or WebP texture files it uses. Up to 30 files and 100 MB total.</div>
+      <div id="modelSummary" class="muted" style="margin-top:6px" role="status" aria-live="polite">No 3D model selected.</div>
+    </div>
+  </div>
+
   <div class="card" style="display:flex;gap:10px;align-items:center">
     <button id="saveBtn" type="submit">Create Item</button>
     <span id="msg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span>

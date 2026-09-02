@@ -7,6 +7,8 @@ const titleEl = document.getElementById('title');
 const descEl = document.getElementById('desc');
 const priceEl = document.getElementById('price');
 const filesEl = document.getElementById('imgFiles');
+const modelFilesEl = document.getElementById('modelFiles');
+const modelSummary = document.getElementById('modelSummary');
 const previews = document.getElementById('previews');
 const createForm = document.getElementById('createForm');
 const saveBtn = document.getElementById('saveBtn');
@@ -29,6 +31,11 @@ filesEl.addEventListener('change', () => {
   if (filesEl.files.length > 5) message('Only the first 5 images will be used. Select at most 5 images.', 'err');
 });
 
+modelFilesEl.addEventListener('change', () => {
+  const files = Array.from(modelFilesEl.files || []);
+  modelSummary.textContent = files.length ? `${files.length} model package file${files.length === 1 ? '' : 's'} selected.` : 'No 3D model selected.';
+});
+
 let session;
 try {
   client = getSupabaseClient();
@@ -47,6 +54,7 @@ if (session) createForm.addEventListener('submit', async (event) => {
       description: descEl.value,
       userValue: priceEl.value,
       files: filesEl.files,
+      modelFiles: modelFilesEl.files,
     });
     message('Created!', 'ok');
     location.href = `item.html?id=${encodeURIComponent(item.id)}`;

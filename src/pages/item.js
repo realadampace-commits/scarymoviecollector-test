@@ -32,7 +32,7 @@ if (!id) { title.textContent = 'Item not found'; throw new Error('missing item i
 const detail = await getItemDetail(client, id);
 if (!detail) { title.textContent = 'Item not found'; throw new Error('item not found'); }
 
-const { item, owner, images, votes } = detail;
+const { item, owner, images, votes, model } = detail;
 title.textContent = item.title || 'Untitled item';
 meta.textContent = owner?.username ? `Owned by @${owner.username}` : '';
 desc.textContent = item.description || 'No description.';
@@ -64,6 +64,36 @@ thumbs.addEventListener('click', (event) => {
   const button = event.target.closest('button');
   if (button) selectImage(Number(button.dataset.index));
 });
+if (model) {
+  const toggle = document.getElementById('mediaToggle');
+  const viewPhotos = document.getElementById('viewPhotos');
+  const viewModel = document.getElementById('viewModel');
+  const viewer = document.getElementById('modelViewer');
+  const viewerStatus = document.getElementById('modelViewerStatus');
+  let mounted = false;
+  toggle.style.display = 'flex';
+  const showPhotos = () => {
+    main.style.display = ''; thumbs.style.display = ''; viewer.style.display = 'none';
+    viewPhotos.setAttribute('aria-pressed', 'true'); viewModel.setAttribute('aria-pressed', 'false');
+  };
+  viewPhotos.addEventListener('click', showPhotos);
+  viewModel.addEventListener('click', async () => {
+    main.style.display = 'none'; thumbs.style.display = 'none'; viewer.style.display = 'block';
+    viewPhotos.setAttribute('aria-pressed', 'false'); viewModel.setAttribute('aria-pressed', 'true');
+    if (mounted) return;
+    mounted = true;
+    try {
+      const { mountModelViewer } = await import('../3d/model-viewer.js');
+      await mountModelViewer(viewer, model);
+    }
+    catch (error) {
+      console.error(error);
+      viewer.replaceChildren(viewerStatus);
+      viewerStatus.textContent = 'This 3D model could not be displayed.';
+      viewerStatus.classList.add('err');
+    }
+  });
+}
 const updateLightboxNavigation = () => {
   const hasMultipleImages = images.length > 1;
   previousButton.disabled = !hasMultipleImages;

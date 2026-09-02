@@ -4,6 +4,7 @@ import { getItem } from '../data/items.js';
 import { listItemImages } from '../data/item-images.js';
 import { uploadOwnItemImages } from '../data/item-image-upload.js';
 import { updateOwnItem } from '../data/item-edit.js';
+import { deleteOwnItemModel, getItemModel, uploadOwnItemModel } from '../data/item-models.js';
 
 const id = new URLSearchParams(location.search).get('id');
 if (!id) { location.href = 'index.html'; throw new Error('missing item id'); }
@@ -34,10 +35,39 @@ const saveSelling = document.getElementById('saveSelling');
 const soldPrice = document.getElementById('soldPrice');
 const markSold = document.getElementById('markSold');
 const undoSold = document.getElementById('undoSold');
+const modelFiles = document.getElementById('modelFiles');
+const uploadModel = document.getElementById('uploadModel');
+const removeModel = document.getElementById('removeModel');
+const modelState = document.getElementById('modelState');
+const modelMsg = document.getElementById('modelMsg');
 sellToggle.checked = Boolean(item.is_for_sale);
 soldPrice.value = item.sold_price ?? '';
 if (item.sold) { soldPrice.disabled = true; markSold.style.display = 'none'; undoSold.style.display = ''; }
 if (!owner) [sellToggle, saveSelling, soldPrice, markSold, undoSold].forEach((element) => { element.disabled = true; });
+let itemModel = await getItemModel(client, id);
+function renderModelState() {
+  modelState.textContent = itemModel ? `${itemModel.model_format.toUpperCase()} model available` : 'No model uploaded';
+  removeModel.style.display = itemModel && owner ? '' : 'none';
+}
+renderModelState();
+if (!owner) [modelFiles, uploadModel, removeModel].forEach((element) => { element.disabled = true; });
+uploadModel.addEventListener('click', async () => {
+  const files = Array.from(modelFiles.files || []);
+  if (!files.length) { modelMsg.textContent = 'Choose a model package first.'; return; }
+  uploadModel.disabled = true; uploadModel.setAttribute('aria-busy', 'true'); modelMsg.textContent = 'Uploading 3D model…';
+  try {
+    itemModel = await uploadOwnItemModel(client, id, session.user.id, files);
+    modelFiles.value = ''; renderModelState(); modelMsg.textContent = '3D model uploaded.';
+  } catch (error) { modelMsg.textContent = error.message || 'Unable to upload 3D model.'; }
+  finally { uploadModel.disabled = false; uploadModel.removeAttribute('aria-busy'); }
+});
+removeModel.addEventListener('click', async () => {
+  if (!confirm('Remove this 3D model and its texture files?')) return;
+  removeModel.disabled = true; modelMsg.textContent = 'Removing 3D model…';
+  try { await deleteOwnItemModel(client, id, session.user.id); itemModel = null; renderModelState(); modelMsg.textContent = '3D model removed.'; }
+  catch (error) { modelMsg.textContent = error.message || 'Unable to remove 3D model.'; }
+  finally { removeModel.disabled = false; }
+});
 saveSelling.addEventListener('click', async () => {
   saveSelling.disabled = true;
   try { await updateOwnItem(client, id, session.user.id, { is_for_sale: sellToggle.checked }); document.getElementById('sellNote').textContent = 'Sale status saved.'; }
