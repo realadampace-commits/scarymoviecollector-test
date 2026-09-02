@@ -19,6 +19,6 @@ test('listFrames reads the public frames gallery in creation order', async () =>
 
 test('frameStyle maps stored frame positioning to CSS variables', () => {
   assert.deepEqual(frameStyle({ scale: 1.2, offset_x: -4, offset_y: 7 }), {
-    '--frameScale': '1.2', '--frameX': '-4px', '--frameY': '7px'
+    '--frameScale': '1.2', '--frameX': '-3.3333333333333335%', '--frameY': '5.833333333333334%'
   });
 });

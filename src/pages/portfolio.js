@@ -21,7 +21,7 @@ let ownerId;
 let owner;
 
 if (username) {
-  const { data, error } = await client.from('profiles').select('id,username,avatar_url').eq('username', username).maybeSingle();
+  const { data, error } = await client.from('profiles').select('id,username,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y').eq('username', username).maybeSingle();
   if (error || !data) { msg.textContent = 'User not found.'; throw new Error('user not found'); }
   owner = data; ownerId = data.id;
 } else {

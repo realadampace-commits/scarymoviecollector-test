@@ -194,8 +194,8 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
   if (profile.frame_url) {
     frameOverlay.style.backgroundImage = `url('${profile.frame_url}')`;
     frameOverlay.style.setProperty('--frameScale', profile.frame_scale ?? 1);
-    frameOverlay.style.setProperty('--frameX', ((profile.frame_offset_x??0) + 'px'));
-    frameOverlay.style.setProperty('--frameY', ((profile.frame_offset_y??0) + 'px'));
+    frameOverlay.style.setProperty('--frameX', (((profile.frame_offset_x??0) / 1.2) + '%'));
+    frameOverlay.style.setProperty('--frameY', (((profile.frame_offset_y??0) / 1.2) + '%'));
   }
   
   const portfolioLink = document.getElementById('portfolioLink');

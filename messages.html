@@ -24,9 +24,7 @@
   .thread-list { overflow:auto; padding:2px 8px 12px; }
   .thread { width:100%; border:0; display:flex; gap:12px; align-items:center; text-align:left; padding:10px 8px; border-radius:10px; background:transparent; color:inherit; cursor:pointer; }
   .thread:hover,.thread.active { background:#e7f3ff; }
-  .avatar { width:48px; height:48px; flex:0 0 auto; position:relative; display:grid; place-items:center; border-radius:50%; overflow:hidden; background:linear-gradient(135deg,#c8d7e9,#7e9dc2); color:#fff; font-size:18px; font-weight:800; }
-  .avatar-media,.avatar-frame { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-  .avatar-frame { object-fit:contain; pointer-events:none; }
+  .avatar { --avatar-size:48px; font-size:18px; }
   .thread-copy { min-width:0; flex:1; }
   .thread-name { display:flex; justify-content:space-between; gap:8px; align-items:baseline; font-weight:700; }
   .thread-time { color:var(--muted); font-size:12px; font-weight:500; }
@@ -39,13 +37,13 @@
   .back { display:none; border:0; background:none; color:var(--messenger-blue); padding:6px; font-size:22px; cursor:pointer; }
   .message-list { flex:1; overflow:auto; display:flex; flex-direction:column; gap:4px; padding:22px; background:linear-gradient(#fff,#f9fafb); }
   .welcome { margin:auto; max-width:370px; text-align:center; color:var(--muted); }
-  .welcome .avatar { margin:0 auto 13px; width:64px; height:64px; font-size:24px; }
+  .welcome .avatar { --avatar-size:64px; margin:0 auto 13px; font-size:24px; }
   .welcome h2 { color:var(--ink); margin:0 0 6px; font-size:22px; }
   .retry-messages { margin-top:10px; border:0; border-radius:999px; background:var(--messenger-blue); color:#fff; padding:9px 14px; font-weight:700; cursor:pointer; }
   .retry-messages:hover { background:#0073e6; }
   .message-row { display:flex; align-items:flex-end; gap:8px; max-width:78%; }
   .message-row.mine { margin-left:auto; flex-direction:row-reverse; }
-  .message-row .avatar { width:28px; height:28px; font-size:11px; }
+  .message-row .avatar { --avatar-size:28px; font-size:11px; }
   .bubble { padding:9px 12px; border-radius:18px; background:#e4e6eb; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.35; }
   .mine .bubble { background:var(--messenger-blue); color:#fff; }
   .message-meta { display:block; color:var(--muted); font-size:11px; margin:3px 8px; }

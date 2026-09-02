@@ -76,10 +76,8 @@ test('new-chat search has a visible associated label', () => {
 
 test('message avatars render profile photos and frames when available', () => {
   const script = readFileSync(resolve(import.meta.dirname, '../src/pages/messages.js'), 'utf8');
-  assert.match(script, /avatar-media/);
-  assert.match(script, /avatar-frame/);
-  assert.match(script, /profile\?\.avatar_url/);
-  assert.match(script, /profile\?\.frame_url/);
+  assert.match(script, /profileAvatarMarkup/);
+  assert.match(script, /mine \? myProfile : thread\.profile/);
 });
 
 test('username chat creation reuses an already-loaded conversation', () => {

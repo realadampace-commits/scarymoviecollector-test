@@ -6,8 +6,8 @@ const maxFrameBytes = 10 * 1024 * 1024;
 export function frameStyle(frame = {}) {
   return {
     '--frameScale': String(frame.scale ?? 1),
-    '--frameX': `${frame.offset_x ?? 0}px`,
-    '--frameY': `${frame.offset_y ?? 0}px`
+    '--frameX': `${(frame.offset_x ?? 0) / 1.2}%`,
+    '--frameY': `${(frame.offset_y ?? 0) / 1.2}%`
   };
 }
 

@@ -80,8 +80,8 @@ const renderFrame = (frame, target = frameOverlay) => {
   if (!target) return;
   target.style.backgroundImage = frame?.image_url ? `url(${JSON.stringify(frame.image_url)})` : '';
   target.style.setProperty('--frameScale', frame?.scale ?? profile?.frame_scale ?? 1);
-  target.style.setProperty('--frameX', `${frame?.offset_x ?? profile?.frame_offset_x ?? 0}px`);
-  target.style.setProperty('--frameY', `${frame?.offset_y ?? profile?.frame_offset_y ?? 0}px`);
+  target.style.setProperty('--frameX', `${(frame?.offset_x ?? profile?.frame_offset_x ?? 0) / 1.2}%`);
+  target.style.setProperty('--frameY', `${(frame?.offset_y ?? profile?.frame_offset_y ?? 0) / 1.2}%`);
 };
 renderFrame(profile?.frame_url ? { image_url: profile.frame_url, scale: profile.frame_scale, offset_x: profile.frame_offset_x, offset_y: profile.frame_offset_y } : null);
 try {

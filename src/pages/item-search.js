@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '../supabase-client.js';
+import { escapeHtml, profileAvatarMarkup } from '../ui.js';
 const sb = getSupabaseClient();
 
 // Attach first photo from items_images as preview_url
@@ -48,7 +49,7 @@ async function runSearch(){
   // 1) Find owners by username (case-insensitive)
   const { data: owners, error: ownersErr } = await sb
     .from('profiles')
-    .select('id,username,avatar_url')
+    .select('id,username,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y')
     .ilike('username', like)
     .limit(200);
 
@@ -68,7 +69,7 @@ async function runSearch(){
   }
 
   const { data, error } = await sb.from('items')
-    .select('id,title,description,user_value,created_at,owner_id,profiles:owner_id(username,avatar_url)')
+    .select('id,title,description,user_value,created_at,owner_id,profiles:owner_id(username,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y)')
     .or(orParts.join(','))
     .order('created_at',{ascending:false})
     .limit(60);
@@ -93,10 +94,8 @@ async function runSearch(){
 
   statusEl.textContent = `Found ${withPrev.length} item${withPrev.length===1?'':'s'}.`;
   resultsEl.innerHTML = withPrev.map(it=>{
-    const ava = it.profiles?.avatar_url
-      ? `<span class="ava"><img src="${escapeHtml(it.profiles.avatar_url)}" alt=""></span>`
-      : `<span class="ava"></span>`;
     const uname = it.profiles?.username ? '@'+it.profiles.username : 'user';
+    const ava = profileAvatarMarkup(it.profiles, { name: uname, className: 'ava' });
     return `
       <div class="item">
         <a href="item.html?id=${escapeHtml(it.id)}" style="color:inherit;text-decoration:none">
@@ -111,8 +110,6 @@ async function runSearch(){
     `;
   }).join('');
 }
-
-function escapeHtml(s){ return String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 // If query provided via ?q= in the URL, use it
 const urlQ = new URLSearchParams(location.search).get('q');

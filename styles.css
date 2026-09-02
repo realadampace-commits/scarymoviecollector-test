@@ -28,6 +28,14 @@ button, input, textarea, select { font: inherit; } input, textarea, select { col
 .status:empty, .empty:empty { display:none; }
 .top, .head, .topbar, .sectionHead { gap:14px; } h1,h2,h3 { letter-spacing:-.02em; line-height:1.15; } h1 { font-size:clamp(2rem,5vw,3.5rem); } h2 { font-size:clamp(1.45rem,3vw,2.2rem); }
 .avatar, .ava { border:2px solid #4b5c78!important; background:var(--surface-3)!important; }
+.profile-avatar { position:relative; display:inline-grid; place-items:center; width:var(--avatar-size,40px); height:var(--avatar-size,40px); flex:0 0 var(--avatar-size,40px); overflow:visible; border:0!important; border-radius:50%; background:transparent!important; isolation:isolate; vertical-align:middle; }
+.profile-avatar-photo,.profile-avatar-fallback { position:absolute; inset:0; width:100%; height:100%; border-radius:50%; overflow:hidden; }
+.profile-avatar-photo { display:block; max-width:none!important; max-height:none!important; object-fit:cover; z-index:1; }
+.profile-avatar-fallback { display:grid; place-items:center; background:var(--surface-3); color:var(--ink); font-weight:800; z-index:1; }
+.profile-avatar-frame { position:absolute!important; inset:0; width:100%!important; height:100%!important; max-width:none!important; max-height:none!important; object-fit:contain!important; border-radius:0!important; pointer-events:none; z-index:2; transform-origin:center; transform:translate(var(--frameX,0px),var(--frameY,0px)) scale(var(--frameScale,1)); }
+.avatarWrap .avatar { position:absolute; inset:0; width:100%!important; height:100%!important; max-width:none; max-height:none; border-radius:50%; overflow:hidden; }
+.avatarWrap .avatar img { display:block; width:100%!important; height:100%!important; max-width:none!important; max-height:none!important; object-fit:cover; }
+.avatarWrap .frameOverlay { position:absolute!important; inset:0!important; width:100%; height:100%; background-size:contain!important; background-position:center!important; background-repeat:no-repeat!important; pointer-events:none; transform-origin:center; transform:translate(var(--frameX,0px),var(--frameY,0px)) scale(var(--frameScale,1)); }
 @media (max-width:700px) {
   .wrap { width:min(calc(100% - 24px),var(--max)); padding-top:76px; padding-right:max(12px, env(safe-area-inset-right)); padding-bottom:max(92px, calc(72px + env(safe-area-inset-bottom))); padding-left:max(12px, env(safe-area-inset-left)); }
   .grid { grid-template-columns:minmax(0,1fr)!important; gap:14px; }

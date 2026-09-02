@@ -1,7 +1,7 @@
 import { getSupabaseClient } from '../supabase-client.js';
 import { getSession } from '../auth.js';
 import { getForumCategory, getForumPostEngagement, listForumChildren, listCategoryPosts } from '../data/forums.js';
-import { escapeHtml } from '../ui.js';
+import { escapeHtml, profileAvatarMarkup } from '../ui.js';
 import { formatShortDate } from '../utils/date.js';
 
 const id = new URLSearchParams(location.search).get('id');
@@ -18,10 +18,9 @@ const when = (value) => formatShortDate(value, { month: 'short', day: 'numeric',
 if (!id) { location.href = 'forum.html'; throw new Error('missing category id'); }
 function postCard(post, profile, engagement) {
   const displayName = profile?.username || 'Community member';
-  const avatar = profile?.avatar_url ? `<img class="avatar-photo" src="${escapeHtml(profile.avatar_url)}" alt="">` : `<span class="avatar-initial">${escapeHtml(initials(displayName))}</span>`;
-  const frame = profile?.frame_url ? `<img class="avatar-frame" src="${escapeHtml(profile.frame_url)}" alt="">` : '';
+  const avatar = profileAvatarMarkup(profile, { name: displayName, className: 'avatar' });
   const commentLabel = `${engagement.replies.length} comment${engagement.replies.length === 1 ? '' : 's'}`;
-  return `<article class="post"><div class="post-top"><span class="avatar">${avatar}${frame}</span><div><div class="author">${escapeHtml(displayName)}</div><div class="when">${escapeHtml(when(post.created_at))} · 🌐</div></div><a class="post-more" aria-label="Open discussion" href="forum_post.html?id=${encodeURIComponent(post.id)}">•••</a></div><a class="post-content" href="forum_post.html?id=${encodeURIComponent(post.id)}"><h2>${escapeHtml(post.title || '(untitled)')}</h2><p class="post-body">${escapeHtml(post.body || '')}</p></a><div class="post-stats"><span>${engagement.likes.count ? `♡ ${engagement.likes.count}` : 'Be the first to like this'}</span><span>${commentLabel}</span></div><div class="post-actions"><a href="forum_post.html?id=${encodeURIComponent(post.id)}">♡ Like</a><a href="forum_post.html?id=${encodeURIComponent(post.id)}">💬 Comment</a><a href="forum_post.html?id=${encodeURIComponent(post.id)}">↗ Share</a></div></article>`;
+  return `<article class="post"><div class="post-top">${avatar}<div><div class="author">${escapeHtml(displayName)}</div><div class="when">${escapeHtml(when(post.created_at))} · 🌐</div></div><a class="post-more" aria-label="Open discussion" href="forum_post.html?id=${encodeURIComponent(post.id)}">•••</a></div><a class="post-content" href="forum_post.html?id=${encodeURIComponent(post.id)}"><h2>${escapeHtml(post.title || '(untitled)')}</h2><p class="post-body">${escapeHtml(post.body || '')}</p></a><div class="post-stats"><span>${engagement.likes.count ? `♡ ${engagement.likes.count}` : 'Be the first to like this'}</span><span>${commentLabel}</span></div><div class="post-actions"><a href="forum_post.html?id=${encodeURIComponent(post.id)}">♡ Like</a><a href="forum_post.html?id=${encodeURIComponent(post.id)}">💬 Comment</a><a href="forum_post.html?id=${encodeURIComponent(post.id)}">↗ Share</a></div></article>`;
 }
 
 async function loadCategory() {
@@ -49,7 +48,7 @@ try {
     const posts = await listCategoryPosts(client, id);
     const engagement = await getForumPostEngagement(client, posts.map((post) => post.id), session?.user?.id);
     const authorIds = [...new Set(posts.map((post) => post.author_id).filter(Boolean))];
-    const { data: profiles } = authorIds.length ? await client.from('profiles').select('id,username,avatar_url,frame_url').in('id', authorIds) : { data: [] };
+    const { data: profiles } = authorIds.length ? await client.from('profiles').select('id,username,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y').in('id', authorIds) : { data: [] };
     const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
     postsStatus.textContent = posts.length ? '' : 'No posts yet. Be the first to start this discussion.';
     postsStatus.hidden = Boolean(posts.length);

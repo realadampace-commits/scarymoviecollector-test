@@ -2,7 +2,7 @@ import { getSupabaseClient } from '../supabase-client.js';
 import { getSession } from '../auth.js';
 import { getForumPost, listForumReplies, getForumPostLikeState, toggleForumPostLike } from '../data/forums.js';
 import { createForumReply } from '../data/forums.js';
-import { escapeHtml } from '../ui.js';
+import { escapeHtml, profileAvatarMarkup } from '../ui.js';
 import { getProfile } from '../data/profiles.js';
 import { formatShortDate } from '../utils/date.js';
 
@@ -31,8 +31,11 @@ body.textContent = post.body || '';
 document.getElementById('pWhen').textContent = when(post.created_at);
 const author = await getProfile(client, post.author_id).catch(() => null);
 const authorName = author?.username || 'Community member';
-const avatar = document.getElementById('pAvaImg');
-if (author?.avatar_url) { avatar.src = author.avatar_url; avatar.alt = `${authorName}'s profile photo`; }
+const avatarTemplate = document.createElement('template');
+avatarTemplate.innerHTML = profileAvatarMarkup(author, { name: authorName, className: 'ava', label: `${authorName}'s profile picture` });
+const avatar = avatarTemplate.content.firstElementChild;
+avatar.id = 'pAvatar';
+document.getElementById('pAvatar').replaceWith(avatar);
 meta.innerHTML = `<strong>${escapeHtml(authorName)}</strong> · <span>${escapeHtml(when(post.created_at))}</span>`;
 
 async function renderReplies() {
@@ -40,11 +43,11 @@ async function renderReplies() {
   list.setAttribute('aria-busy', 'true');
   const replies = await listForumReplies(client, id);
   const authorIds = [...new Set(replies.map((reply) => reply.author_id).filter(Boolean))];
-  const { data: profiles } = authorIds.length ? await client.from('profiles').select('id,username,avatar_url').in('id', authorIds) : { data: [] };
+  const { data: profiles } = authorIds.length ? await client.from('profiles').select('id,username,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y').in('id', authorIds) : { data: [] };
   const profileMap = new Map((profiles || []).map((profile) => [profile.id, profile]));
   status.textContent = replies.length ? '' : 'No comments yet.';
   document.getElementById('commentCount').textContent = `${replies.length} comment${replies.length === 1 ? '' : 's'}`;
-  list.innerHTML = replies.map((reply) => { const profile = profileMap.get(reply.author_id); const name = profile?.username || 'Community member'; const photo = profile?.avatar_url ? `<img src="${escapeHtml(profile.avatar_url)}" alt="">` : escapeHtml(name.slice(0, 1).toUpperCase()); return `<div class="reply"><span class="reply-ava">${photo}</span><div><div class="metaRow"><strong>${escapeHtml(name)}</strong><span class="muted">${escapeHtml(when(reply.created_at))}</span></div><div class="rbody">${escapeHtml(reply.body)}</div></div></div>`; }).join('');
+  list.innerHTML = replies.map((reply) => { const profile = profileMap.get(reply.author_id); const name = profile?.username || 'Community member'; const avatar = profileAvatarMarkup(profile, { name, className: 'reply-ava' }); return `<div class="reply">${avatar}<div><div class="metaRow"><strong>${escapeHtml(name)}</strong><span class="muted">${escapeHtml(when(reply.created_at))}</span></div><div class="rbody">${escapeHtml(reply.body)}</div></div></div>`; }).join('');
   list.removeAttribute('aria-busy');
 }
 

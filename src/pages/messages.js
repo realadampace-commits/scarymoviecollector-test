@@ -2,11 +2,12 @@ import { getSupabaseClient } from '../supabase-client.js';
 import { getSession } from '../auth.js';
 import { createRequestTracker, createThread, getOtherParticipantId, listMyThreads, listThreadMessages, sendMessage } from '../data/messages.js';
 import { getProfile, searchProfiles } from '../data/profiles.js';
-import { escapeHtml } from '../ui.js';
+import { escapeHtml, profileAvatarMarkup } from '../ui.js';
 
 const client = getSupabaseClient();
 const session = await getSession(client);
 if (!session) { location.href = 'login.html?next=messages.html'; throw new Error('authentication required'); }
+const myProfile = await getProfile(client, session.user.id).catch(() => null);
 
 const shell = document.getElementById('messagesShell');
 const list = document.getElementById('list');
@@ -25,12 +26,7 @@ let activeThread = null;
 let threadCards = [];
 const selectionRequests = createRequestTracker();
 
-const initials = (name) => String(name || '?').replace(/^@/, '').slice(0, 1).toUpperCase();
-const avatarMarkup = (profile, name, className = 'avatar') => {
-  const avatar = profile?.avatar_url ? `<img class="avatar-media" src="${escapeHtml(profile.avatar_url)}" alt="">` : escapeHtml(initials(name));
-  const frame = profile?.frame_url ? `<img class="avatar-frame" src="${escapeHtml(profile.frame_url)}" alt="">` : '';
-  return `<span class="${className}">${avatar}${frame}</span>`;
-};
+const avatarMarkup = (profile, name, className = 'avatar') => profileAvatarMarkup(profile, { name, className });
 const timeLabel = (date) => {
   const value = new Date(date).getTime();
   if (!Number.isFinite(value)) return '';
@@ -90,7 +86,11 @@ async function selectThread(id, { refreshInbox = true } = {}) {
   shell.classList.add('show-thread');
   head.textContent = thread.name;
   subhead.textContent = 'Messages are private to conversation participants.';
-  headAvatar.replaceWith(Object.assign(document.createElement('span'), { className: 'avatar', id: 'headAvatar', innerHTML: avatarMarkup(thread.profile, thread.profile?.username).replace(/^<span class="avatar">|<\/span>$/g, '') }));
+  const wrapper = document.createElement('template');
+  wrapper.innerHTML = avatarMarkup(thread.profile, thread.profile?.username, 'avatar');
+  const nextAvatar = wrapper.content.firstElementChild;
+  nextAvatar.id = 'headAvatar';
+  headAvatar.replaceWith(nextAvatar);
   headAvatar = document.getElementById('headAvatar');
   text.disabled = false;
   send.disabled = false;
@@ -104,7 +104,7 @@ async function selectThread(id, { refreshInbox = true } = {}) {
     preview.innerHTML = messages.map((message) => {
       const mine = message.author_id === session.user.id;
       const label = mine ? 'You' : thread.name;
-      return `<div class="message-row ${mine ? 'mine' : ''}">${avatarMarkup(mine ? null : thread.profile, mine ? 'You' : thread.profile?.username)}<div><div class="bubble">${escapeHtml(message.body)}</div><span class="message-meta">${escapeHtml(label)} · ${escapeHtml(timeLabel(message.created_at))}</span></div></div>`;
+      return `<div class="message-row ${mine ? 'mine' : ''}">${avatarMarkup(mine ? myProfile : thread.profile, mine ? 'You' : thread.profile?.username)}<div><div class="bubble">${escapeHtml(message.body)}</div><span class="message-meta">${escapeHtml(label)} · ${escapeHtml(timeLabel(message.created_at))}</span></div></div>`;
     }).join('') || '<div class="welcome"><div class="avatar">✦</div><h2>Say hello</h2><p>This is the beginning of your conversation with ' + escapeHtml(thread.name) + '.</p></div>';
     preview.scrollTop = preview.scrollHeight;
   } catch (error) {

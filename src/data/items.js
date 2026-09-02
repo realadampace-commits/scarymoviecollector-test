@@ -44,7 +44,7 @@ export async function listPortfolioItems(client, ownerId) {
   if (!ownerId || typeof ownerId !== 'string') throw new TypeError('owner id is required');
   const { data, error } = await client
     .from('items')
-    .select('id,title,user_value,created_at,owner_id,sold,profiles:owner_id(username,avatar_url)')
+    .select('id,title,user_value,created_at,owner_id,sold,profiles:owner_id(username,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y)')
     .eq('owner_id', ownerId)
     .or('sold.is.null,sold.eq.false')
     .order('created_at', { ascending: false });
