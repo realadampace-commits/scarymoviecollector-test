@@ -5,6 +5,7 @@ import { deleteOwnItem } from '../data/items.js';
 
 import { getItemVotes, saveItemVote } from '../data/item-votes.js';
 import { escapeHtml, formatUsd } from '../ui.js';
+import { getProfilePrivacy } from '../data/privacy.js';
 
 const client = getSupabaseClient();
 const id = new URLSearchParams(location.search).get('id') || new URLSearchParams(location.search).get('itemId');
@@ -33,10 +34,13 @@ const detail = await getItemDetail(client, id);
 if (!detail) { title.textContent = 'Item not found'; throw new Error('item not found'); }
 
 const { item, owner, images, votes, model } = detail;
+const session = await getSession(client);
+const privacy = await getProfilePrivacy(client,item.owner_id);
+const showValues = session?.user?.id === item.owner_id || privacy.show_collection_values;
 title.textContent = item.title || 'Untitled item';
 meta.textContent = owner?.username ? `Owned by @${owner.username}` : '';
 desc.textContent = item.description || 'No description.';
-price.textContent = formatUsd(item.user_value);
+price.textContent = showValues ? formatUsd(item.user_value) : 'Private';
 sale.textContent = item.sold ? 'Sold' : item.is_for_sale ? 'Available for sale' : 'Not listed for sale';
 created.textContent = item.created_at ? `Added ${new Date(item.created_at).toLocaleDateString()}` : '';
 
@@ -143,11 +147,10 @@ function renderVoteSummary(summary) {
   agg.textContent = `Agree: ${summary.agree} • Disagree: ${summary.disagree}`;
   const total = summary.agree + summary.disagree;
   fill.style.width = `${total ? (summary.agree / total) * 100 : 0}%`;
-  avg.textContent = `Average suggested: ${summary.averageSuggested == null ? '—' : formatUsd(summary.averageSuggested)}`;
+  avg.textContent = showValues ? `Average suggested: ${summary.averageSuggested == null ? '—' : formatUsd(summary.averageSuggested)}` : 'Suggested values are private';
 }
 renderVoteSummary(votes);
 
-const session = await getSession(client);
 if (session) voteBox.style.display = '';
 else {
   guest.style.display = '';

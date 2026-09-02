@@ -4,6 +4,7 @@ import { getProfile, updateOwnProfile } from '../data/profiles.js';
 import { uploadAvatar } from '../data/avatars.js';
 import { listFrames, createFrame } from '../data/frames.js';
 import { listPortfolioItems } from '../data/items.js';
+import { DEFAULT_PRIVACY, getOwnPrivacySettings, updateOwnPrivacySettings } from '../data/privacy.js';
 
 const loginUrl = `login.html?next=${encodeURIComponent(`${location.pathname.split('/').pop() || 'settings.html'}${location.search}`)}`;
 
@@ -12,6 +13,22 @@ const client = getSupabaseClient();
 const session = await requireSession(client);
 document.body.classList.remove('auth-pending');
 const profile = await getProfile(client, session.user.id);
+const privacy = await getOwnPrivacySettings(client).catch(() => DEFAULT_PRIVACY);
+const privacyFields = {
+  profile_visibility: document.getElementById('profileVisibility'), allow_messages: document.getElementById('allowMessages'),
+  discoverable: document.getElementById('discoverable'), show_avatar: document.getElementById('showAvatar'), show_bio: document.getElementById('showBio'),
+  show_showcase: document.getElementById('showShowcase'), show_collection: document.getElementById('showCollection'), show_sold_items: document.getElementById('showSoldItems'),
+  show_collection_values: document.getElementById('showCollectionValues'), show_activity_counts: document.getElementById('showActivityCounts')
+};
+for (const [key, field] of Object.entries(privacyFields)) field[field.type === 'checkbox' ? 'checked' : 'value'] = privacy[key];
+document.getElementById('savePrivacy')?.addEventListener('click', async () => {
+  const button = document.getElementById('savePrivacy'); const message = document.getElementById('privacyMsg');
+  if (button.disabled) return; button.disabled = true; message.textContent = 'Saving…';
+  const patch = Object.fromEntries(Object.entries(privacyFields).map(([key, field]) => [key, field.type === 'checkbox' ? field.checked : field.value]));
+  try { await updateOwnPrivacySettings(client, session.user.id, patch); message.textContent = 'Privacy settings saved.'; }
+  catch (error) { console.error(error); message.textContent = 'Unable to save privacy settings. Try again.'; }
+  finally { button.disabled = false; }
+});
 const username = document.getElementById('username');
 const bio = document.getElementById('bioInput');
 const showcase = document.getElementById('showcaseInput');

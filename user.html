@@ -57,6 +57,7 @@
         <h1 id="uname" style="margin:0;font-size:22px">Loading…</h1>
         <div id="roleBadge" class="pill" style="margin-top:6px;display:none"></div>
         <a id="messageLink" class="btn" href="messages.html" style="display:none;margin-top:10px">Message</a>
+        <div id="friendActions" class="tools" style="display:none;margin-top:10px"><button id="friendAction" class="btn" type="button"></button><button id="blockAction" class="btn" type="button">Block</button></div><span id="friendMsg" class="muted" role="status" aria-live="polite"></span>
       </div>
     </div>
     <div id="profileStatus" class="muted" role="status" aria-live="polite" aria-atomic="true">Loading profile…</div>
@@ -93,6 +94,8 @@
 <script type="module">
 import { getSupabaseClient } from './src/supabase-client.js';
 import { escapeHtml } from './src/ui.js';
+import { blockUser, getFriendRelationship, removeFriend, respondToFriendRequest, sendFriendRequest, unblockUser } from './src/data/friends.js';
+import { getProfilePrivacy } from './src/data/privacy.js';
 const sb = getSupabaseClient();
 
 // DOM
@@ -103,6 +106,10 @@ const frameOverlay = document.getElementById('frameOverlay');
 const bioEl = document.getElementById('bio');
 const profileStatus = document.getElementById('profileStatus');
 const messageLink = document.getElementById('messageLink');
+const friendActions = document.getElementById('friendActions');
+const friendAction = document.getElementById('friendAction');
+const blockAction = document.getElementById('blockAction');
+const friendMsg = document.getElementById('friendMsg');
 
 const portfolioGrid = document.getElementById('portfolioGrid');
 const portfolioCount = document.getElementById('portfolioCount');
@@ -122,6 +129,7 @@ const username = rawU.replace(/^@/, '');
 
 let profile = null;
 let ownerId = null;
+let showProfileValues = true;
 
 function money(n){ return '$' + Number(n||0).toLocaleString(); }
 
@@ -142,7 +150,7 @@ async function attachPreviews(items){
 
 function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
   const soldInfo = soldAt ? `
-    <span class="pill soldPill">Sold for ${money(soldPrice || 0)}</span>
+    <span class="pill soldPill">${showProfileValues ? `Sold for ${money(soldPrice || 0)}` : 'Sold'}</span>
   ` : (forSale ? `<span class="pill" style="border-color:#2a6;color:#9f9">For sale</span>` : '');
   return `
     <a class="itemCard" href="item.html?id=${encodeURIComponent(id)}" title="${escapeHtml(title || 'Item')}">
@@ -150,7 +158,7 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
       <div class="itemBody">
         <h4 class="itemTitle">${escapeHtml(title || 'Untitled')}</h4>
         <div class="row2">
-          <div class="price">${money(price || 0)}</div>
+          <div class="price">${showProfileValues ? money(price || 0) : 'Value private'}</div>
           ${soldInfo}
         </div>
       </div>
@@ -178,11 +186,35 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
   }
 
   ownerId = profile.id;
+  const privacy = await getProfilePrivacy(sb, ownerId);
   profileStatus.textContent = '';
   const { data: { session } } = await sb.auth.getSession();
+  const viewingOwnProfile = session?.user?.id === ownerId;
+  showProfileValues = viewingOwnProfile || privacy.show_collection_values;
   if (session?.user?.id !== ownerId && profile.username) {
     messageLink.href = 'messages.html?u=' + encodeURIComponent(profile.username);
     messageLink.style.display = 'inline-flex';
+    friendActions.style.display = 'flex';
+    let relationship = await getFriendRelationship(sb, ownerId);
+    const renderRelationship = () => {
+      friendAction.dataset.relationship = relationship;
+      friendAction.textContent = relationship === 'friends' ? 'Unfriend' : relationship === 'outgoing' ? 'Request sent' : relationship === 'incoming' ? 'Accept friend request' : relationship === 'blocked_by_me' ? 'Unblock' : 'Add friend';
+      friendAction.disabled = relationship === 'outgoing' || relationship === 'blocked_me';
+      blockAction.style.display = ['blocked_by_me','blocked_me'].includes(relationship) ? 'none' : '';
+      if (relationship === 'blocked_by_me' || relationship === 'blocked_me') messageLink.style.display = 'none';
+    };
+    renderRelationship();
+    friendAction.addEventListener('click', async () => {
+      friendAction.disabled = true; friendMsg.textContent = 'Updating…';
+      try {
+        if (relationship === 'friends') await removeFriend(sb,ownerId);
+        else if (relationship === 'incoming') { const requests = await sb.rpc('list_my_friend_requests'); const incoming=(requests.data||[]).find((r)=>r.id===ownerId&&r.direction==='incoming'); if (!incoming) throw new Error('request not found'); await respondToFriendRequest(sb,incoming.request_id,true); }
+        else if (relationship === 'blocked_by_me') await unblockUser(sb,ownerId);
+        else await sendFriendRequest(sb,ownerId);
+        relationship = await getFriendRelationship(sb,ownerId); friendMsg.textContent = 'Updated.'; renderRelationship();
+      } catch(error){console.error(error);friendMsg.textContent='Unable to update friendship.';friendAction.disabled=false;}
+    });
+    blockAction.addEventListener('click', async () => { if (!confirm('Block this user? They will not be able to find, friend, or message you.')) return; blockAction.disabled=true; try{await blockUser(sb,ownerId);relationship='blocked_by_me';friendMsg.textContent='User blocked.';renderRelationship();}catch(error){console.error(error);friendMsg.textContent='Unable to block user.';blockAction.disabled=false;} });
   }
   
   unameEl.textContent = '@' + (profile.username || username || 'me');
@@ -190,15 +222,15 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
     roleBadge.style.display = 'inline-block';
     roleBadge.textContent = profile.role;
   }
-  bioEl.textContent = profile.bio || '—';
+  bioEl.textContent = viewingOwnProfile || privacy.show_bio ? (profile.bio || '—') : 'Bio is private.';
 
-  if (profile.avatar_url) {
+  if ((viewingOwnProfile || privacy.show_avatar) && profile.avatar_url) {
     const image = document.createElement('img');
     image.src = profile.avatar_url;
     image.alt = 'avatar';
     avatarBox.replaceChildren(image);
   }
-  if (profile.frame_url) {
+  if ((viewingOwnProfile || privacy.show_avatar) && profile.frame_url) {
     frameOverlay.style.backgroundImage = `url('${profile.frame_url}')`;
     frameOverlay.style.setProperty('--frameScale', profile.frame_scale ?? 1);
     frameOverlay.style.setProperty('--frameX', (((profile.frame_offset_x??0) / 1.2) + '%'));
@@ -212,10 +244,11 @@ function itemCard({id, title, price, img, forSale, soldAt, soldPrice}) {
   } else {
     portfolioLink.href = 'portfolio.html';
   }
-  await loadAllItemsForUser();
+  if (viewingOwnProfile || privacy.show_collection) await loadAllItemsForUser();
+  else { portfolioEmpty.textContent='Collection is private.';portfolioEmpty.style.display='block';soldEmpty.textContent='Sold-item history is private.';soldEmpty.style.display='block'; }
   
   const ids = Array.isArray(profile.showcase_ids) ? profile.showcase_ids.filter(Boolean) : [];
-  if (ids.length) await loadShowcase(ids);
+  if ((viewingOwnProfile || privacy.show_showcase) && ids.length) await loadShowcase(ids);
 })().catch(() => {
   unameEl.textContent = 'Unable to load profile';
   profileStatus.textContent = 'Check your connection and try again.';
@@ -277,7 +310,7 @@ async function loadAllItemsForUser(){
     portfolioGrid.innerHTML = unsold.map(r => itemCard({
       id: r.id,
       title: r.title,
-      price: r.user_value,
+      price: showProfileValues ? r.user_value : null,
       img: thumbById.get(r.id),
       forSale: !!(r.is_for_sale===true||r.is_for_sale===1||r.is_for_sale==='t'||r.is_for_sale==='true'),
       soldAt: null,
@@ -295,7 +328,7 @@ async function loadAllItemsForUser(){
     soldGrid.innerHTML = sold.map(r => itemCard({
       id: r.id,
       title: r.title,
-      price: r.user_value,
+      price: showProfileValues ? r.user_value : null,
       img: thumbById.get(r.id),
       forSale: false,
       soldAt: r.sold_at,

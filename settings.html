@@ -17,6 +17,7 @@
   .showcaseChoice:has(input:checked){border-color:#2a6;background:#18251d}
   .ok{color:#9f9}.err{color:#f88}
   .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .privacy-grid{display:grid;gap:12px}.privacy-option{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;padding:13px;border:1px solid var(--line);background:#111}.privacy-option label{font-size:14px;text-transform:none;letter-spacing:0}.privacy-option small{display:block;margin-top:3px;color:var(--muted);font-weight:400}.privacy-option input[type="checkbox"]{width:22px;height:22px;min-height:0}.privacy-select{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,260px);gap:14px;align-items:center}.privacy-select label{font-size:14px;text-transform:none;letter-spacing:0}.privacy-select small{display:block;color:var(--muted);font-weight:400;margin-top:3px}@media(max-width:600px){.privacy-select{grid-template-columns:1fr}}
   /* avatar + frame */
   .avatarWrap{position:relative;width:120px;height:120px}
   .avatar{width:120px;height:120px;border-radius:50%;background:#222;overflow:hidden;display:flex;align-items:center;justify-content:center}
@@ -50,6 +51,24 @@
   </div>
   <h2>Account Settings</h2>
   <div id="roleBanner" class="muted" style="margin-top:6px"></div>
+
+  <div class="card" id="privacySettings">
+    <h3>Privacy</h3>
+    <p class="muted">Control who can find you, view your collection, and contact you. Changes apply across the site.</p>
+    <div class="privacy-grid">
+      <div class="privacy-select"><label for="profileVisibility">Profile audience<small>Friends-only profiles remain available to accepted friends, you, and site moderators.</small></label><select id="profileVisibility"><option value="public">Everyone</option><option value="members">Signed-in members</option><option value="friends">Friends only</option><option value="private">Only me</option></select></div>
+      <div class="privacy-select"><label for="allowMessages">New messages<small>Existing conversations remain available unless you delete or block the user.</small></label><select id="allowMessages"><option value="everyone">Any signed-in member</option><option value="friends">Friends only</option><option value="existing">Existing conversations only</option><option value="nobody">Nobody</option></select></div>
+      <div class="privacy-option"><label for="discoverable">Appear in user search<small>Turning this off removes you from user and message suggestions. Direct profile links still follow your profile audience.</small></label><input id="discoverable" type="checkbox"></div>
+      <div class="privacy-option"><label for="showAvatar">Show profile picture and frame<small>Use your username initial instead on public profile displays.</small></label><input id="showAvatar" type="checkbox"></div>
+      <div class="privacy-option"><label for="showBio">Show bio<small>Hide your profile description from other people.</small></label><input id="showBio" type="checkbox"></div>
+      <div class="privacy-option"><label for="showShowcase">Show showcase favorites<small>Hide the featured-items section on your public profile.</small></label><input id="showShowcase" type="checkbox"></div>
+      <div class="privacy-option"><label for="showCollection">Show collection<small>This securely removes your collection items from other users and public feeds.</small></label><input id="showCollection" type="checkbox"></div>
+      <div class="privacy-option"><label for="showSoldItems">Show sold-item history<small>Hide sold items from your public profile.</small></label><input id="showSoldItems" type="checkbox"></div>
+      <div class="privacy-option"><label for="showCollectionValues">Show collection values<small>Hide estimated values and portfolio totals in profile and portfolio views.</small></label><input id="showCollectionValues" type="checkbox"></div>
+      <div class="privacy-option"><label for="showActivityCounts">Show forum activity counts<small>Control whether post and reply totals can appear on your profile.</small></label><input id="showActivityCounts" type="checkbox"></div>
+    </div>
+    <div class="tools" style="margin-top:14px"><button id="savePrivacy" type="button">Save Privacy Settings</button><span id="privacyMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span></div>
+  </div>
   
 
   <!-- Avatar -->
@@ -204,4 +223,3 @@
 <script type="module" src="/src/pages/settings.js"></script>
 </body>
 </html>
-

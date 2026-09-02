@@ -3,6 +3,7 @@ import { getSession } from '../auth.js';
 import { homeActionsForSession } from '../data/home-actions.js';
 import { listRecentItems } from '../data/items.js';
 import { escapeHtml, formatUsd } from '../ui.js';
+import { getProfilePrivacy } from '../data/privacy.js';
 
 const listEl = document.getElementById('list');
 const msgEl = document.getElementById('msg');
@@ -31,11 +32,13 @@ async function loadHome() {
     listRecentItems(client),
   ]);
   renderActions(session);
+  const privacyByOwner = new Map();
+  await Promise.all([...new Set(items.map((item)=>item.owner_id).filter(Boolean))].map(async(ownerId)=>privacyByOwner.set(ownerId,await getProfilePrivacy(client,ownerId))));
   msgEl.textContent = items.length ? '' : 'No items yet.';
   listEl.innerHTML = items.map((item) => `
     <a class="tile" href="item.html?id=${encodeURIComponent(item.id)}">
       <div class="thumb">${item.image_url ? `<img src="${escapeHtml(item.image_url)}" alt="" loading="lazy" decoding="async">` : '<span class="muted">No image</span>'}</div>
-      <div class="meta"><strong>${escapeHtml(item.title)}</strong><br><span class="muted">${formatUsd(item.user_value)}</span></div>
+      <div class="meta"><strong>${escapeHtml(item.title)}</strong><br><span class="muted">${privacyByOwner.get(item.owner_id)?.show_collection_values === false && session?.user?.id !== item.owner_id ? 'Value private' : formatUsd(item.user_value)}</span></div>
     </a>
   `).join('');
 }

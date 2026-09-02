@@ -5,6 +5,7 @@ import { getProfile } from '../data/profiles.js';
 import { listPortfolioItems } from '../data/items.js';
 import { listItemImages, firstImage } from '../data/item-images.js';
 import { escapeHtml, formatUsd } from '../ui.js';
+import { DEFAULT_PRIVACY, getProfilePrivacy } from '../data/privacy.js';
 
 const client = getSupabaseClient();
 const msg = document.getElementById('msg');
@@ -19,6 +20,8 @@ const params = new URLSearchParams(location.search);
 const username = params.get('u');
 let ownerId;
 let owner;
+let privacy = DEFAULT_PRIVACY;
+let viewingOwnPortfolio = false;
 
 if (username) {
   const { data, error } = await client.from('profiles').select('id,username,avatar_url,frame_url,frame_scale,frame_offset_x,frame_offset_y').eq('username', username).maybeSingle();
@@ -29,14 +32,17 @@ if (username) {
   if (!session) { location.href = 'login.html?next=portfolio.html'; throw new Error('authentication required'); }
   ownerId = session.user.id;
   owner = await getProfile(client, ownerId);
+  viewingOwnPortfolio = true;
 }
+privacy = await getProfilePrivacy(client, ownerId);
+const showValues = viewingOwnPortfolio || privacy.show_collection_values;
 
 titleEl.textContent = `@${owner.username || 'user'} — Portfolio`;
 const items = await listPortfolioItems(client, ownerId);
 const prepared = await Promise.all(items.map(async (item) => ({ ...item, preview_url: firstImage(await listItemImages(client, item.id)) })));
 const history = buildPortfolioHistory(prepared);
 const total = prepared.reduce((sum, item) => sum + Number(item.user_value || 0), 0);
-totalEl.textContent = formatUsd(total);
+totalEl.textContent = showValues ? formatUsd(total) : 'Private';
 
 const chartSvg = (points) => {
   if (!points.length) return '<div class="chart-empty">Add collection items to start a value history.</div>';
@@ -57,6 +63,7 @@ const chartSvg = (points) => {
 };
 
 const renderRange = (range) => {
+  if (!showValues) { chartEl.innerHTML='<div class="chart-empty">Collection value is private.</div>';highEl.textContent='Private';lowEl.textContent='Private';changeEl.textContent='Value history is private.';return; }
   const points = selectPortfolioRange(history, range);
   const values = points.map((point) => point.value);
   const first = values[0] ?? 0;
@@ -76,5 +83,5 @@ if (!prepared.length) msg.textContent = 'No items yet.';
 itemsEl.innerHTML = prepared.map((item) => {
   const image = item.preview_url ? `<img src="${escapeHtml(item.preview_url)}" alt="" loading="lazy" decoding="async">` : 'No image';
   const profile = item.profiles || owner;
-  return `<div class="card"><a href="item.html?id=${encodeURIComponent(item.id)}" style="color:inherit;text-decoration:none"><div class="thumb">${image}</div><div class="meta"><strong>${escapeHtml(item.title)}</strong><div class="owner">@${escapeHtml(profile?.username || 'user')}</div><div>${formatUsd(item.user_value)}</div></div></a>${username ? '' : `<div style="padding:0 10px 12px"><a class="btn" href="edit.html?id=${encodeURIComponent(item.id)}" style="background:#444;padding:8px 12px">Edit</a></div>`}</div>`;
+  return `<div class="card"><a href="item.html?id=${encodeURIComponent(item.id)}" style="color:inherit;text-decoration:none"><div class="thumb">${image}</div><div class="meta"><strong>${escapeHtml(item.title)}</strong><div class="owner">@${escapeHtml(profile?.username || 'user')}</div><div>${showValues ? formatUsd(item.user_value) : 'Value private'}</div></div></a>${username ? '' : `<div style="padding:0 10px 12px"><a class="btn" href="edit.html?id=${encodeURIComponent(item.id)}" style="background:#444;padding:8px 12px">Edit</a></div>`}</div>`;
 }).join('');
