@@ -10,8 +10,20 @@ function load(loader, url) {
   return new Promise((resolve, reject) => loader.load(url, resolve, undefined, reject));
 }
 
-function fileMap(model) {
-  return new Map((model.files || []).map((file) => [file.name.toLowerCase(), file.url]));
+async function fileMap(model) {
+  const urls = [];
+  const entries = await Promise.all((model.files || []).map(async (file) => {
+    if (!Array.isArray(file.parts)) return [file.name.toLowerCase(), file.url];
+    const responses = await Promise.all(file.parts.map(async (part) => {
+      const response = await fetch(part.url);
+      if (!response.ok) throw new Error(`Unable to load ${file.name}.`);
+      return response.blob();
+    }));
+    const url = URL.createObjectURL(new Blob(responses, { type: file.type || 'application/octet-stream' }));
+    urls.push(url);
+    return [file.name.toLowerCase(), url];
+  }));
+  return { assets: new Map(entries), release: () => urls.forEach((url) => URL.revokeObjectURL(url)) };
 }
 
 async function loadObject(model, manager) {
@@ -61,7 +73,13 @@ export async function mountModelViewer(container, model) {
   rim.position.set(-4, 2, -3);
   scene.add(rim);
 
-  const assets = fileMap(model);
+  const { assets, release } = await fileMap(model);
+  const primary = (model.files || []).find((file) => file.name.toLowerCase().endsWith(`.${model.model_format}`));
+  const resolvedModel = {
+    ...model,
+    model_url: assets.get(primary?.name.toLowerCase()) || model.model_url,
+    files: (model.files || []).map((file) => ({ ...file, url: assets.get(file.name.toLowerCase()) || file.url }))
+  };
   const manager = new THREE.LoadingManager();
   manager.setURLModifier((url) => {
     if (/^(data:|blob:)/i.test(url)) return url;
@@ -69,7 +87,7 @@ export async function mountModelViewer(container, model) {
     if (assets.has(name)) return assets.get(name);
     return /^https?:/i.test(url) ? 'data:,' : url;
   });
-  const object = await loadObject(model, manager);
+  const object = await loadObject(resolvedModel, manager);
   scene.add(object);
   const box = new THREE.Box3().setFromObject(object);
   if (box.isEmpty()) throw new Error('The model contains no visible geometry.');
@@ -115,5 +133,6 @@ export async function mountModelViewer(container, model) {
       });
     });
     renderer.dispose();
+    release();
   };
 }

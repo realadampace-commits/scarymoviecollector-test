@@ -30,4 +30,5 @@ test('3D viewer supports orbit controls and every advertised primary format', as
   assert.match(source, /setURLModifier/);
   assert.match(source, /assets\.get\(name\)/);
   assert.match(source, /\^https\?:/);
+  assert.match(source, /new Blob\(responses/);
 });

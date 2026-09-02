@@ -73,9 +73,37 @@ test('uploadOwnItemModel removes a partial package after an upload failure', asy
   assert.equal(removed[0].length, 1);
 });
 
+test('uploadOwnItemModel splits files above the Supabase object limit', async () => {
+  const uploads = [];
+  const largeFile = {
+    name: 'large.glb', type: 'model/gltf-binary', size: 60 * 1024 * 1024,
+    slice(start, end, type) { return { size: end - start, type }; }
+  };
+  let row;
+  const client = {
+    from(table) {
+      if (table === 'items') return { select() { return this; }, eq() { return this; }, maybeSingle() { return Promise.resolve({ data: { id: 'item-1' }, error: null }); } };
+      return {
+        select() { return this; }, eq() { return this; }, maybeSingle() { return Promise.resolve({ data: null, error: null }); },
+        upsert(value) { row = value; return Promise.resolve({ error: null }); }
+      };
+    },
+    storage: { from() { return {
+      upload(path, body) { uploads.push([path, body.size]); return Promise.resolve({ error: null }); },
+      getPublicUrl(path) { return { data: { publicUrl: `https://models.example/${path}` } }; },
+      remove() { return Promise.resolve({ error: null }); }
+    }; } }
+  };
+  await uploadOwnItemModel(client, 'item-1', 'owner-1', [largeFile]);
+  assert.equal(uploads.length, 2);
+  assert.ok(uploads.every(([, size]) => size <= 45 * 1024 * 1024));
+  assert.equal(row.files[0].parts.length, 2);
+  assert.match(row.files[0].parts[0].path, /\.part-001$/);
+});
+
 test('deleteOwnItemModel deletes metadata and every stored package file', async () => {
   const removed = [];
-  const model = { owner_id: 'owner-1', files: [{ path: 'one' }, { path: 'two' }] };
+  const model = { owner_id: 'owner-1', files: [{ parts: [{ path: 'one' }, { path: 'two' }] }] };
   const client = {
     from() { const query = {
       deleting: false,

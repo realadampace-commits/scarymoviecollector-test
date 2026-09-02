@@ -2,6 +2,7 @@ const MODEL_EXTENSIONS = new Set(['glb', 'gltf', 'obj', 'fbx', 'stl']);
 const COMPANION_EXTENSIONS = new Set(['mtl', 'bin', 'png', 'jpg', 'jpeg', 'webp']);
 const MAX_PACKAGE_BYTES = 100 * 1024 * 1024;
 const MAX_FILES = 30;
+const MAX_STORAGE_OBJECT_BYTES = 45 * 1024 * 1024;
 
 function extension(name) {
   return String(name || '').split('.').pop()?.toLowerCase() || '';
@@ -56,27 +57,40 @@ export async function uploadOwnItemModel(client, itemId, ownerId, files) {
     const manifest = [];
     for (const file of plan.files) {
       const name = safeName(file.name);
-      const path = `${ownerId}/${itemId}/${packageId}/${name}`;
-      const { error } = await client.storage.from('item-models').upload(path, file, { contentType: uploadContentType(file), upsert: false });
-      if (error) throw error;
-      uploadedPaths.push(path);
-      const { data } = client.storage.from('item-models').getPublicUrl(path);
-      manifest.push({ name, path, url: data.publicUrl, type: uploadContentType(file), size: Number(file.size || 0) });
+      const type = uploadContentType(file);
+      const partCount = Math.max(1, Math.ceil(Number(file.size || 0) / MAX_STORAGE_OBJECT_BYTES));
+      const parts = [];
+      for (let partIndex = 0; partIndex < partCount; partIndex += 1) {
+        const suffix = partCount === 1 ? '' : `.part-${String(partIndex + 1).padStart(3, '0')}`;
+        const path = `${ownerId}/${itemId}/${packageId}/${name}${suffix}`;
+        const body = partCount === 1 ? file : file.slice(partIndex * MAX_STORAGE_OBJECT_BYTES, Math.min((partIndex + 1) * MAX_STORAGE_OBJECT_BYTES, file.size), type);
+        const { error } = await client.storage.from('item-models').upload(path, body, { contentType: type, upsert: false });
+        if (error) throw error;
+        uploadedPaths.push(path);
+        const { data } = client.storage.from('item-models').getPublicUrl(path);
+        parts.push({ path, url: data.publicUrl, size: Number(body.size || 0) });
+      }
+      manifest.push({
+        name,
+        type,
+        size: Number(file.size || 0),
+        ...(parts.length === 1 ? parts[0] : { parts })
+      });
     }
     const primaryName = safeName(plan.primary.name);
     const primary = manifest.find((file) => file.name === primaryName);
     const { error } = await client.from('item_models').upsert({
       item_id: itemId,
       owner_id: ownerId,
-      model_url: primary.url,
+      model_url: primary.url || primary.parts[0].url,
       model_format: plan.format,
       files: manifest,
       updated_at: new Date().toISOString()
     }, { onConflict: 'item_id' });
     if (error) throw error;
-    const oldPaths = Array.isArray(previous?.files) ? previous.files.map((file) => file.path).filter(Boolean) : [];
+    const oldPaths = Array.isArray(previous?.files) ? previous.files.flatMap((file) => file.parts?.map((part) => part.path) || [file.path]).filter(Boolean) : [];
     if (oldPaths.length) await client.storage.from('item-models').remove(oldPaths);
-    return { model_url: primary.url, model_format: plan.format, files: manifest };
+    return { model_url: primary.url || primary.parts[0].url, model_format: plan.format, files: manifest };
   } catch (error) {
     if (uploadedPaths.length) await client.storage.from('item-models').remove(uploadedPaths);
     throw error;
@@ -88,6 +102,6 @@ export async function deleteOwnItemModel(client, itemId, ownerId) {
   if (!model || model.owner_id !== ownerId) throw new Error('item model ownership could not be verified');
   const { error } = await client.from('item_models').delete().eq('item_id', itemId).eq('owner_id', ownerId);
   if (error) throw error;
-  const paths = Array.isArray(model.files) ? model.files.map((file) => file.path).filter(Boolean) : [];
+  const paths = Array.isArray(model.files) ? model.files.flatMap((file) => file.parts?.map((part) => part.path) || [file.path]).filter(Boolean) : [];
   if (paths.length) await client.storage.from('item-models').remove(paths);
 }
