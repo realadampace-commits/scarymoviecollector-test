@@ -32,3 +32,10 @@ test('3D viewer supports orbit controls and every advertised primary format', as
   assert.match(source, /\^https\?:/);
   assert.match(source, /new Blob\(responses/);
 });
+
+test('production security policy permits reconstructed model and texture blobs', async () => {
+  const config = JSON.parse(await read('vercel.json'));
+  const csp = config.headers.flatMap((entry) => entry.headers).find((header) => header.key === 'Content-Security-Policy')?.value || '';
+  assert.match(csp, /img-src[^;]*blob:/);
+  assert.match(csp, /connect-src[^;]*blob:/);
+});
