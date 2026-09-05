@@ -288,7 +288,8 @@ document.addEventListener('keydown', (event) => {
 });
 text.addEventListener('keydown', (event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submitMessage(); } });
 
-await renderInbox();
+const threadFromUrl = new URLSearchParams(location.search).get('thread');
+await renderInbox(threadFromUrl);
 const profileFromUrl = new URLSearchParams(location.search).get('u');
 if (profileFromUrl) {
   userSearch.value = `@${profileFromUrl.replace(/^@/, '')}`;

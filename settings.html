@@ -69,7 +69,18 @@
     </div>
     <div class="tools" style="margin-top:14px"><button id="savePrivacy" type="button">Save Privacy Settings</button><span id="privacyMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span></div>
   </div>
-  
+
+  <div class="card" id="notificationSettings">
+    <h3>Notifications</h3>
+    <p class="muted">Choose which activity appears in your notification inbox and bell count.</p>
+    <div class="privacy-grid">
+      <div class="privacy-option"><label for="notifyFriendRequests">Friends<small>Friend requests and newly accepted friendships.</small></label><input id="notifyFriendRequests" type="checkbox"></div>
+      <div class="privacy-option"><label for="notifyMessages">Messages<small>New direct messages from conversations you have not blocked.</small></label><input id="notifyMessages" type="checkbox"></div>
+      <div class="privacy-option"><label for="notifyForumActivity">Forum activity<small>Likes and replies on your forum posts.</small></label><input id="notifyForumActivity" type="checkbox"></div>
+      <div class="privacy-option"><label for="notifyItemVotes">Collectible votes<small>Agreement and suggested-value votes on your collectibles.</small></label><input id="notifyItemVotes" type="checkbox"></div>
+    </div>
+    <div class="tools" style="margin-top:14px"><button id="saveNotifications" type="button">Save Notification Settings</button><span id="notificationMsg" class="muted" role="status" aria-live="polite" aria-atomic="true"></span></div>
+  </div>
 
   <!-- Avatar -->
   <div class="card">

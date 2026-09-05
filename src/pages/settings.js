@@ -5,6 +5,7 @@ import { uploadAvatar } from '../data/avatars.js';
 import { listFrames, createFrame } from '../data/frames.js';
 import { listPortfolioItems } from '../data/items.js';
 import { DEFAULT_PRIVACY, getOwnPrivacySettings, updateOwnPrivacySettings } from '../data/privacy.js';
+import { DEFAULT_NOTIFICATION_PREFERENCES, getNotificationPreferences, updateNotificationPreferences } from '../data/notifications.js';
 
 const loginUrl = `login.html?next=${encodeURIComponent(`${location.pathname.split('/').pop() || 'settings.html'}${location.search}`)}`;
 
@@ -13,7 +14,18 @@ const client = getSupabaseClient();
 const session = await requireSession(client);
 document.body.classList.remove('auth-pending');
 const profile = await getProfile(client, session.user.id);
-const privacy = await getOwnPrivacySettings(client).catch(() => DEFAULT_PRIVACY);
+const [privacy, notificationPreferences] = await Promise.all([
+  getOwnPrivacySettings(client).catch(() => DEFAULT_PRIVACY),
+  getNotificationPreferences(client).catch(() => DEFAULT_NOTIFICATION_PREFERENCES),
+]);
+const notificationFields = { friend_requests:document.getElementById('notifyFriendRequests'), messages:document.getElementById('notifyMessages'), forum_activity:document.getElementById('notifyForumActivity'), item_votes:document.getElementById('notifyItemVotes') };
+for (const [key, field] of Object.entries(notificationFields)) field.checked = notificationPreferences[key];
+document.getElementById('saveNotifications')?.addEventListener('click', async () => {
+  const button=document.getElementById('saveNotifications'); const message=document.getElementById('notificationMsg');
+  if(button.disabled)return; button.disabled=true; message.textContent='Saving…';
+  try { await updateNotificationPreferences(client,session.user.id,Object.fromEntries(Object.entries(notificationFields).map(([key,field])=>[key,field.checked]))); message.textContent='Notification settings saved.'; }
+  catch(error){console.error(error);message.textContent='Unable to save notification settings. Try again.';} finally{button.disabled=false;}
+});
 const privacyFields = {
   profile_visibility: document.getElementById('profileVisibility'), allow_messages: document.getElementById('allowMessages'),
   discoverable: document.getElementById('discoverable'), show_avatar: document.getElementById('showAvatar'), show_bio: document.getElementById('showBio'),

@@ -1,5 +1,6 @@
 <!-- /menu.html -->
 <nav class="menu">
+  <a class="notification-bell only-auth" href="notifications.html" aria-label="Notifications"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span class="notification-count" hidden></span></a>
   <button class="hamburger" aria-expanded="false" aria-controls="drawer" aria-label="Open menu">☰</button>
 
   <aside id="drawer" class="drawer" hidden>
@@ -15,6 +16,7 @@
       <li class="only-auth"><a href="forum.html"><span class="ico"><svg aria-hidden="true"><use href="#i-forum"/></svg></span> Forum</a></li>
       <li class="only-auth"><a href="messages.html"><span class="ico"><svg aria-hidden="true"><use href="#i-message"/></svg></span> Messages</a></li>
       <li class="only-auth"><a href="friends.html"><span class="ico"><svg aria-hidden="true"><use href="#i-users"/></svg></span> Friends</a></li>
+      <li class="only-auth"><a href="notifications.html"><span class="ico"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span> Notifications <span class="drawer-notification-count" hidden></span></a></li>
       <li class="only-auth"><a href="portfolio.html"><span class="ico"><svg aria-hidden="true"><use href="#i-bag"/></svg></span> My Portfolio</a></li>
       <li class="only-auth"><a href="create.html"><span class="ico"><svg aria-hidden="true"><use href="#i-add"/></svg></span> Add Item</a></li>
 
@@ -23,7 +25,3 @@
     </ul>
   </aside>
 </nav>
-
-
-
-

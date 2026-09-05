@@ -1,4 +1,5 @@
 import { getSupabaseClient } from './src/supabase-client.js';
+import { getUnreadNotificationCount } from './src/data/notifications.js';
 
 class AppMenu extends HTMLElement {
   static cache = null;
@@ -15,7 +16,8 @@ class AppMenu extends HTMLElement {
       <svg aria-hidden="true" style="position:absolute;width:0;height:0"><symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></symbol><symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8 3 3-2 2 2 2-3 3-2-2-3 3"/></symbol><symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.5-5 6-5s6 2 6 5M16 5.5a3 3 0 0 1 0 5.8M18 15c2 .6 3 2 3 4"/></symbol><symbol id="i-item" viewBox="0 0 24 24"><path d="m4 7 8-4 8 4-8 4zM4 7v10l8 4 8-4V7M12 11v10"/></symbol><symbol id="i-forum" viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 13h5"/></symbol><symbol id="i-message" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z"/><path d="M8 9h8M8 12h5"/></symbol><symbol id="i-bag" viewBox="0 0 24 24"><path d="M5 8h14l1 13H4zM8 8a4 4 0 0 1 8 0"/></symbol><symbol id="i-add" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/><circle cx="12" cy="12" r="9"/></symbol><symbol id="i-settings" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M4 12h-1m18 0h-1M12 4V3m0 18v-1M6.3 6.3l-.7-.7m13.1 13.1-.7-.7m0-12.4.7-.7M5.6 18.7l.7-.7"/></symbol><symbol id="i-exit" viewBox="0 0 24 24"><path d="M10 4H4v16h6M14 8l4 4-4 4M9 12h9"/></symbol></svg>
       <style>
         :host { position: fixed; top: 16px; right: 16px; z-index: 999; font-family:"Avenir Next","Segoe UI",system-ui,sans-serif; }
-        .menu { position: relative; display:flex; align-items:flex-start; justify-content:center; }
+        .menu { position: relative; display:flex; gap:8px; align-items:flex-start; justify-content:center; }
+        .notification-bell{position:relative;width:46px;height:46px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;background:rgba(15,14,14,.94);color:#f0ede6;border:1px solid #514644;text-decoration:none}.notification-bell svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.notification-count{position:absolute;top:-6px;right:-6px;min-width:19px;height:19px;padding:0 4px;box-sizing:border-box;display:grid;place-items:center;border-radius:999px;background:#d51f3e;color:white;border:2px solid #111;font-size:10px;font-weight:800}.drawer-notification-count{margin-left:auto;min-width:20px;text-align:center;padding:2px 5px;border-radius:999px;background:#b51f36;color:white;font-size:10px}
         .hamburger {
           width:46px; height:46px; font-size:18px; background:rgba(15,14,14,.94); color:#f0ede6; border:1px solid #514644;
           border-radius:2px; padding:8px 12px; cursor:pointer; box-shadow:0 10px 30px rgba(0,0,0,.34); backdrop-filter:blur(12px);
@@ -111,11 +113,33 @@ class AppMenu extends HTMLElement {
           await this.sb.auth.signOut();
           location.href = 'login.html';
         });
+        await this.refreshNotificationCount();
+        this._notificationTimer = setInterval(() => this.refreshNotificationCount(), 30000);
+        this._notificationChannel = this.sb.channel(`notifications:${session.user.id}`).on('postgres_changes', { event:'*', schema:'public', table:'notifications', filter:`recipient_id=eq.${session.user.id}` }, () => this.refreshNotificationCount()).subscribe();
+        this._visibilityHandler = () => { if (!document.hidden) this.refreshNotificationCount(); };
+        document.addEventListener('visibilitychange', this._visibilityHandler);
       } else {
         onlyAuth.forEach(el=>el.style.display='none');
         onlyGuest.forEach(el=>el.style.display='flex');
       }
     } catch(e){ console.error('Auth check error', e); }
+  }
+
+  async refreshNotificationCount() {
+    if (!this.sb) return;
+    try {
+      const count = await getUnreadNotificationCount(this.sb);
+      const compact = count > 99 ? '99+' : String(count);
+      const bell = this.shadowRoot.querySelector('.notification-bell');
+      for (const badge of this.shadowRoot.querySelectorAll('.notification-count,.drawer-notification-count')) { badge.textContent = compact; badge.hidden = count === 0; }
+      if (bell) bell.setAttribute('aria-label', count ? `Notifications, ${count} unread` : 'Notifications, none unread');
+    } catch (error) { console.warn('Notification count unavailable.', error); }
+  }
+
+  disconnectedCallback() {
+    if (this._notificationTimer) clearInterval(this._notificationTimer);
+    if (this._visibilityHandler) document.removeEventListener('visibilitychange', this._visibilityHandler);
+    if (this._notificationChannel && this.sb) this.sb.removeChannel(this._notificationChannel);
   }
 }
 customElements.define('app-menu', AppMenu);
